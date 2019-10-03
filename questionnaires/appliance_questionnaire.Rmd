@@ -1,0 +1,56 @@
+---
+title: "Appliance Questionnaire"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: paper
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.path = 'figures/',
+  warning = FALSE,
+  message = FALSE,
+  echo = FALSE,
+  fig.width = 10, fig.height = 4,
+  cache = FALSE)
+```
+
+---
+
+```{r}
+library(googlesheets)
+library(tidyverse)
+# gs_auth(new_user = TRUE)
+q_appl_info <- gs_title("Appliance Questionnaire (Responses)")
+q_appl <- gs_read(q_appl_info, col_types = cols(.default = "c"))
+```
+
+```{r}
+q_appl <- q_appl %>%
+  pivot_longer(-c("Visit", "Participant ID"),
+    names_to = "question",
+    values_to = "answer") %>%
+  rename_all(function(x){gsub(" ","_", tolower(x))})
+```
+
+```{r}
+questions <- as_tibble(unique(q_appl$question)) %>%
+  rename(question = "value") %>%
+  mutate(q = row.names(.))
+```
+
+```{r}
+q_appl <- q_appl %>%
+  left_join(questions, by = "question") %>%
+  dplyr::select(-question) %>%
+  mutate(answer = tolower(answer))
+```
+
+```{r}
+questions <- questions %>%
+  mutate(question = tolower(question))
+```
+
+---
+
