@@ -35,20 +35,20 @@ q_appl <- q_appl %>%
 ```
 
 ```{r}
-questions <- as_tibble(unique(q_appl$question)) %>%
+questions_appl <- as_tibble(unique(q_appl$question)) %>%
   rename(question = "value") %>%
   mutate(q = row.names(.))
 ```
 
 ```{r}
 q_appl <- q_appl %>%
-  left_join(questions, by = "question") %>%
+  left_join(questions_appl, by = "question") %>%
   dplyr::select(-question) %>%
   mutate(answer = tolower(answer))
 ```
 
 ```{r}
-questions <- questions %>%
+questions_appl <- questions_appl %>%
   mutate(question = tolower(question))
 ```
 
