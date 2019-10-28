@@ -12,7 +12,7 @@ knitr::opts_chunk$set(fig.path = 'figures/',
   warning = FALSE,
   message = FALSE,
   echo = FALSE,
-  fig.width = 10, fig.height = 4,
+  fig.width = 10, fig.height = 3,
   cache = FALSE)
 ```
 
@@ -20,5 +20,36 @@ knitr::opts_chunk$set(fig.path = 'figures/',
 
 ```{r}
 library(tidyverse)
-
 ```
+
+# Read
+
+```{r}
+nice_names <- function(name){
+  tolower(gsub("[^[:alnum:] ]", "", name))
+}
+```
+
+```{r}
+data_001 <- read_csv("../../data/omni/epic_001.csv", col_types = cols()) %>%
+  rename_all(nice_names) %>%
+  rename(datetime = "timestampamericadenver") %>%
+  pivot_longer(-datetime, names_to = "var", values_to = "val")
+data_001
+```
+
+---
+
+# Plot
+
+```{r fig_timeseries, fig.width = 8 , fig.height = 4}
+ggplot(data = data_001, aes(x = datetime, y = val, color = var)) +
+  geom_point() +
+  theme_bw() +
+  theme(legend.position = "none") +
+  facet_wrap(~var, ncol = 4, scales = "free_y") +
+  ylab("Value") + xlab("")
+```
+
+---
+
