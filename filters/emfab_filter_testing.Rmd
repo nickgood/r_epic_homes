@@ -1,0 +1,94 @@
+---
+title: "Filter Testing"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: paper
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.path = 'figures/',
+  warning = FALSE,
+  message = FALSE,
+  echo = FALSE,
+  fig.width = 7, fig.height = 4,
+  cache = FALSE)
+```
+
+```{r}
+library(readr)
+library(dplyr)
+library(purrr)
+library(ggplot2)
+library(tidyr)
+```
+
+
+```{r}
+files <- list.files("../../data", "^filter.*.csv$",
+  include.dirs = "TRUE",
+  full.names = TRUE)
+```
+
+# Read files
+
+```{r}
+data <- read_csv(files[2],
+                 col_types = cols())
+```
+
+# Analysis
+
+```{r}
+filter_data <- data %>%
+  group_by(date, filter_id) %>%
+  summarise(mass_mean = mean(mass)) %>%
+  ungroup() %>%
+  mutate(date = as.Date(date, format = "%m/%d/%Y"))
+```
+
+* Time series
+
+```{r fig_timeseries}
+ggplot(filter_data, aes(x = date, y = mass_mean, color = filter_id)) +
+  geom_point() +
+  geom_line() +
+  theme_bw() +
+  xlab("") +
+  theme(legend.position = "top")
+```
+
+(remove November 4th, no-equilibriation time before mass measurement)
+
+```{r fig_delta, fig.height=2, fig.width=7}
+delta_data <- filter_data %>%
+  filter(date != "2019-11-04") %>%
+  group_by(filter_id) %>%
+  summarise(d_mass = max(mass_mean) - min(mass_mean)) %>%
+  ungroup() %>%
+  mutate(d_conc = (d_mass * 1e3) / (7 * 24 * 60 * 1e-3)) %>%
+  pivot_longer(c("d_conc", "d_mass"),
+               names_to = "var", values_to = "val")
+
+ggplot(delta_data %>%
+       mutate(var = factor(var, levels =  c("d_conc", "d_mass"),
+                                labels = c("seven day 1 L/min conc. (ug/m^3)",
+                                          "change in mass (mg)"))),
+       aes(x = filter_id, y = val)) +
+  geom_point() +
+  facet_wrap(~var, scales = "free_y") +
+  theme_bw() +
+  xlab("") + ylab("")
+```
+
+* LOD
+
+```{r}
+lod <- delta_data %>%
+  group_by(var) %>%
+  summarise(lod = sd(val) * 3) %>%
+  ungroup()
+```
+
+This gives an LOD of `r round(lod$lod[2], 3)` milligrams, equivalent to `r round(lod$lod[1], 1)` $\mu g/m^{3}$ for a 7 day 1 L/min sample.
