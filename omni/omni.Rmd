@@ -42,13 +42,15 @@ data_001
 
 ---
 
-# Plot
+# Timeseries
 
 ```{r fig_timeseries, fig.width = 8 , fig.height = 4}
 ggplot(data = data_001, aes(x = datetime, y = val, color = var)) +
   geom_point() +
+  geom_line() +
   theme_bw() +
-  theme(legend.position = "none") +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle = 45, hjust = 1)) +
   facet_wrap(~var, ncol = 4, scales = "free_y") +
   ylab("Value") + xlab("")
 ```
