@@ -39,9 +39,10 @@ nice_names <- function(x){gsub(" ", "_", tolower(x))}
 ```
 
 ```{r}
-df <- read_csv(files[1], col_types = cols()) %>%
+df <- read_csv(files[2], col_types = cols()) %>%
   rename_all(nice_names) %>%
-  mutate(rep = as.factor(rep))
+  mutate(rep = as.factor(rep),
+         date = as.factor(date))
 ```
 
 * `r length(unique(df$filter_id))` unloaded filters,  repeated soot scan measurements
@@ -49,7 +50,7 @@ df <- read_csv(files[1], col_types = cols()) %>%
 # Plot
 
 ```{r fig_total_kwh}
-ggplot(df, aes(x = filter_id, y = ir, color = rep)) +
+ggplot(df, aes(x = filter_id, y = ir, color = date)) +
   geom_point() +
   theme_bw()
 ```
@@ -64,7 +65,7 @@ df_clean <- df %>%
   filter (!(filter_id == "001" & rep == "1")) %>%
   filter (!(filter_id == "002" & rep == "1")) %>%
   filter (!(filter_id == "003" & rep == "1")) %>%
-  group_by(filter_id) %>%
+  group_by(filter_id, date) %>%
   summarise(mean_ir = mean(ir, na.rm = TRUE)) %>%
   ungroup()
 ```
@@ -91,4 +92,4 @@ d_bc <- tibble(max = max(df_clean$mean_ir),
 ```
 
 
-For a `r duration_days` day sample, at `r flow_lpm` L/min, onto a `r filter_diam_mm` filter, the effective blank-to-blank variabilty in BC is `r round(d_bc$bc_conc[1], 1)` $\mu g/m^{-3}$, based on the maximum and minimum IR transmission. 
+For a `r duration_days` day sample, at `r flow_lpm` L/min, onto a `r filter_diam_mm` filter, repeated on `r length(unique(df_clean$date))` days, the effective blank-to-blank variabilty in BC is `r round(d_bc$bc_conc[1], 1)` $\mu g/m^{-3}$, based on the maximum and minimum IR transmission. 
