@@ -12,7 +12,7 @@ knitr::opts_chunk$set(fig.path = 'figures/',
   warning = FALSE,
   message = FALSE,
   echo = FALSE,
-  fig.width = 10, fig.height = 4,
+  fig.width = 8, fig.height = 4,
   cache = FALSE)
 ```
 
@@ -49,10 +49,11 @@ df <- read_csv(files[2], col_types = cols()) %>%
 
 # Plot
 
-```{r fig_total_kwh}
+```{r soot_scan_blanks}
 ggplot(df, aes(x = filter_id, y = ir, color = date)) +
   geom_point() +
-  theme_bw()
+  theme_bw() +
+  xlab("")
 ```
 
 
