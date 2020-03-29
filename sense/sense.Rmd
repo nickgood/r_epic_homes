@@ -39,16 +39,16 @@ nice_names <- function(x){gsub(" ", "_", tolower(x))}
 ```
 
 ```{r}
-df <- read_csv(files[1], skip = 1, col_types = cols()) %>%
+sense_data <- read_csv(files[1], skip = 1, col_types = cols()) %>%
   rename_all(nice_names) %>%
   mutate_if(is.character, tolower) %>%
-  mutate(datetime = force_tz(df$datetime, "US/Mountain"))
+  mutate(datetime = force_tz(datetime, "US/Mountain")) # asume timestamp is Mountain
 ```
 
 # Plot
 
 ```{r fig_total_kwh}
-ggplot(df %>% filter(name == "total usage"),
+ggplot(sense_data %>% filter(name == "total usage"),
   aes(x = datetime, y = kwh)) +
   geom_line() +
   geom_point(color = "#F9461C") +
