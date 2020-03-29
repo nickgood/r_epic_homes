@@ -1,0 +1,102 @@
+---
+title: "Outdoor Omni Testing"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: paper
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.path = 'figures/',
+  warning = FALSE,
+  message = FALSE,
+  echo = FALSE,
+  fig.width = 10, fig.height = 3,
+  cache = FALSE)
+```
+
+---
+
+```{r}
+library(httr)
+library(jsonlite)
+library(dplyr)
+library(purrr)
+library(tidyr)
+library(openair)
+library(ggplot2)
+library(readr)
+```
+
+```{r}
+source("../functions.R")
+```
+
+```{r}
+tkn <- "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjoiNjEyNzIifQ.NG3rGE-ANLX110LgLzHVvKns-owboJHtJjCLDndrqWk"
+```
+
+# Devices
+
+```{r}
+url <- "http://developer-apis.awair.is/v1/users/self/devices"
+
+result <- GET(url, add_headers(Authorization = paste("Bearer", tkn, sep = " ")))
+  
+devices <- content(result)
+```
+
+```{r}
+device_tbl <- as_tibble(devices) %>%
+  unnest_wider(devices) %>%
+  rename_all(tolower) %>%
+  filter(name == "outdoor")
+```
+
+---
+
+
+# Retrieve data
+
+Get the 5-minute data 
+
+```{r}
+data <- list(
+  date = seq.Date(as.Date("2020-03-08"), as.Date("2020-04-27"), 1),
+  device_id = device_tbl$deviceid[1]) %>%
+  cross_df() %>%
+  mutate(date_start = as.Date(date, origin = "1970-01-01"),
+         date_end = date_start + 1) %>%
+  mutate_all(as.character) %>%
+  select(date_start, date_end, device_id)
+
+data <- data %>% 
+  mutate(data = pmap(., omni_read_5min)) %>% 
+  filter(!is.na(data)) %>% 
+  unnest(cols = data) %>%
+  select(-date_start, -date_end, -timestamp) %>%
+  arrange(datetime_local) %>%
+  pivot_longer(c(-datetime_local, -device_id), names_to = "var", values_to = "val") %>%
+  mutate(val = as.numeric(val),
+         datetime_local = as.POSIXct(datetime_local))
+```
+
+```{r fig_timeseries, fig.height=8, fig.width=8}
+ggplot(data %>% filter(var != "lux"),
+  aes(x = datetime_local, y = val, color = var)) +
+  geom_point() +
+  facet_wrap(~var, ncol = 1, scales = "free_y") +
+  theme_bw() +
+  theme(legend.position = "none") +
+  xlab("") + ylab("")
+```
+
+---
+
+```{r fig_timevariation_pm25, fig.width=9, fig.height=6}
+ class(timeVariation(data %>%
+   filter(var == "pm25") %>%
+   rename(date = "datetime_local"),
+   pollutant = "val", ylab = "pm25 (ug/m3)"))
+```
