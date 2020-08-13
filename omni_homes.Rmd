@@ -18,3 +18,28 @@ knitr::opts_chunk$set(fig.path = 'figures/',
 
 ---
 
+```{r}
+source("functions_epic.R")
+```
+
+```{r}
+tkn <- "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjoiNjEyNzIifQ.NG3rGE-ANLX110LgLzHVvKns-owboJHtJjCLDndrqWk"
+```
+
+# Get Devices
+
+```{r}
+url <- "http://developer-apis.awair.is/v1/users/self/devices"
+
+result <- GET(url, add_headers(Authorization = paste("Bearer", tkn, sep = " ")))
+  
+devices <- content(result)
+```
+
+```{r}
+device_tbl <- as_tibble(devices) %>%
+  unnest_wider(devices) %>%
+  rename_all(tolower)
+```
+
+---
