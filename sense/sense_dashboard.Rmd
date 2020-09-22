@@ -55,7 +55,8 @@ data <- raw_data %>%
   left_join(meta %>% select("monitor_serial_number", "job_id"),
             by = c("serial_number" = "monitor_serial_number")) %>%
   mutate_if(is.character, tolower) %>%
-  filter(!is.na(job_id))
+  filter(!is.na(job_id)) %>%
+  distinct()
 ```
 
 ---
