@@ -22,24 +22,22 @@ knitr::opts_chunk$set(fig.path = 'figures/',
 source("functions_epic.R")
 ```
 
+# Get Devices
+
 ```{r}
-tkn <- "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1c2VyX2lkIjoiNjEyNzIifQ.NG3rGE-ANLX110LgLzHVvKns-owboJHtJjCLDndrqWk"
+url <- "https://developer-apis.awair.is/v1/orgs/{{2059}}/devices?filter=location_id={{epic_homes}}&page_size={{page_size}}&page_token={{page_token}}"
 ```
 
-# Get Devices
+
 
 ```{r}
 url <- "http://developer-apis.awair.is/v1/users/self/devices"
 
-result <- GET(url, add_headers(Authorization = paste("Bearer", tkn, sep = " ")))
-  
-devices <- content(result)
-```
-
-```{r}
-device_tbl <- as_tibble(devices) %>%
+device_tbl <- as_tibble(content(GET(url, add_headers(Authorization = paste("x-api-key", tkn, sep = " "))))) %>%
   unnest_wider(devices) %>%
   rename_all(tolower)
 ```
 
 ---
+
+# Homes
