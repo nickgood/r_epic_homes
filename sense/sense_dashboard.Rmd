@@ -13,6 +13,7 @@ knitr::opts_chunk$set(fig.path = 'figures/',
 ```
 
 ```{r}
+# reads source
 source("../functions_epic.R")
 ```
 
