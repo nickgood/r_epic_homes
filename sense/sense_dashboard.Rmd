@@ -52,7 +52,8 @@ raw_data <- map(f, read_sense) %>%
 ```{r}
 data <- raw_data %>%
   mutate(datetime = with_tz(datetime_utc, "US/Mountain")) %>%
-  select(datetime, serial_number, device_id, sense_device_name, device_type, consumption_kwh, avg_wattage) %>%
+  select(datetime, serial_number, device_id, sense_device_name, device_type,
+         consumption_kwh, avg_wattage) %>%
   left_join(meta %>% select("monitor_serial_number", "job_id"),
             by = c("serial_number" = "monitor_serial_number")) %>%
   mutate_if(is.character, tolower) %>%
