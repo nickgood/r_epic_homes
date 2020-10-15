@@ -79,5 +79,13 @@ ggplot(p_data, aes(x = datetime, y = consumption_kwh)) +
 
 ---
 
+# Write
+
+```{r}
+write_rds(data, "../output/sense_all.rds")
+```
+
+---
+
 
 
