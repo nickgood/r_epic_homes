@@ -22,7 +22,7 @@ source("../functions_epic.R")
 # Read metadata
 
 ```{r}
-f <- list.files("../../data/sense", ".csv$", full.names = TRUE)
+f <- list.files("../../data/sense/metadata", ".csv$", full.names = TRUE)
 
 meta <- read_csv(f, col_types = cols()) %>%
   rename_all(clean_names) %>%
@@ -78,4 +78,6 @@ ggplot(p_data, aes(x = datetime, y = consumption_kwh)) +
 ```
 
 ---
+
+
 
