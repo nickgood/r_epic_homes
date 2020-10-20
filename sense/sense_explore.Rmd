@@ -70,6 +70,37 @@ ggplot(device_data, aes(x = date, y = n, color = job_id)) +
 ```{r}
 device_data <- data %>%
   select(job_id, datetime, device_id, sense_device_name, device_type) %>%
-  filter(sense_device_name != "consumption" & sense_device_name != "always on")
+  filter(sense_device_name != "consumption" & sense_device_name != "always on") %>%
+  filter(grepl("dryer", sense_device_name) == TRUE) %>%
+  pull(sense_device_name) %>%
+  unique()
+device_data
 ```
+
+```{r}
+device_data <- data %>%
+  filter(grepl("dryer", sense_device_name) == TRUE) %>%
+  group_by(job_id) %>%
+  summarise_all(first)
+
+device_data
+```
+
+So far the SENSE has identified dryers in `r nrow(device_data)` homes.
+
+```{r}
+device_data <- data %>%
+  filter(grepl("dryer", sense_device_name) == TRUE) %>%
+  mutate(date = as.Date(datetime)) %>%
+  filter(job_id != "013")
+```
+
+```{r fig_dryer, fig.width=10, fig.height=6}
+ggplot(device_data, aes(x = datetime, y = avg_wattage, group = date, color = job_id)) +
+  geom_boxplot(outlier.size = 0.25, outlier.alpha = 0.5) +
+  theme_bw() +
+  facet_wrap(~job_id, scales = "free", ncol = 2) +
+  xlab("")
+```
+
 
