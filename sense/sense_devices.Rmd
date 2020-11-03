@@ -35,7 +35,25 @@ device_data <- data %>%
 device_data
 ```
 
+# Device Compumption Summary
 
+```{r}
+device_data <- data %>%
+  filter(sense_device_name != "consumption" & sense_device_name != "always on") %>%
+  select(job_id, datetime, sense_device_name, consumption_kwh) %>%
+  mutate(date = as.Date(datetime)) %>%
+  group_by(job_id, date, sense_device_name) %>%
+  summarise(consumption = sum(consumption_kwh), .groups = "drop")
+```
+
+```{r}
+ggplot(device_data, aes(x = date, y = consumption, fill = sense_device_name)) +
+  geom_bar(stat = "identity") +
+  theme_bw() +
+  facet_wrap(~job_id, ncol = 4, scales = "free") +
+  scale_y_log10() +
+  xlab("")
+```
 
 
 
