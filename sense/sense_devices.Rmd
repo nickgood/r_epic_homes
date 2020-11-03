@@ -1,0 +1,41 @@
+---
+title: "Sense Explore"
+output: html_document
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.path = 'figures/',
+  warning = FALSE,
+  message = FALSE,
+  echo = FALSE,
+  fig.width = 10, fig.height = 3,
+  cache = FALSE)
+```
+
+```{r}
+# reads source
+source("../functions_epic.R")
+```
+
+```{r}
+data <- read_rds("../output/sense_all.rds")
+```
+
+---
+
+# Devices
+
+```{r}
+device_data <- data %>%
+  select(job_id, datetime, device_id, sense_device_name, device_type) %>%
+  filter(sense_device_name != "consumption" & sense_device_name != "always on") %>%
+  pull(sense_device_name) %>%
+  unique()
+
+device_data
+```
+
+
+
+
+
