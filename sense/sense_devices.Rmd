@@ -60,5 +60,3 @@ ggplot(device_data, aes(x = date, y = consumption, fill = device)) +
   xlab("")
 ```
 
-
-
