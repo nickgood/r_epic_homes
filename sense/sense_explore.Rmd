@@ -79,6 +79,9 @@ device_data
 
 ```{r}
 device_data <- data %>%
+  mutate(device = as.factor(sense_device_name),
+         device = fct_collapse(device,
+                  drier = c("dryer", "dryer 2"))) %>%
   filter(grepl("dryer", sense_device_name) == TRUE) %>%
   group_by(job_id) %>%
   summarise_all(first)
