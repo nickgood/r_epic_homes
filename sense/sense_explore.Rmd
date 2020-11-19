@@ -103,4 +103,13 @@ ggplot(device_data, aes(x = datetime, y = avg_wattage, group = date, color = job
   xlab("")
 ```
 
+```{r}
+device_data <-%>%
+  filter(sense_device_name != "consumption" & sense_device_name != "always on")%>%
+  select(job_id, datetime, device_id, )
+
+
+
+
+
 
