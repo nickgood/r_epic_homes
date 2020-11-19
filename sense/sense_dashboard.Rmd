@@ -12,7 +12,7 @@ knitr::opts_chunk$set(fig.path = 'figures/',
   cache = FALSE)
 ```
 
-```{r}
+```{r files}
 # reads source
 source("../functions_epic.R")
 ```
@@ -21,7 +21,7 @@ source("../functions_epic.R")
 
 # Read metadata
 
-```{r}
+```{r meta}
 f <- list.files("../../data/sense/metadata", ".csv$", full.names = TRUE)
 
 meta <- read_csv(f, col_types = cols()) %>%
@@ -33,7 +33,7 @@ meta <- read_csv(f, col_types = cols()) %>%
 
 # Read data
 
-```{r}
+```{r }
 f <- list.files("../../data/sense/homes", ".csv$", full.names = TRUE)
 
 read_sense <- function(f){
