@@ -81,8 +81,8 @@ device_data
 device_data <- data %>%
   mutate(device = as.factor(sense_device_name),
          device = fct_collapse(device,
-                  drier = c("dryer", "dryer 2"))) %>%
-  filter(grepl("dryer", sense_device_name) == TRUE) %>%
+                  dryer = c("dryer", "dryer 2"))) %>%
+  filter(grepl("dryer", device) == TRUE) %>%
   group_by(job_id) %>%
   summarise_all(first)
 
@@ -93,6 +93,9 @@ So far the SENSE has identified dryers in `r nrow(device_data)` homes.
 
 ```{r}
 device_data <- data %>%
+  mutate(device = as.factor(sense_device_name),
+         device = fct_collapse(device,
+                  dryer = c("dryer", "dryer 2"))) %>%
   filter(grepl("dryer", sense_device_name) == TRUE) %>%
   mutate(date = as.Date(datetime)) %>%
   filter(job_id != "013")
@@ -105,5 +108,70 @@ ggplot(device_data, aes(x = datetime, y = avg_wattage, group = date, color = job
   facet_wrap(~job_id, scales = "free", ncol = 2) +
   xlab("")
 ```
+
+# Washer
+
+```{r}
+device_data <- data %>%
+  select(job_id, datetime, device_id, sense_device_name, device_type) %>%
+  filter(sense_device_name != "consumption" & sense_device_name != "always on") %>%
+  filter(grepl("washer", sense_device_name) == TRUE) %>%
+  pull(sense_device_name) %>%
+  unique()
+device_data
+```
+
+```{r}
+device_data <- data %>%
+  mutate(device = as.factor(sense_device_name)) %>%
+  filter(grepl("^washer", device) == TRUE) %>%
+  group_by(job_id) %>%
+  summarise_all(first)
+
+device_data
+```
+
+So far the SENSE has identified washers in `r nrow(device_data)` homes.
+
+```{r}
+device_data <- data %>%
+  mutate(device = as.factor(sense_device_name)) %>%
+  filter(grepl("^washer", sense_device_name) == TRUE) %>%
+  mutate(date = as.Date(datetime))
+```
+
+```{r fig_washer, fig.width=10, fig.height=6}
+ggplot(device_data, aes(x = datetime, y = avg_wattage, group = date, color = job_id)) +
+  geom_boxplot(outlier.size = 0.25, outlier.alpha = 0.5) +
+  theme_bw() +
+  facet_wrap(~job_id, scales = "free", ncol = 2) +
+  xlab("") +
+  ggtitle("Washer Data")
+```
+
+
+```{r}
+n_homes <- length(unique(data$job_id))
+
+out <- data %>%
+  group_by(job_id, device_type) %>%
+  summarise_all(first) %>%
+  select(job_id, device_type) %>%
+  na.omit() %>%
+  group_by(device_type) %>%
+  count() %>%
+  mutate(pct = 100 * n / n_homes)
+```
+
+```{r}
+ggplot(out, aes(x = fct_reorder(device_type, pct, .desc = TRUE), y = pct)) +
+  geom_col() +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90)) +
+  xlab("") + ylab("Homes with device detected (%)")
+```
+
+
+
 
 
