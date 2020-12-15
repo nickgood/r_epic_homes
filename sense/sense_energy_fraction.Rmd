@@ -73,7 +73,3 @@ ggplot(device_frac_pct, aes(x = datetime, y = device_pct_watts)) +
 
 ---
 
-
-
-
-
