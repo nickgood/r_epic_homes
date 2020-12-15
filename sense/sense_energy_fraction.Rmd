@@ -46,7 +46,7 @@ devices <- data %>%
   filter(device_id != "always_on" & device_id != "mains") %>%
   select(job_id, datetime, consumption_kwh, avg_wattage) %>%
   group_by(job_id, datetime) %>%
-  summarise(devices_consumption = sum(consumption_kwh, na.rm = TRUE),
+  summarise(consumption_devices = sum(consumption_kwh, na.rm = TRUE),
             watts_devices = sum(avg_wattage, na.rm = TRUE),
             .groups = "drop")
 ```
