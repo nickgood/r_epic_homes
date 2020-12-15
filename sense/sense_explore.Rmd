@@ -171,7 +171,3 @@ ggplot(out, aes(x = fct_reorder(device_type, pct, .desc = TRUE), y = pct)) +
   xlab("") + ylab("Homes with device detected (%)")
 ```
 
-
-
-
-
