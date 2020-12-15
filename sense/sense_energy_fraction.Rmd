@@ -20,3 +20,60 @@ source("../functions_epic.R")
 ```{r}
 data <- read_rds("../output/sense_all.rds")
 ```
+
+# Organize Data
+
+```{r}
+mains <- data %>%
+  group_by(job_id) %>%
+  filter(device_id == "mains") %>%
+  select(job_id, datetime, consumption_kwh, avg_wattage) %>% 
+  rename(consumption_total = "consumption_kwh",
+         watts_total = "avg_wattage")
+```
+
+```{r}
+always_on <- data %>%
+  group_by(job_id) %>%
+  filter(device_id == "always_on") %>%
+  select(job_id, datetime, consumption_kwh, avg_wattage) %>% 
+  rename(consumption_alwayson = "consumption_kwh",
+         watts_alwayson = "avg_wattage")
+```
+
+```{r}
+devices <- data %>%
+  filter(device_id != "always_on" & device_id != "mains") %>%
+  select(job_id, datetime, consumption_kwh, avg_wattage) %>%
+  group_by(job_id, datetime) %>%
+  summarise(devices_consumption = sum(consumption_kwh, na.rm = TRUE),
+            watts_devices = sum(avg_wattage, na.rm = TRUE),
+            .groups = "drop")
+```
+
+```{r}
+device_frac <- mains %>% 
+  left_join(always_on, by = c("job_id", "datetime")) %>%
+  left_join(devices, by = c("job_id", "datetime"))
+```
+
+```{r}
+device_frac_pct <- device_frac %>%
+  mutate(device_pct_watts = 100 * (watts_alwayson + watts_devices) / watts_total,
+         device_pct_kwh = 100 * (consumption_alwayson + consumption_devices) / consumption_total)
+```
+
+```{r fig_timeseries_devicefrac, fig.width = 10, fig.height=10}
+ggplot(device_frac_pct, aes(x = datetime, y = device_pct_watts)) +
+  geom_point() +
+  geom_line() +
+  theme_bw() +
+  facet(~job_id, ncol = 2, scales = "free_y")
+```
+
+---
+
+
+
+
+
