@@ -87,5 +87,102 @@ write_rds(data, "../output/sense_all.rds")
 
 ---
 
+```{r}
+grouped_data <- data
 
+grouped_data$sense_device_name <- gsub("coffee maker","kitchen appliances",grouped_data$sense_device_name)
+grouped_data$sense_device_name <- gsub("coffee maker 2","kitchen appliances",grouped_data$sense_device_name)
+grouped_data$sense_device_name <- gsub("dishwasher","kitchen appliances",grouped_data$sense_device_name)
+grouped_data$sense_device_name <- gsub("disposal","kitchen appliances",grouped_data$sense_device_name)
+grouped_data$sense_device_name <- gsub("microwave","kitchen appliances",grouped_data$sense_device_name)
+grouped_data$sense_device_name <- gsub("stove","kitchen appliances",grouped_data$sense_device_name)
+grouped_data$sense_device_name <- gsub("stove 1","kitchen appliances",grouped_data$sense_device_name)
+grouped_data$sense_device_name <- gsub("stove 2","kitchen appliances",grouped_data$sense_device_name)
+grouped_data$sense_device_name <- gsub("stove 3","kitchen appliances",grouped_data$sense_device_name)
+grouped_data$sense_device_name <- gsub("kitchen appliances 2","kitchen appliances",grouped_data$sense_device_name)
+grouped_data$sense_device_name <- gsub("kitchen appliances 3","kitchen appliances",grouped_data$sense_device_name)
+
+grouped_data$sense_device_name <- gsub("ac","ventilation",grouped_data$sense_device_name)
+grouped_data$sense_device_name <- gsub("ac 2","ventilation",grouped_data$sense_device_name)
+grouped_data$sense_device_name <- gsub("furnance","ventilation",grouped_data$sense_device_name)
+grouped_data$sense_device_name <- gsub("fan","ventilation",grouped_data$sense_device_name)
+grouped_data$sense_device_name <- gsub("furnance","ventilation",grouped_data$sense_device_name)
+grouped_data$sense_device_name <- gsub("ventilation 2", "ventilation", grouped_data$sense_device_name)
+grouped_data$sense_device_name <- gsub("furnventilatione","ventilation",grouped_data$sense_device_name)
+grouped_data$sense_device_name <- gsub("vventilationuum","ventilation",grouped_data$sense_device_name)
+
+grouped_data$sense_device_name <- gsub("fridge 2","fridge",grouped_data$sense_device_name)
+
+grouped_data$sense_device_name <- gsub("heat 1","heat",grouped_data$sense_device_name)
+grouped_data$sense_device_name <- gsub("heat 2","heat",grouped_data$sense_device_name)
+grouped_data$sense_device_name <- gsub("heat 3","heat",grouped_data$sense_device_name)
+grouped_data$sense_device_name <- gsub("heat 4","heat",grouped_data$sense_device_name)
+grouped_data$sense_device_name <- gsub("heat 5","heat",grouped_data$sense_device_name)
+grouped_data$sense_device_name <- gsub("heat 6","heat",grouped_data$sense_device_name)
+grouped_data$sense_device_name <- gsub("heat 7","heat",grouped_data$sense_device_name)
+grouped_data$sense_device_name <- gsub("heat 8","heat",grouped_data$sense_device_name)
+grouped_data$sense_device_name <- gsub("heat 9","heat",grouped_data$sense_device_name)
+
+grouped_data$sense_device_name <- gsub("motor 1","motor",grouped_data$sense_device_name)
+grouped_data$sense_device_name <- gsub("motor 2","motor",grouped_data$sense_device_name)
+
+grouped_data$sense_device_name <- gsub("pump 2","pump",grouped_data$sense_device_name)
+
+unique(grouped_data$sense_device_name)
+```
+
+```{r}
+home_009 <- grouped_data %>%
+  filter(job_id == "009") %>%
+  filter(sense_device_name != "consumption" & sense_device_name != "always on") %>%
+  mutate(date = as.Date(datetime)) %>%
+  select(job_id, datetime, sense_device_name, consumption_kwh)
+```
+
+```{r}
+ggplot(home_009, aes(x = datetime, y = consumption_kwh)) +
+  geom_line(aes(color = sense_device_name, linetype = sense_device_name))
+```
+```{r}
+ggplot(home_009, aes(x = datetime, y = consumption_kwh)) +
+  geom_smooth(aes(color = sense_device_name, linetype = sense_device_name))
+```
+
+```{r}
+home_008 <- grouped_data %>%
+  filter(job_id == "008") %>%
+  filter(sense_device_name != "consumption" & sense_device_name != "always on") %>%
+  mutate(date = as.Date(datetime)) %>%
+  select(job_id, datetime, sense_device_name, consumption_kwh)
+```
+
+```{r}
+ggplot(home_008, aes(x = datetime, y = consumption_kwh)) +
+  geom_smooth(aes(color = sense_device_name, linetype = sense_device_name))
+```
+```{r}
+ggplot(home_008, aes(x = datetime, y = consumption_kwh)) +
+  geom_line(aes(color = sense_device_name, linetype = sense_device_name))
+```
+
+```{r}
+home_004 <- grouped_data %>%
+  filter(job_id == "004") %>%
+  filter(sense_device_name != "consumption" & sense_device_name != "always on") %>%
+  mutate(date = as.Date(datetime)) %>%
+  select(job_id, datetime, sense_device_name, consumption_kwh)
+```
+```{r}
+ggplot(home_004, aes(x = datetime, y = consumption_kwh)) +
+  geom_smooth(aes(color = sense_device_name, linetype = sense_device_name))
+```
+```{r}
+ggplot(home_004, aes(x = datetime, y = consumption_kwh)) +
+  geom_line(aes(color = sense_device_name, linetype = sense_device_name))
+```
+
+```{r}
+ggplot(home_009, aes(x=datetime, y=consumption_kwh, fill=sense_device_name)) + 
+    geom_area()
+```
 
