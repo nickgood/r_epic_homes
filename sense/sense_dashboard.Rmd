@@ -88,6 +88,8 @@ write_rds(data, "../output/sense_all.rds")
 ---
 
 ```{r}
+
+#Grouping devices based on domain
 grouped_data <- data
 
 grouped_data$sense_device_name <- gsub("coffee maker","kitchen appliances",grouped_data$sense_device_name)
