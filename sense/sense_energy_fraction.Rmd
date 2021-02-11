@@ -68,7 +68,7 @@ ggplot(device_frac_pct, aes(x = datetime, y = device_pct_watts)) +
   geom_point() +
   geom_line() +
   theme_bw() +
-  facet(~job_id, ncol = 2, scales = "free_y")
+  facet_wrap(~job_id, ncol = 2, scales = "free_y")
 ```
 
 ---
