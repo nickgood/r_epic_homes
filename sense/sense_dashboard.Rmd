@@ -130,6 +130,16 @@ grouped_data$sense_device_name <- gsub("motor 2","motor",grouped_data$sense_devi
 
 grouped_data$sense_device_name <- gsub("pump 2","pump",grouped_data$sense_device_name)
 
+grouped_data$sense_device_name <- gsub("light 1","light",grouped_data$sense_device_name)
+grouped_data$sense_device_name <- gsub("light 2","light",grouped_data$sense_device_name)
+grouped_data$sense_device_name <- gsub("light 3","light",grouped_data$sense_device_name)
+grouped_data$sense_device_name <- gsub("light 4","light",grouped_data$sense_device_name)
+grouped_data$sense_device_name <- gsub("light 5","light",grouped_data$sense_device_name)
+grouped_data$sense_device_name <- gsub("light 6","light",grouped_data$sense_device_name)
+grouped_data$sense_device_name <- gsub("light 7","light",grouped_data$sense_device_name)
+grouped_data$sense_device_name <- gsub("light 8","light",grouped_data$sense_device_name)
+grouped_data$sense_device_name <- gsub("light 9","light",grouped_data$sense_device_name)
+
 unique(grouped_data$sense_device_name)
 ```
 
@@ -171,12 +181,14 @@ ggplot(home_008, aes(x = datetime, y = consumption_kwh)) +
 home_004 <- grouped_data %>%
   filter(job_id == "004") %>%
   filter(sense_device_name != "consumption" & sense_device_name != "always on") %>%
+  filter(consumption_kwh != 0) %>%
   mutate(date = as.Date(datetime)) %>%
   select(job_id, datetime, sense_device_name, consumption_kwh)
 ```
+
 ```{r}
 ggplot(home_004, aes(x = datetime, y = consumption_kwh)) +
-  geom_smooth(aes(color = sense_device_name, linetype = sense_device_name))
+  geom_line(aes(color = sense_device_name, linetype = sense_device_name))
 ```
 ```{r}
 ggplot(home_004, aes(x = datetime, y = consumption_kwh)) +
@@ -184,7 +196,50 @@ ggplot(home_004, aes(x = datetime, y = consumption_kwh)) +
 ```
 
 ```{r}
-ggplot(home_009, aes(x=datetime, y=consumption_kwh, fill=sense_device_name)) + 
+ggplot(home_004, aes(x=datetime, y=consumption_kwh, fill=sense_device_name)) + 
     geom_area()
+```
+```{r}
+home_005 <- grouped_data %>%
+  filter(job_id == "005") %>%
+  filter(sense_device_name != "consumption" & sense_device_name != "always on") %>%
+  mutate(date = as.Date(datetime)) %>%
+  select(job_id, datetime, sense_device_name, consumption_kwh, avg_wattage)
+
+test_data_005 <- home_005 %>%
+  filter(job_id == "005") %>%
+  rename(date = datetime)
+
+  timeVariation(test_data_005, pollutant = "avg_wattage", ylab = "W", group = "sense_device_name")
+
+```
+```{r}
+home_009 <- grouped_data %>%
+  filter(job_id == "009") %>%
+  filter(sense_device_name != "consumption" & sense_device_name != "always on") %>%
+  mutate(date = as.Date(datetime)) %>%
+  select(job_id, datetime, sense_device_name, consumption_kwh, avg_wattage)
+
+test_data_009 <- home_009 %>%
+  filter(job_id == "009") %>%
+  rename(date = datetime)
+
+  timeVariation(test_data_009, pollutant = "avg_wattage", ylab = "W", group = "sense_device_name")
+  timeVariation(test_data_009, pollutant = "avg_wattage", ylab = "W")
+```
+
+```{r}
+home_008 <- grouped_data %>%
+  filter(job_id == "008") %>%
+  filter(sense_device_name != "consumption" & sense_device_name != "always on") %>%
+  mutate(date = as.Date(datetime)) %>%
+  select(job_id, datetime, sense_device_name, consumption_kwh, avg_wattage)
+
+test_data_008 <- home_008 %>%
+  filter(job_id == "008") %>%
+  rename(date = datetime)
+
+  timeVariation(test_data_008, pollutant = "avg_wattage", ylab = "W", group = "sense_device_name")
+  timeVariation(test_data_008, pollutant = "avg_wattage", ylab = "W")
 ```
 
