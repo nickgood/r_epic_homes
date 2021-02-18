@@ -24,6 +24,7 @@ library(openair)
 library(ggplot2)
 library(readr)
 library(lubridate)
+library(geofacet)
 ```
 
 ---
@@ -31,7 +32,7 @@ library(lubridate)
 # Read data
 
 ```{r}
-files <- list.files("../../data/sense", ".*.csv$", full.names = "TRUE")
+files <- list.files("../../data/sense/homes", ".*.csv$", full.names = "TRUE")
 ```
 
 ```{r}
@@ -39,9 +40,10 @@ nice_names <- function(x){gsub(" ", "_", tolower(x))}
 ```
 
 ```{r}
-sense_data <- read_csv(files[1], skip = 1, col_types = cols()) %>%
+sense_data <- read_csv(files[1], skip = 0, col_types = cols()) %>%
   rename_all(nice_names) %>%
   mutate_if(is.character, tolower) %>%
+  rename(datetime="datetime_(utc)") %>%
   mutate(datetime = force_tz(datetime, "US/Mountain")) # asume timestamp is Mountain
 ```
 
