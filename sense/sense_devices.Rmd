@@ -42,15 +42,16 @@ device_data <- data %>%
   filter(sense_device_name != "consumption" & sense_device_name != "always on") %>%
   select(job_id, datetime, sense_device_name, consumption_kwh) %>%
   mutate(date = as.Date(datetime),
-         device = fct_collapse(sense_device_name,
+         device = fct_collapse(sense_device_name, 
                              ac = c("ac", "ac 2"),
                              coffee = c("coffee maker", "coffee maker 2"),
-                             drier = c("drier", "drier 2"),
+                             drier = c("drier 1", "drier 2"),
                              heat = c("heat", "heat 1", "heat 2", "heat 3", "heat 4",
                                       "heat 5", "heat 6", "heat 7", "heat 8", "heat 9"),
-                             light = c("light 1", "light 2", "light 3", "light 4",),
+                            light = c("light 1", "light 2", "light 3", "light 4"),
                              fridge = c("fridge 1", "fridge 2"),
                              stove = c("stove 1", "stove 2"),
+                            unknown = c("device 1", "device 2"),
                              motor = c("motor 1", "motor 2"))) %>%
   group_by(job_id, date, device) %>%
   summarise(consumption = sum(consumption_kwh), .groups = "drop")
