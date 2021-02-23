@@ -20,3 +20,22 @@ source("../functions_epic.R")
 ```{r}
 data <- read_rds("../output/sense_all.rds")
 ```
+
+```{r}
+hourly <- data %>%
+  mutate(year = year(datetime),
+         month = month(datetime),
+         day = day(datetime),
+         hod = hour(datetime)) %>%
+  group_by(job_id, year, month, day, hod, device_id, sense_device_name, device_type) %>%
+  summarise(datetime = mean(datetime, na.rm = TRUE),
+            kwh_sum = sum(consumption_kwh, na.rm = TRUE),
+            watts_avg = mean(avg_wattage, na.rm = TRUE),
+            .groups = "drop")
+```
+
+```{r}
+rm(data)
+```
+
+
