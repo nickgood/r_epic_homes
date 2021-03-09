@@ -43,7 +43,8 @@ hourly <- data %>%
 hourly <- hourly %>%
   filter(!grepl("mains|always_on", device_id)) %>%
   mutate(device = sub("^(.*)( .*)$","\\1", sense_device_name),
-         device = if_else(device == "water", "water heater", device))
+         device = if_else(device == "water", "water heater", device),
+         device = if_else(device == "coffee", "coffee maker", device))
 ```
 
 ```{r}
@@ -57,8 +58,7 @@ rm(data)
 ```{r}
 home_008 <- hourly %>%
   filter(job_id == "008", !grepl("mains|always_on", device_id)) %>%
-  mutate(device = sub("^(.*)( .*)$","\\1", sense_device_name),
-         device = if_else(device == "water", "water heater", device))
+  mutate(device = sub("^(.*)( .*)$","\\1", sense_device_name))
 ```
 
 ```{r}
@@ -84,6 +84,18 @@ ggplot(hourly, aes(fill=device, y = kwh_sum, x = hod)) +
 
 ---
 
+
+
+```{r, fig.width=10, fig.height=30}
+ggplot(hourly, aes(y = watts_avg, x = factor(hod), color = device)) +
+  geom_boxplot() +
+  theme_bw() +
+  xlab("Hour of day") + ylab ("Consumption (kWh)") +
+  facet_wrap(~device, ncol = 1, scales = "free")
+```
+
+
+---
 
 ```{r fig.width = 10, fig.height = 10}
 pump_motor <- hourly %>%
