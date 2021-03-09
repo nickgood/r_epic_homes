@@ -111,14 +111,6 @@ ggplot(hourly %>% filter(grepl("008", job_id)),
   facet_wrap(~device, ncol = 1, scales = "free")
 ```
 
-
-
-
-
-
-
-
-
 ---
 
 ```{r fig.width = 10, fig.height = 10}
@@ -134,3 +126,13 @@ ggplot(pump_motor, aes(fill=device, y = kwh_sum, x = hod)) +
   scale_x_continuous(breaks = seq(0, 24, 6), minor_breaks = seq(3, 21, 6)) +
   ggtitle("Pumps and motors")
 ```
+
+# Total
+
+```{r}
+#df <- hourly %>% 
+#group_by(job_id, month, device) %>% 
+#summarize(kw = sum(kwh_sum, na.rm = TRUE))
+```
+
+
