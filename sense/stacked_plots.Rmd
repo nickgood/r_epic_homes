@@ -84,15 +84,39 @@ ggplot(hourly, aes(fill=device, y = kwh_sum, x = hod)) +
 
 ---
 
-
-
 ```{r, fig.width=10, fig.height=30}
 ggplot(hourly, aes(y = watts_avg, x = factor(hod), color = device)) +
   geom_boxplot() +
   theme_bw() +
-  xlab("Hour of day") + ylab ("Consumption (kWh)") +
+  xlab("Hour of day") + ylab ("Power (W)") +
   facet_wrap(~device, ncol = 1, scales = "free")
 ```
+
+
+```{r, fig.width=10, fig.height=30}
+ggplot(hourly %>% filter(grepl("^ac$", device)),
+       aes(y = watts_avg, x = factor(hod), color = device)) +
+  geom_boxplot() +
+  theme_bw() +
+  xlab("Hour of day") + ylab ("Power (W)") +
+  facet_wrap(~job_id, ncol = 1, scales = "free")
+```
+
+```{r, fig.width=10, fig.height=30}
+ggplot(hourly %>% filter(grepl("008", job_id)),
+       aes(y = watts_avg, x = factor(hod), color = device)) +
+  geom_boxplot() +
+  theme_bw() +
+  xlab("Hour of day") + ylab ("Power (W)") +
+  facet_wrap(~device, ncol = 1, scales = "free")
+```
+
+
+
+
+
+
+
 
 
 ---
