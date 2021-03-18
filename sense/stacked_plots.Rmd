@@ -135,4 +135,8 @@ ggplot(pump_motor, aes(fill=device, y = kwh_sum, x = hod)) +
 #summarize(kw = sum(kwh_sum, na.rm = TRUE))
 ```
 
+```{r}
+#Sum of consumption over hours/month/week
+```
+
 
