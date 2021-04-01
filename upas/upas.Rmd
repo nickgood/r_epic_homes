@@ -83,7 +83,9 @@ summary_info_f <- function(file){
 ```{r}
 summary_info <- map(files, summary_info_f) %>%
   bind_rows() %>%
-  mutate(out = str_split(info, "_"))
+  mutate(visit = gsub("^(.*)_(.*)_(.*)_(.*)(.txt$)", "\\2", info),
+         id = gsub("^(.*)_(.*)_(.*)_(.*)(.txt$)", "\\3", info),
+         location = gsub("^(.*)_(.*)_(.*)_(.*)(.txt$)", "\\4", info))
 ```
 
 ---
@@ -98,7 +100,10 @@ data_f <- function(file){
   select(datetimelocal, volumetricflowrate, pumpt, pcbt, fdpt, bfgvolt) %>%
   rename(datetime = "datetimelocal", flow = "volumetricflowrate",
          battery = "bfgvolt") %>%
-  mutate(datetime = ymd_hms(datetime, tz = "US/Mountain")) %>%
+  mutate(datetime = sub("T"," ", datetime),
+         datetime = as.POSIXct(strptime(datetime,
+                                        format = "%Y-%m-%d %T",
+                                        tz = "US/Mountain"))) %>%
   mutate_if(is.character, as.numeric) %>%
   mutate(battery = 100 * battery / 4,
          info = basename(file))
@@ -108,9 +113,10 @@ data_f <- function(file){
 ```{r}
 data <- map(files, data_f) %>%
   bind_rows() %>%
-  mutate(id = str_split(info, "_")[[1]][3],
-         visit = sub("visit", "", str_split(info, "_")[[1]][2]),
-         location = sub(".txt", "", str_split(info, "_")[[1]][4]))
+  mutate(visit = gsub("^(.*)_(.*)_(.*)_(.*)(.txt$)", "\\2", info),
+         id = gsub("^(.*)_(.*)_(.*)_(.*)(.txt$)", "\\3", info),
+         location = gsub("^(.*)_(.*)_(.*)_(.*)(.txt$)", "\\4", info))
+```
 ```
 
 ---
