@@ -92,10 +92,12 @@ ggplot(blanks, aes(y = conc)) +
   ggtitle("Blanks")
 ```
 
+
 ```{r}
 lod <- sd(blanks$conc, na.rm = TRUE) * 3
-lod
 ```
+
+The LOD is currently `r round(lod, 3)`.
 
 ```{r}
 ggplot(meta, aes(x = as.numeric(duration) /24 )) +
