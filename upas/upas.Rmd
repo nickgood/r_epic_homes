@@ -84,9 +84,15 @@ summary_info_f <- function(file){
 summary_info <- map(files, summary_info_f) %>%
   bind_rows() %>%
   mutate(visit = gsub("^(.*)_(.*)_(.*)_(.*)(.txt$)", "\\2", info),
-         id = gsub("^(.*)_(.*)_(.*)_(.*)(.txt$)", "\\3", info),
+         visit = str_pad(sub("visit", "", visit), 2, "left", "0"),
+         id_home = gsub("^(.*)_(.*)_(.*)_(.*)(.txt$)", "\\3", info),
          location = gsub("^(.*)_(.*)_(.*)_(.*)(.txt$)", "\\4", info)) %>%
-  mutate_at(vars(contains("datetime")), upas_to_datetime)
+  mutate_at(vars(contains("datetime")), upas_to_datetime) %>%
+  select(-startdatetimeutc, -enddatetimeutc) %>%
+  rename(start = "startdatetimelocal",
+         end = "enddatetimelocal",
+         volume = "sampledvolume",
+         duration = "sampledruntime")
 ```
 
 ---
