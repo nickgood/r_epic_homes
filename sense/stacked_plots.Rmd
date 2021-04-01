@@ -1,0 +1,138 @@
+---
+title: "Stacked Plots"
+output: html_document
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.path = 'figures/',
+  warning = FALSE,
+  message = FALSE,
+  echo = FALSE,
+  fig.width = 10, fig.height = 3,
+  cache = FALSE)
+```
+
+```{r}
+# reads source
+source("../functions_epic.R")
+```
+
+```{r}
+data <- read_rds("../output/sense_all.rds")
+```
+
+---
+
+# Hourly data
+
+```{r}
+hourly <- data %>%
+  mutate(year = year(datetime),
+         month = month(datetime),
+         day = day(datetime),
+         hod = hour(datetime)) %>%
+  group_by(job_id, year, month, day, hod, device_id, sense_device_name, device_type) %>%
+  summarise(datetime = mean(datetime, na.rm = TRUE),
+            kwh_sum = sum(consumption_kwh, na.rm = TRUE),
+            watts_avg = mean(avg_wattage, na.rm = TRUE,
+            watts_max = max(avg_wattage, na.rm = TRUE)),
+            .groups = "drop")
+```
+
+```{r}
+hourly <- hourly %>%
+  filter(!grepl("mains|always_on", device_id)) %>%
+  mutate(device = sub("^(.*)( .*)$","\\1", sense_device_name),
+         device = if_else(device == "water", "water heater", device),
+         device = if_else(device == "coffee", "coffee maker", device))
+```
+
+```{r}
+rm(data)
+```
+
+---
+
+# Stacked plot
+
+```{r}
+home_008 <- hourly %>%
+  filter(job_id == "008", !grepl("mains|always_on", device_id)) %>%
+  mutate(device = sub("^(.*)( .*)$","\\1", sense_device_name))
+```
+
+```{r}
+ggplot(home_008, aes(fill=device, y = kwh_sum, x = hod)) +
+  geom_bar(position = "stack", stat="identity") +
+  theme_bw() +
+  xlab("Hour of day") + ylab ("Consumption (kWh)")
+```
+
+---
+
+# Small multiples
+
+```{r fig.width = 10, fig.height = 10}
+ggplot(hourly, aes(fill=device, y = kwh_sum, x = hod)) +
+  geom_bar(position = "stack", stat="identity") +
+  theme_bw() +
+  xlab("Hour of day") + ylab ("Consumption (kWh)") +
+  facet_wrap(~job_id, ncol = 3, scales = "free_y") +
+  theme(legend.position = "top") +
+  scale_x_continuous(breaks = seq(0, 24, 6), minor_breaks = seq(3, 21, 6))
+```
+
+---
+
+```{r, fig.width=10, fig.height=30}
+ggplot(hourly, aes(y = watts_avg, x = factor(hod), color = device)) +
+  geom_boxplot() +
+  theme_bw() +
+  xlab("Hour of day") + ylab ("Power (W)") +
+  facet_wrap(~device, ncol = 1, scales = "free")
+```
+
+
+```{r, fig.width=10, fig.height=30}
+ggplot(hourly %>% filter(grepl("^ac$", device)),
+       aes(y = watts_avg, x = factor(hod), color = device)) +
+  geom_boxplot() +
+  theme_bw() +
+  xlab("Hour of day") + ylab ("Power (W)") +
+  facet_wrap(~job_id, ncol = 1, scales = "free")
+```
+
+```{r, fig.width=10, fig.height=30}
+ggplot(hourly %>% filter(grepl("008", job_id)),
+       aes(y = watts_avg, x = factor(hod), color = device)) +
+  geom_boxplot() +
+  theme_bw() +
+  xlab("Hour of day") + ylab ("Power (W)") +
+  facet_wrap(~device, ncol = 1, scales = "free")
+```
+
+---
+
+```{r fig.width = 10, fig.height = 10}
+pump_motor <- hourly %>%
+  filter(grepl("pump|motor",device))
+
+ggplot(pump_motor, aes(fill=device, y = kwh_sum, x = hod)) +
+  geom_bar(position = "stack", stat="identity") +
+  theme_bw() +
+  xlab("Hour of day") + ylab ("Consumption (kWh)") +
+  facet_wrap(~job_id, ncol = 3, scales = "free_y") +
+  theme(legend.position = "top") +
+  scale_x_continuous(breaks = seq(0, 24, 6), minor_breaks = seq(3, 21, 6)) +
+  ggtitle("Pumps and motors")
+```
+
+# Total
+
+```{r}
+#df <- hourly %>% 
+#group_by(job_id, month, device) %>% 
+#summarize(kw = sum(kwh_sum, na.rm = TRUE))
+```
+
+
