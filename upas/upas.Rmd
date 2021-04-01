@@ -50,7 +50,7 @@ sample_info_f <- function(file){
 
 ```{r}
 sample_info <- map(files, sample_info_f) %>%
-  bind_rows()
+  bind_rows() 
 ```
 
 ---
@@ -85,7 +85,8 @@ summary_info <- map(files, summary_info_f) %>%
   bind_rows() %>%
   mutate(visit = gsub("^(.*)_(.*)_(.*)_(.*)(.txt$)", "\\2", info),
          id = gsub("^(.*)_(.*)_(.*)_(.*)(.txt$)", "\\3", info),
-         location = gsub("^(.*)_(.*)_(.*)_(.*)(.txt$)", "\\4", info))
+         location = gsub("^(.*)_(.*)_(.*)_(.*)(.txt$)", "\\4", info)) %>%
+  mutate_at(vars(contains("datetime")), upas_to_datetime)
 ```
 
 ---
@@ -135,3 +136,13 @@ ggplot(data, aes(x = datetime, y = fdpt, color = location)) +
   facet_wrap(~id, scales = "free") +
   ggtitle("Battry")
 ```
+
+---
+
+# Write Data
+
+```{r}
+write_rds(summary_info, "../output/upas_summary.rds")
+write_rds(data, "../output/upas_data.rds")
+```
+
