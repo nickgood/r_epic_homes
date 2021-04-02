@@ -101,6 +101,7 @@ summary_info <- map(files, summary_info_f) %>%
 
 ```{r}
 data_f <- function(file){
+  print(file)
   read_csv(file, col_names = TRUE, col_types = cols(.default = "c"),
                        skip = 59) %>%
   rename_all(tolower) %>%
