@@ -1,0 +1,98 @@
+---
+title: "Summarize Location"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: paper
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.path = 'figures/',
+  warning = FALSE,
+  message = FALSE,
+  echo = FALSE,
+  fig.width = 10, fig.height = 3,
+  cache = FALSE)
+```
+
+---
+
+```{r}
+library(dplyr)
+library(purrr)
+library(tidyr)
+library(openair)
+library(ggplot2)
+library(readr)
+library(googlesheets4)
+library(lubridate)
+```
+
+```{r}
+clean_data <- function(x){
+  #print(x)
+  f <- read_rds(x)
+ if(length(f$data) > 0){
+  data_long <- as_tibble(f) %>%
+  unnest_wider(data) %>%
+  select(-indices) %>%
+  mutate(df = map(sensors, ~ .x %>% map_df(magrittr::extract, c("comp", "value")))) %>%
+  unnest(df) %>%
+  select(-sensors, -score) %>%
+  pivot_wider(names_from = "comp", values_from = "value") %>%
+  mutate(datetime = format(as.POSIXct(strptime(timestamp,format = "%FT%H:%M:%S",tz = "GMT")),
+                          tz = "US/Mountain",
+                          usetz = TRUE),
+         filename = x)
+ }else{
+   tibble(timestamp = NA_character_,
+          co2 = NA_real_,
+          voc = NA_real_,
+          temp = NA_real_,
+          lux = NA_real_,
+          humid = NA_real_,
+          pm25 = NA_real_,
+          score = NA_real_,
+          spl_a  = NA_real_,    
+          datetime = NA_character_,
+          filename = NA_character_)
+ }
+}
+```
+
+# 001 Outdoor
+
+```{r}
+id_home <- "001"
+location <- "outdoor"
+pattern = paste0(".*", id_home, "_", location, ".*.rds$")
+files <- list.files("../output/omni", pattern = pattern, full.names = TRUE)
+```
+
+```{r}
+data <- map(files, clean_data) %>%
+  bind_rows() %>%
+  mutate_at(vars(contains("time")), ymd_hms) %>%
+  na.omit()
+```
+
+```{r fig_pm25, fig.width=10, fig.height= 5}
+timeVariation(data %>% rename(date = datetime),
+              pollutant = "pm25",
+              ylab = "pm2.5 (ug/m3)")
+```
+
+```{r fig_co2, fig.width=10, fig.height= 5}
+timeVariation(data %>% rename(date = datetime),
+              pollutant = "co2",
+              ylab = "CO2 (ppmV)")
+```
+
+```{r fig_temp, fig.width=10, fig.height= 5}
+timeVariation(data %>% rename(date = datetime) %>% filter(temp < 45),
+              pollutant = "temp",
+              ylab = "Temperature (oC)")
+```
+
+---
