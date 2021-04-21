@@ -9,6 +9,7 @@ library(ggplot2)
 library(lubridate)
 library(readr)
 library(stringr)
+library(googlesheets4)
 
 #_______________________________________________________________________________
 # clean names
@@ -58,5 +59,14 @@ if(length(result$data) > 0){
                            usetz = TRUE))
 }else{NA}
 
+}
+#_______________________________________________________________________________
+
+#_______________________________________________________________________________
+# upas time to posixct
+upas_to_datetime <- function(x){
+  as.POSIXct(strptime(sub("T"," ", x),
+             format = "%Y-%m-%d %T",
+             tz = "US/Mountain"))
 }
 #_______________________________________________________________________________

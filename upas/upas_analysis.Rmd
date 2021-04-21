@@ -1,0 +1,109 @@
+---
+title: "UPAS Analysis"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: paper
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.path = 'figures/',
+  warning = FALSE,
+  message = FALSE,
+  echo = FALSE,
+  fig.width = 10, fig.height = 3,
+  cache = FALSE)
+```
+
+---
+
+```{r}
+source("../functions_epic.R")
+```
+
+---
+
+# Read Data
+
+```{r}
+grav <- read_sheet("18_J7ZQgnuji-r6ovpTjmlvdz3xUGBYzy0u_ACadLG-c",
+                   sheet = "data", col_types = "c") %>%
+  filter(date > as.Date("2021-01-01")) %>%
+  mutate(id_filter = str_pad(id_filter, 4, "left", "0"),
+         id_keeper = str_pad(id_keeper, 4, "left", "0"))
+```
+
+```{r}
+grav_meta <- read_sheet("18_J7ZQgnuji-r6ovpTjmlvdz3xUGBYzy0u_ACadLG-c",
+                        sheet = "metadata")
+
+meta <- read_rds("../output/upas_summary.rds")
+
+upas_log <- read_sheet("1PnPjgbYWljb5oXoSCBqpJb2pi7gU0Kzre5lx4H-3i70",
+                       sheet = "upas", col_types = "c")
+```
+
+---
+
+# Process Data
+
+```{r}
+data <- grav %>%
+  mutate(date = as.Date(date, format = "%Y-%m-%d")) %>%
+  left_join(upas_log %>% select(id_filter, id_home, visit, location),
+            by = "id_filter") %>%
+  left_join(meta %>% select(id_home, visit, location,
+                            volume, duration,
+                            start, end),
+            by = c("id_home", "visit", "location")) %>%
+  mutate_at(vars("mass", "volume", "duration"), as.numeric)
+```
+
+```{r}
+output <- data %>%
+  group_by(id_home, visit, location, type, volume, duration, start, end) %>%
+  summarise(mass = mean(mass, na.rm = TRUE), .groups = "drop") %>%
+  pivot_wider(names_from = "type", values_from = "mass") %>%
+  mutate(d_mass = post - pre,
+         conc = (d_mass * 1000) / (volume / 1000))
+
+```
+
+```{r}
+ggplot(output %>% filter(!grepl("blank", location) & duration > 1)) +
+  geom_boxplot(aes(x = location, y = conc)) +
+  theme_bw() +
+  xlab("") + ylab("PM2.5 Concentration (ug/m^3)") +
+  ggtitle("Samples")
+```
+
+```{r}
+blanks <- output %>% 
+  filter(location == "blank") %>%
+  mutate(conc = (d_mass * 1000) / ((24*7*60*2)/1000))
+```
+
+```{r, fig.width=5}
+ggplot(blanks, aes(y = conc)) +
+  geom_boxplot() +
+  theme_bw() +
+  xlab("") + ylab("PM2.5 Concentration (ug/m^3)") +
+  ggtitle("Blanks")
+```
+
+
+```{r}
+lod <- sd(blanks$conc, na.rm = TRUE) * 3
+```
+
+The LOD is currently `r round(lod, 3)`.
+
+```{r}
+ggplot(meta, aes(x = as.numeric(duration) /24 )) +
+  geom_histogram(bins = 7, fill = "grey80", color = "blue") +
+  theme_bw() +
+  xlab("Days") +
+  ggtitle("Sample duration")
+```
+

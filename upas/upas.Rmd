@@ -50,7 +50,7 @@ sample_info_f <- function(file){
 
 ```{r}
 sample_info <- map(files, sample_info_f) %>%
-  bind_rows()
+  bind_rows() 
 ```
 
 ---
@@ -84,8 +84,15 @@ summary_info_f <- function(file){
 summary_info <- map(files, summary_info_f) %>%
   bind_rows() %>%
   mutate(visit = gsub("^(.*)_(.*)_(.*)_(.*)(.txt$)", "\\2", info),
-         id = gsub("^(.*)_(.*)_(.*)_(.*)(.txt$)", "\\3", info),
-         location = gsub("^(.*)_(.*)_(.*)_(.*)(.txt$)", "\\4", info))
+         visit = str_pad(sub("visit", "", visit), 2, "left", "0"),
+         id_home = gsub("^(.*)_(.*)_(.*)_(.*)(.txt$)", "\\3", info),
+         location = gsub("^(.*)_(.*)_(.*)_(.*)(.txt$)", "\\4", info)) %>%
+  mutate_at(vars(contains("datetime")), upas_to_datetime) %>%
+  select(-startdatetimeutc, -enddatetimeutc) %>%
+  rename(start = "startdatetimelocal",
+         end = "enddatetimelocal",
+         volume = "sampledvolume",
+         duration = "sampledruntime")
 ```
 
 ---
@@ -94,6 +101,7 @@ summary_info <- map(files, summary_info_f) %>%
 
 ```{r}
 data_f <- function(file){
+  print(file)
   read_csv(file, col_names = TRUE, col_types = cols(.default = "c"),
                        skip = 59) %>%
   rename_all(tolower) %>%
@@ -135,3 +143,13 @@ ggplot(data, aes(x = datetime, y = fdpt, color = location)) +
   facet_wrap(~id, scales = "free") +
   ggtitle("Battry")
 ```
+
+---
+
+# Write Data
+
+```{r}
+write_rds(summary_info, "../output/upas_summary.rds")
+write_rds(data, "../output/upas_data.rds")
+```
+
