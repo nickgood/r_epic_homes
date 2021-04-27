@@ -10,6 +10,7 @@ library(lubridate)
 library(readr)
 library(stringr)
 library(googlesheets4)
+library(hrbrthemes)
 
 #_______________________________________________________________________________
 # clean names
