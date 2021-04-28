@@ -1,0 +1,97 @@
+---
+title: "Draft Summary"
+output: html_document
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.path = 'figures/',
+  warning = FALSE,
+  message = FALSE,
+  echo = FALSE,
+  fig.width = 10, fig.height = 3,
+  cache = FALSE)
+```
+
+```{r}
+# reads source
+source("../functions_epic.R")
+```
+
+```{r}
+data <- read_rds("../output/sense_all.rds") %>%
+  filter(job_id == "001") %>%
+  mutate(year = year(datetime),
+         month = month(datetime),
+         day = day(datetime),
+         hod = hour(datetime)) %>%
+  group_by(job_id, year, month, day, hod, device_id, sense_device_name, device_type) %>%
+  summarise(datetime = min(datetime, na.rm = TRUE),
+            kwh_sum = sum(consumption_kwh, na.rm = TRUE),
+            watts_avg = mean(avg_wattage, na.rm = TRUE,
+            watts_max = max(avg_wattage, na.rm = TRUE)),
+            .groups = "drop")
+```
+
+# Fraction on
+
+```{r}
+data_frac <- data %>%
+  group_by(device_id, sense_device_name, hod) %>%
+  summarise(start = min(datetime, na.rm = TRUE),
+         end = max(datetime, na.rm = TRUE),
+        obs = n(), .groups = "drop") %>%
+  mutate(days = as.numeric(end - start) / (24*60*60),
+         pct = 100 * obs / days)
+```
+
+# Usage By Device
+
+```{r}
+devices <- data %>%
+  filter(!grepl("always_on|mains", device_id)) %>%
+  group_by(device_id, sense_device_name) %>%
+  summarise(kwh = sum(kwh_sum, na.rm = TRUE), .groups = "drop") %>%
+  mutate(device = sub(" [0-9]", "", sense_device_name)) %>%
+  group_by(device) %>%
+  summarise(kwh = sum(kwh, na.rm = TRUE), .groups = "drop") %>%
+  mutate(device = if_else(is.na(device), "unknown", device)) %>%
+  arrange(kwh) %>%
+  mutate(device = factor(device, device))
+```
+
+```{r}
+ggplot(devices, aes(x = device, y = kwh) ) +
+    geom_segment(aes(x = device, xend = device, y = min(kwh), yend = kwh), color = "grey") +
+    geom_point(size = 3, color="#69b3a2") +
+    coord_flip() +
+    theme_ipsum() +
+    theme(panel.grid.minor.y = element_blank(),
+      panel.grid.major.y = element_blank(),
+      legend.position="none"
+    ) +
+    xlab("") +
+    ylab("Consumption (kWh)") +
+    scale_y_log10()
+```
+
+# Usage By Device & Hour of Day
+
+```{r}
+devices <- data %>%
+  filter(!grepl("always_on|mains", device_id)) %>%
+  mutate(device = sub(" [0-9]", "", sense_device_name)) %>%
+  group_by(device, hod) %>%
+  summarise(kwh = mean(kwh_sum, na.rm = TRUE), .groups = "drop") %>%
+  mutate(device = if_else(is.na(device), "unknown", device))
+```
+
+```{r}
+ggplot(devices, aes(x = hod, y = kwh, color = device)) +
+  geom_point() + 
+  geom_line() +
+  theme_bw() +
+  facet_wrap(~device, scales = "free_y") +
+  theme(legend.position = "top",
+        legend.title = element_blank()) 
+```
+
