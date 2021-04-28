@@ -21,6 +21,7 @@ source("../functions_epic.R")
 data <- read_rds("../output/sense_all.rds")
 ```
 
+---
 
 # Home 001 Device Use
 
@@ -48,7 +49,7 @@ home_001_f <- home_001 %>%
 ```{r, fig.width=10, fig.height=16}
 ggplot(home_001_f, aes(x = hod, y = pct) ) +
     geom_segment(aes(x = hod, xend = hod, y = 0, yend = pct), color = "grey") +
-    geom_point(size = 2, color="#69b3a2") +
+    geom_point(size = 1, color="#69b3a2") +
     coord_flip() +
     theme_ipsum() +
     theme(panel.grid.minor.y = element_blank(),
@@ -60,15 +61,7 @@ ggplot(home_001_f, aes(x = hod, y = pct) ) +
     #scale_x_log10() +
   facet_wrap(~sense_device_name, ncol = 4, scales = "free")
 ```
-
-```{r}
-ac <- home_001 %>%
-  filter(sense_device_name == "ac") %>%
-  mutate(hod = hour(datetime)) %>%
-  count(hod)
-
-ac
-```
+---
 
 
 
