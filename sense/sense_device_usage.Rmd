@@ -48,7 +48,7 @@ home_001_f <- home_001 %>%
 ```{r, fig.width=10, fig.height=16}
 ggplot(home_001_f, aes(x = hod, y = pct) ) +
     geom_segment(aes(x = hod, xend = hod, y = 0, yend = pct), color = "grey") +
-    geom_point(size = 3, color="#69b3a2") +
+    geom_point(size = 2, color="#69b3a2") +
     coord_flip() +
     theme_ipsum() +
     theme(panel.grid.minor.y = element_blank(),
