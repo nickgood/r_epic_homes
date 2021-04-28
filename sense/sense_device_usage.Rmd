@@ -1,0 +1,22 @@
+---
+title: "Sense Fraction In Use"
+output: html_document
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.path = 'figures/',
+  warning = FALSE,
+  message = FALSE,
+  echo = FALSE,
+  fig.width = 10, fig.height = 3,
+  cache = FALSE)
+```
+
+```{r}
+# reads source
+source("../functions_epic.R")
+```
+
+```{r}
+data <- read_rds("../output/sense_all.rds")
+```
