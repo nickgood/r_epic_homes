@@ -45,7 +45,7 @@ home_001_f <- home_001 %>%
 
 ```
 
-```{r, fig.width=10, fig.height=12}
+```{r, fig.width=10, fig.height=16}
 ggplot(home_001_f, aes(x = hod, y = pct) ) +
     geom_segment(aes(x = hod, xend = hod, y = 0, yend = pct), color = "grey") +
     geom_point(size = 3, color="#69b3a2") +
@@ -56,7 +56,7 @@ ggplot(home_001_f, aes(x = hod, y = pct) ) +
       legend.position="none") +
     scale_x_continuous(breaks = c(0, 3, 6, 9, 12, 15, 18, 21, 24)) +
     xlab("Hour of Day") +
-    ylab("") +
+    ylab("Time in use (%)") +
     #scale_x_log10() +
   facet_wrap(~sense_device_name, ncol = 4, scales = "free")
 ```
