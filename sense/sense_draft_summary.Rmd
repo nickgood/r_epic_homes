@@ -47,7 +47,6 @@ devices <- data %>%
   mutate(device = if_else(is.na(device), "unknown", device)) %>%
   arrange(kwh) %>%
   mutate(device = factor(device, device))
-
 ```
 
 ```{r}
