@@ -32,7 +32,17 @@ data <- read_rds("../output/sense_all.rds") %>%
             .groups = "drop")
 ```
 
----
+# Fraction on
+
+```{r}
+data_frac <- data %>%
+  group_by(device_id, sense_device_name, hod) %>%
+  summarise(start = min(datetime, na.rm = TRUE),
+         end = max(datetime, na.rm = TRUE),
+        obs = n(), .groups = "drop") %>%
+  mutate(days = as.numeric(end - start) / (24*60*60),
+         pct = 100 * obs / days)
+```
 
 # Usage By Device
 
@@ -64,8 +74,6 @@ ggplot(devices, aes(x = device, y = kwh) ) +
     scale_y_log10()
 ```
 
----
-
 # Usage By Device & Hour of Day
 
 ```{r}
@@ -87,4 +95,3 @@ ggplot(devices, aes(x = hod, y = kwh, color = device)) +
         legend.title = element_blank()) 
 ```
 
----
