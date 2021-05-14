@@ -79,10 +79,31 @@ ggplot(p_data, aes(x = datetime, y = consumption_kwh)) +
 
 ---
 
+# Hourly Data
+
+```{r}
+data_hourly <- data %>%
+  mutate(year = year(datetime),
+         month = month(datetime),
+         day = day(datetime),
+         hod = hour(datetime)) %>%
+  group_by(job_id, year, month, day, hod, 
+           serial_number, device_id, sense_device_name, device_type) %>%
+  summarise(datetime = first(datetime),
+            consumption_kwh = sum(consumption_kwh, na.rm = TRUE),
+            avg_wattage = mean(avg_wattage, na.rm = TRUE,
+            max_wattage = max(avg_wattage, na.rm = TRUE)),
+            .groups = "drop") %>%
+  mutate(datetime = floor_date(datetime, unit = "hours"))
+```
+
+---
+
 # Write
 
 ```{r}
-write_rds(data, "../output/sense/sense_all.rds")
+write_rds(data, "../output/sense/sense_all.rds") # one-minute data
+write_rds(data_hourly, "../output/sense/sense_hourly.rds") # one-hour data
 ```
 
 ---
