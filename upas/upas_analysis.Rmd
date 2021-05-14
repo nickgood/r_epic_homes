@@ -16,17 +16,29 @@ knitr::opts_chunk$set(fig.path = 'figures/',
   cache = FALSE)
 ```
 
----
-
 ```{r}
 source("../functions_epic.R")
 ```
 
 ---
 
-# Read Data
+# Read Metadata
 
-## Gravimetric
+```{r}
+grav_meta <- read_sheet("18_J7ZQgnuji-r6ovpTjmlvdz3xUGBYzy0u_ACadLG-c",
+                        sheet = "metadata")
+
+meta <- read_rds("../output/upas/upas_summary.rds")
+
+upas_log <- read_sheet("1PnPjgbYWljb5oXoSCBqpJb2pi7gU0Kzre5lx4H-3i70",
+                       sheet = "upas", col_types = "c")
+```
+
+---
+
+# Gravimetric
+
+* Read Data
 
 ```{r}
 grav <- read_sheet("18_J7ZQgnuji-r6ovpTjmlvdz3xUGBYzy0u_ACadLG-c",
@@ -36,21 +48,7 @@ grav <- read_sheet("18_J7ZQgnuji-r6ovpTjmlvdz3xUGBYzy0u_ACadLG-c",
          id_keeper = str_pad(id_keeper, 4, "left", "0"))
 ```
 
-## Metadata
-
-```{r}
-grav_meta <- read_sheet("18_J7ZQgnuji-r6ovpTjmlvdz3xUGBYzy0u_ACadLG-c",
-                        sheet = "metadata")
-
-meta <- read_rds("../output/upas_summary.rds")
-
-upas_log <- read_sheet("1PnPjgbYWljb5oXoSCBqpJb2pi7gU0Kzre5lx4H-3i70",
-                       sheet = "upas", col_types = "c")
-```
-
----
-
-# Process Gravimetric
+* Organize Data
 
 ```{r}
 pm25 <- grav %>%
@@ -64,15 +62,19 @@ pm25 <- grav %>%
   mutate_at(vars("mass", "volume", "duration"), as.numeric)
 ```
 
+* Check for transcription errors
+
 ```{r}
 delta <- pm25 %>%
   group_by(id_filter, type) %>%
   summarise(delta = max(mass, na.rm = TRUE) - min(mass, na.rm = TRUE),
             .groups = "drop") %>%
-  filter(delta > 0.05)
+  filter(delta > 0.05) # difference greater than 0.05 mg
 ```
 
-* Note there are `r nrow(delta)` replicate measurements with a difference in mass above 0.05 mg. 
+Note there are `r nrow(delta)` replicate measurements with a difference in mass above 0.05 mg. 
+
+* Calculate PM2.5 concentration
 
 ```{r}
 pm25 <- pm25 %>%
@@ -81,8 +83,10 @@ pm25 <- pm25 %>%
   pivot_wider(names_from = "type", values_from = "mass") %>%
   mutate(d_mass = post - pre,
          conc = (d_mass * 1000) / (volume / 1000)) %>%
-  mutate(conc = if_else(duration < 6, NA_real_, conc))
+  mutate(conc = if_else(duration < 24, NA_real_, conc)) # samples must be longer than 24 hours
 ```
+
+* Plot PM2.5 concentration
 
 ```{r}
 ggplot(pm25 %>% filter(!grepl("blank", location))) +
@@ -93,11 +97,15 @@ ggplot(pm25 %>% filter(!grepl("blank", location))) +
   scale_y_log10()
 ```
 
+* impute blank concentration equivalent
+
 ```{r}
 blanks <- pm25 %>% 
   filter(location == "blank") %>%
-  mutate(conc = (d_mass * 1000) / ((24*7*60*2)/1000))
+  mutate(conc = (d_mass * 1000) / ((24*7*60*2)/1000)) # seven day sample
 ```
+
+* blank equivalent concentration
 
 ```{r, fig.width=5}
 ggplot(blanks, aes(y = conc)) +
@@ -113,6 +121,8 @@ lod <- sd(blanks$conc, na.rm = TRUE) * 3
 
 The LOD is currently `r round(lod, 3)` micrograms per cubic meter.
 
+* Sample durations
+
 ```{r}
 ggplot(meta, aes(x = as.numeric(duration) /24 )) +
   geom_histogram(bins = 7, fill = "grey80", color = "blue") +
@@ -124,6 +134,8 @@ ggplot(meta, aes(x = as.numeric(duration) /24 )) +
 ---
 
 # Black Carbon
+
+* read data
 
 ```{r}
 files <- list.files("../../data/filters/soot_scan_csv", full.names = TRUE, pattern = ".csv$")
@@ -139,6 +151,8 @@ data_bc <- map(files, read_csv, col_types = cols(.default = "c")) %>%
   mutate(ir = as.numeric(ir))
 ```
 
+* organize data
+
 ```{r}
 bc_dates <- data_bc %>%
   left_join(upas_log %>% select(id_home, visit, location, id_filter),
@@ -153,6 +167,8 @@ bc_dates <- data_bc %>%
   pivot_wider(names_from = "when", values_from = "date_analyzed") %>%
   rename(date_pre = "pre", date_post = "post")
 ```
+
+* blank dates
 
 ```{r}
 blank_dates <- data_bc %>%
@@ -170,6 +186,8 @@ blank_dates <- data_bc %>%
   rename(date_pre = "pre", date_post = "post")
 ```
 
+* blank values
+
 ```{r}
 blank_values <- data_bc %>%
   left_join(upas_log %>% select(id_home, visit, location, id_filter),
@@ -185,11 +203,17 @@ blank_values <- data_bc %>%
   pivot_wider(names_from = "when", values_from = "ir")
 ```
 
+* blank day of analysis correction
+
 ```{r}
 blanks_bc <- blank_values %>%
   left_join(blank_dates, by = c("id_filter")) %>%
   mutate(delta = post - pre)
 ```
+
+* change in blank ATN
+
+Note: samples 0001 to 0100 all have the same pre-scan day
 
 ```{r}
 ggplot(blanks_bc, aes(x = date_post, y = delta)) +
@@ -207,6 +231,7 @@ blanks_bc_mean <- blanks_bc %>%
 blanks_bc_mean
 ```
 
+* Calculate BC
 
 ```{r}
 data_bc <- data_bc %>%
@@ -231,6 +256,8 @@ bc <- data_bc %>%
   filter(duration > 24) %>% # only samples that ran for > 24 hours
   mutate(bc = bc_calc(pre + blank_atn_cor, post, 2, 0.00045, duration * 60 * 60))
 ```
+
+* Plot BC
 
 ```{r}
 ggplot(bc %>% filter(!(location == "bedroom")), aes(x = location, y = bc)) +
