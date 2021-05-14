@@ -53,7 +53,7 @@ upas_log <- read_sheet("1PnPjgbYWljb5oXoSCBqpJb2pi7gU0Kzre5lx4H-3i70",
 # Process Gravimetric
 
 ```{r}
-data <- grav %>%
+pm25 <- grav %>%
   mutate(date = as.Date(date, format = "%Y-%m-%d")) %>%
   left_join(upas_log %>% select(id_filter, id_home, visit, location),
             by = "id_filter") %>%
@@ -65,7 +65,7 @@ data <- grav %>%
 ```
 
 ```{r}
-delta <- data %>%
+delta <- pm25 %>%
   group_by(id_filter, type) %>%
   summarise(delta = max(mass, na.rm = TRUE) - min(mass, na.rm = TRUE),
             .groups = "drop") %>%
@@ -75,7 +75,7 @@ delta <- data %>%
 * Note there are `r nrow(delta)` replicate measurements with a difference in mass above 0.05 mg. 
 
 ```{r}
-output <- data %>%
+pm25 <- pm25 %>%
   group_by(id_home, visit, location, type, volume, duration, start, end) %>%
   summarise(mass = mean(mass, na.rm = TRUE), .groups = "drop") %>%
   pivot_wider(names_from = "type", values_from = "mass") %>%
@@ -85,7 +85,7 @@ output <- data %>%
 ```
 
 ```{r}
-ggplot(output %>% filter(!grepl("blank", location))) +
+ggplot(pm25 %>% filter(!grepl("blank", location))) +
   geom_boxplot(aes(x = location, y = conc)) +
   theme_bw() +
   xlab("") + ylab("PM2.5 Concentration (ug/m^3)") +
@@ -94,7 +94,7 @@ ggplot(output %>% filter(!grepl("blank", location))) +
 ```
 
 ```{r}
-blanks <- output %>% 
+blanks <- pm25 %>% 
   filter(location == "blank") %>%
   mutate(conc = (d_mass * 1000) / ((24*7*60*2)/1000))
 ```
@@ -243,7 +243,10 @@ ggplot(bc %>% filter(!(location == "bedroom")), aes(x = location, y = bc)) +
 
 ---
 
-```{r}
+# Write Data
 
+```{r}
+write_rds(bc, "../output/bc/bc.rds")
+write_rds(pm25, "../output/pm25/pm25.rds")
 ```
 
