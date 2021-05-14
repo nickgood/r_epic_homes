@@ -141,7 +141,8 @@ ggplot(data, aes(x = datetime, y = fdpt, color = location)) +
   geom_line() +
   theme_bw() +
   facet_wrap(~id, scales = "free") +
-  ggtitle("Battry")
+  ggtitle("Device Temperature") +
+  ylab("Degrees C")
 ```
 
 ---
