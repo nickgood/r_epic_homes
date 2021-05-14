@@ -150,7 +150,7 @@ ggplot(data, aes(x = datetime, y = fdpt, color = location)) +
 # Write Data
 
 ```{r}
-write_rds(summary_info, "../output/upas_summary.rds")
-write_rds(data, "../output/upas_data.rds")
+write_rds(summary_info, "../output/upas/upas_summary.rds")
+write_rds(data, "../output/upas/upas_data.rds")
 ```
 
