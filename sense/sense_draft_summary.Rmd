@@ -1,6 +1,8 @@
 ---
 title: "Draft Summary"
-output: html_document
+output:
+  html_document: default
+  pdf_document: default
 ---
 
 ```{r global_options, include=FALSE}
@@ -32,17 +34,7 @@ data <- read_rds("../output/sense_all.rds") %>%
             .groups = "drop")
 ```
 
-# Fraction on
-
-```{r}
-data_frac <- data %>%
-  group_by(device_id, sense_device_name, hod) %>%
-  summarise(start = min(datetime, na.rm = TRUE),
-         end = max(datetime, na.rm = TRUE),
-        obs = n(), .groups = "drop") %>%
-  mutate(days = as.numeric(end - start) / (24*60*60),
-         pct = 100 * obs / days)
-```
+---
 
 # Usage By Device
 
@@ -69,10 +61,12 @@ ggplot(devices, aes(x = device, y = kwh) ) +
       panel.grid.major.y = element_blank(),
       legend.position="none"
     ) +
-    xlab("") +
+    xlab("Device") +
     ylab("Consumption (kWh)") +
     scale_y_log10()
 ```
+
+---
 
 # Usage By Device & Hour of Day
 
@@ -85,13 +79,15 @@ devices <- data %>%
   mutate(device = if_else(is.na(device), "unknown", device))
 ```
 
-```{r}
+```{r, fig.width=10, fig.height=8}
 ggplot(devices, aes(x = hod, y = kwh, color = device)) +
   geom_point() + 
   geom_line() +
   theme_bw() +
   facet_wrap(~device, scales = "free_y") +
   theme(legend.position = "top",
-        legend.title = element_blank()) 
+        legend.title = element_blank()) +
+  xlab("Hour of Day")
 ```
 
+---

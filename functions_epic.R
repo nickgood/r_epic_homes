@@ -71,3 +71,19 @@ upas_to_datetime <- function(x){
              tz = "US/Mountain"))
 }
 #_______________________________________________________________________________
+
+#_______________________________________________________________________________
+bc_calc <- function(ref, sample, flow, area, dur){
+  # area = m^2
+  # flow = L/min
+  # dur = seconds
+  q <- flow / (60*1000)   # L/min to m^3/s
+  rho_atn <- 12.5         # m^2/g
+  d_atn = 100 * log(ref / sample)
+  b_atn = (area * d_atn) / (q * dur)
+  vol = q * dur 
+  r = exp(-d_atn / 100) * 0.88 + 0.12
+  bc_conc = 1e4 * b_atn / (rho_atn * r)
+  bc_conc
+}
+#_______________________________________________________________________________
