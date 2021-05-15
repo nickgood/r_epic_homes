@@ -10,11 +10,16 @@ knitr::opts_chunk$set(fig.path = 'figures/',
   echo = FALSE,
   fig.width = 10, fig.height = 3,
   cache = FALSE)
+
 ```
 
 ```{r}
 # reads source
 source("../functions_epic.R")
+library('cluster')
+library('factoextra')
+
+
 ```
 
 ```{r}
@@ -23,7 +28,9 @@ data <- read_rds("../output/sense_all.rds")
 
 ---
 
-# Home 001 Device Use
+# Home 001 Device Fraction On
+
+## Hourly
 
 ```{r}
 home_001 <- data %>%
@@ -47,6 +54,8 @@ home_001_f <- home_001 %>%
 ```
 
 ```{r, fig.width=10, fig.height=16}
+
+
 ggplot(home_001_f, aes(x = hod, y = pct) ) +
     geom_segment(aes(x = hod, xend = hod, y = 0, yend = pct), color = "grey") +
     geom_point(size = 1, color="#69b3a2") +
@@ -60,7 +69,143 @@ ggplot(home_001_f, aes(x = hod, y = pct) ) +
     ylab("Time in use (%)") +
     #scale_x_log10() +
   facet_wrap(~sense_device_name, ncol = 4, scales = "free")
+
 ```
+
+## Daily
+
+```{r}
+
+home_001_day<- home_001 %>%
+  mutate(dateday = floor_date(datetime, unit = 'day'),
+         sense_device_name = if_else(is.na(sense_device_name), device_id, sense_device_name)) %>%
+  group_by(sense_device_name, dateday) %>%
+  summarise(
+            mins = n(), # amount of minutes device was on during specified day
+            .groups = "drop") %>%
+  mutate(d_min =  60 * 24, # amoutn of minutes in each day
+         pct = mins * 100 / d_min,
+         pct = if_else(pct == Inf, 0, pct),
+         pct = if_else(d_min < 50, 0, pct))
+```
+
+```{r}
+
+# cluster functions ---------------------------------------------
+cluster_maker <- function(  
+  devices # character vector of devices from which to make clusters
+) {
+
+  ##make cluster of time periods
+  ## for home_001
+  df <- home_001_day %>%
+    select(-c(mins,d_min))%>%
+    filter(sense_device_name %in% devices) %>%
+    pivot_wider(names_from = sense_device_name, values_from = pct,
+                values_fill = 0 # make device usage minutes zero if not registered
+                # in a certain day
+    ) %>%
+  tibble::column_to_rownames(var = 'dateday') %>%
+  ##scale the data to prepare for cluster analysis
+  scale()
+}
+
+# function to run multiple test determining optimal cluster number
+cluster_tests <- function(
+  df # dataframe resulting from cluster_maker function
+) {
+  
+  #####decide how many clusters to use using different methods:
+  #silhouette
+  a <- fviz_nbclust(df, pam, method = 'silhouette')
+  
+  #knee bend
+  b <- fviz_nbclust(df, pam, method = 'wss')
+  
+  
+  # Gap statistic
+  # nboot = 50 to keep the function speedy. 
+  # recommended value: nboot= 500 for your analysis.
+  # Use verbose = FALSE to hide computing progression.
+ c<-  fviz_nbclust(df, kmeans, nstart = 25,  method = "gap_stat", nboot = 50)+
+    labs(subtitle = "Gap statistic method")
+ 
+ return(list(a,b,c))
+}
+
+
+# function to separate daily data into clusters and plot
+cluster_plots <- function(
+  df, # dataframe resulting from cluster_maker function
+  cluster_amount # sepcifed amount of clusters
+                          ) {
+  
+
+###plot with decided number of clusters
+##use pam package
+pam.res <- pam(df, cluster_amount)
+
+cluster_colors <- c('red', 'blue', 'darkgreen', 'darkorange', 'purple')
+
+# Visualize pam clustering
+pca_cluster_plot <- fviz_cluster(pam.res, geom = "point", ellipse.type = "norm",
+             palette = cluster_colors)
+
+#make function to define color based on cluster
+color.find <- function(x)  cluster_colors[x]
+
+df_clust <- df %>%
+  as.data.frame() %>%
+  ##add a cludter column to dataframe and put date back in as column
+  mutate(cluster = pam.res$clustering) %>%
+  mutate(clust_color = color.find(cluster)) %>% # add column for color based on cluster
+  tibble::rownames_to_column(var = 'date')%>%
+  #convert date column from character to date
+  #and cluster to factor
+  mutate(date = as.Date(date), cluster = as.factor(cluster))
+
+
+
+
+# #plot the cluster number over date to see if there is a
+# #"trend" or identification of fire time period
+# ggplot(df_clust, aes(x = date, y = cluster)) +
+#   geom_col(orientation = 'x')+
+#   scale_x_date(date_breaks = "1 month", date_labels = '%B')
+
+# map color column to cluster number column
+# from https://stackoverflow.com/questions/35279570/assign-point-color-depending-on-data-frame-column-value-r
+col <- as.character(df_clust$clust_color)
+names(col) <- as.character(df_clust$cluster)
+
+#plot the cluster number over date to see if there is a "trend"
+time_cluster_plot <- ggplot(df_clust, aes(x = date, y = 1)) +
+  # color data point by cluster
+  geom_tile(aes(fill = cluster))+
+  scale_fill_manual(values = col)+
+  scale_x_date(date_breaks = "1 month", date_labels = '%B')+
+  theme_bw()+
+  theme(
+    axis.title.y = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank()
+  )
+
+return(list(pca_cluster_plot, time_cluster_plot))
+}
+
+
+
+```
+
+
+```{r}
+cluster_df <- cluster_maker(c('heat 6','ac'))
+cluster_tests(cluster_df)
+cluster_plots(cluster_df,3)
+```
+
+
 ---
 
 
