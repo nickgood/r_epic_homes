@@ -74,6 +74,9 @@ delta <- pm25 %>%
 
 Note there are `r nrow(delta)` replicate measurements with a difference in mass above 0.05 mg. 
 
+
+## PM2.5
+
 * Calculate PM2.5 concentration
 
 ```{r}
@@ -121,7 +124,7 @@ lod <- sd(blanks$conc, na.rm = TRUE) * 3
 
 The LOD is currently `r round(lod, 3)` micrograms per cubic meter.
 
-* Sample durations
+* Sample duration
 
 ```{r}
 ggplot(meta, aes(x = as.numeric(duration) /24 )) +
@@ -130,6 +133,9 @@ ggplot(meta, aes(x = as.numeric(duration) /24 )) +
   xlab("Days") +
   ggtitle("Sample duration")
 ```
+
+## Compare to OMNI
+
 
 ---
 
