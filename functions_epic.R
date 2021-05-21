@@ -86,3 +86,41 @@ bc_calc <- function(ref, sample, flow, area, dur){
   bc_conc
 }
 #_______________________________________________________________________________
+
+#_______________________________________________________________________________
+read_omni_rds_file <- function(file){
+  f <- read_rds(file)
+  if(length(f$data) > 0){
+    as_tibble(f) %>%
+      unnest_wider(data) %>%
+      select(-indices) %>%
+      mutate(df = map(sensors, ~ .x %>% map_df(magrittr::extract, c("comp", "value")))) %>%
+      unnest(df) %>%
+      select(-sensors, -score) %>%
+      pivot_wider(names_from = "comp", values_from = "value") %>%
+      mutate(datetime = format(as.POSIXct(strptime(timestamp,format = "%FT%H:%M:%S",tz = "GMT")),
+                               tz = "US/Mountain",
+                               usetz = TRUE)) %>%
+      mutate(filename = file)
+  }else{
+    tibble(timestamp = NA_character_,
+           co2 = NA_real_,
+           voc = NA_real_,
+           temp = NA_real_,
+           lux = NA_real_,
+           humid = NA_real_,
+           pm25 = NA_real_,
+           score = NA_real_,
+           spl_a  = NA_real_,    
+           datetime = NA_character_,
+           filename = file)
+  }
+}
+#_______________________________________________________________________________
+
+#_______________________________________________________________________________
+read_omni_rds_files <- function(files){
+  map(files, read_omni_rds_file) %>%
+    bind_rows()
+}
+#_______________________________________________________________________________
