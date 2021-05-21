@@ -16,6 +16,7 @@ knitr::opts_chunk$set(fig.path = 'figures/',
 ```{r}
 # reads source
 source("../functions_epic.R")
+# add extra libraries for cluster analysis
 library('cluster')
 library('factoextra')
 
@@ -72,13 +73,30 @@ ggplot(home_001_f, aes(x = hod, y = pct) ) +
 
 ```
 
-## Daily
 
-```{r}
 
-home_001_day<- home_001 %>%
+
+---
+
+# Daily
+
+
+## Cluster days based on heating and ac behaviours  
+
+## Compare all homes
+
+
+```{r cluster_functions}
+
+
+cluster.maker <- function(home_id, # home id, in form: '003'
+                       devices # character vector of devices from which to make clusters
+                       ) {
+a <- data %>%
+  filter(job_id == home_id) %>%
   mutate(dateday = floor_date(datetime, unit = 'day'),
-         sense_device_name = if_else(is.na(sense_device_name), device_id, sense_device_name)) %>%
+         sense_device_name = if_else(is.na(sense_device_name),
+                                     device_id, sense_device_name)) %>%
   group_by(sense_device_name, dateday) %>%
   summarise(
     mins = n(), # amount of minutes device was on during specified day
@@ -86,19 +104,10 @@ home_001_day<- home_001 %>%
   mutate(d_min =  60 * 24, # amoutn of minutes in each day
          pct = mins * 100 / d_min,
          pct = if_else(pct == Inf, 0, pct),
-         pct = if_else(d_min < 50, 0, pct))
-```
-
-```{r}
-
-# cluster functions ---------------------------------------------
-cluster_maker <- function(  
-  devices # character vector of devices from which to make clusters
-) {
+         pct = if_else(d_min < 50, 0, pct)) %>%
   
-  ##make cluster of time periods
-  ## for home_001
-  df <- home_001_day %>%
+  # make cluster of time periods
+  
     select(-c(mins,d_min))%>%
     pivot_wider(names_from = sense_device_name, values_from = pct,
                 values_fill = 0 # make device usage minutes zero if not registered
@@ -108,9 +117,10 @@ cluster_maker <- function(
     tibble::column_to_rownames(var = 'dateday') %>%
     ##scale the data to prepare for cluster analysis
     scale()
+
 }
 
-# function to run multiple test determining optimal cluster number
+# function to run multiple tests determining optimal cluster number
 cluster_tests <- function(
   df # dataframe resulting from cluster_maker function
 ) {
@@ -194,23 +204,90 @@ cluster_plots <- function(
   return(list(pca_cluster_plot, time_cluster_plot))
 }
 
-
-
 ```
-
-
-# Cluster days based on heating and ac behaviours
 
 ```{r}
-home_001_cluster_df <- cluster_maker(c('heat 6','ac'))
-cluster_tests(home_001_cluster_df)
-cluster_plots(home_001_cluster_df,2)
-cluster_plots(home_001_cluster_df,3)
+#
+cluster_df <- cluster.maker('001', c('heat 6','ac'))
+cluster_tests(cluster_df)
+cluster_plots(cluster_df,3)
+
+#
+cluster_df <- cluster.maker('002', c('heat 6','ac'))
+cluster_tests(cluster_df)
+cluster_plots(cluster_df,3)
+
+#
+cluster_df <- cluster.maker('003', c('heat 6','ac'))
+cluster_tests(cluster_df)
+cluster_plots(cluster_df,3)
+
+#
+cluster_df <- cluster.maker('004', c('heat 6','ac'))
+cluster_tests(cluster_df)
+cluster_plots(cluster_df,3)
+
+#
+cluster_df <- cluster.maker('006', c('heat 6','ac'))
+cluster_tests(cluster_df)
+cluster_plots(cluster_df,3)
+
+#
+cluster_df <- cluster.maker('007', c('heat 6','ac'))
+cluster_tests(cluster_df)
+cluster_plots(cluster_df,3)
+
+#
+cluster_df <- cluster.maker('008', c('heat 6','ac'))
+cluster_tests(cluster_df)
+cluster_plots(cluster_df,3)
+
+#
+cluster_df <- cluster.maker('009', c('heat 6','ac'))
+cluster_tests(cluster_df)
+cluster_plots(cluster_df,3)
+
+#
+cluster_df <- cluster.maker('010', c('heat 6','ac'))
+cluster_tests(cluster_df)
+cluster_plots(cluster_df,3)
+
+#
+cluster_df <- cluster.maker('011', c('heat 6','ac'))
+cluster_tests(cluster_df)
+cluster_plots(cluster_df,3)
+
+#
+cluster_df <- cluster.maker('012', c('heat 6','ac'))
+cluster_tests(cluster_df)
+cluster_plots(cluster_df,3)
+
+#
+cluster_df <- cluster.maker('013', c('heat 6','ac'))
+cluster_tests(cluster_df)
+cluster_plots(cluster_df,3)
+
+#
+cluster_df <- cluster.maker('014', c('heat 6','ac'))
+cluster_tests(cluster_df)
+cluster_plots(cluster_df,3)
+
+#
+cluster_df <- cluster.maker('015', c('heat 6','ac'))
+cluster_tests(cluster_df)
+cluster_plots(cluster_df,3)
+
+#
+cluster_df <- cluster.maker('016', c('heat 6','ac'))
+cluster_tests(cluster_df)
+cluster_plots(cluster_df,3)
+
+#
+cluster_df <- cluster.maker('017', c('heat 6','ac'))
+cluster_tests(cluster_df)
+cluster_plots(cluster_df,3)
+
 
 ```
-
-
----
-
 
 
