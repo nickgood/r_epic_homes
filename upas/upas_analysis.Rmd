@@ -136,6 +136,56 @@ ggplot(meta, aes(x = as.numeric(duration) /24 )) +
 
 ## Compare to OMNI
 
+* Sample Info
+
+```{r}
+data <- pm25 %>%
+  filter(!grepl("blank", location)) %>%
+  na.omit() %>%
+  mutate(pattern = paste("^omni.*", id_home, location, sep = "_"),
+         files = map2("../output/omni", pattern, list.files, full.names = TRUE),
+         start_ = as.Date(start) - 1,
+         end_ = as.Date(end) + 1,
+         dates = map2(start_, end_, seq.Date, by = "day"),
+         dates = map(dates, paste, collapse = "|"),
+         files = map2(dates, files, grep, value = TRUE)) %>%
+  select(-start_, -end_) %>%
+  mutate(omni = map(files, read_omni_rds_files))
+```
+
+```{r}
+out <- data %>%
+  filter(lengths(files) > 0) %>%
+  mutate(pm25_omni = pmap(list(start, end, omni), pm25_mean)) %>%
+  mutate(pm25_all = map(.x = omni, .f = ~mean(.x$pm25, na.rm = TRUE))) %>%
+  unnest(pm25_omni) %>%
+  select(-omni) %>% 
+  mutate(diff = ((conc - pm25_omni)^2)^0.5,
+         g = if_else(diff > 3, TRUE, FALSE))
+```
+
+```{r}
+out %>% group_by(g) %>% count()
+```
+
+
+```{r}
+pm25_mean <- function(start, end, df){
+  df %>% filter(datetime >= start & datetime <= end) %>%
+    pull(pm25) %>%
+    mean(., na.rm = TRUE)
+}
+```
+
+```{r fig_omni_vs_filter, fig.width=1.5, fig.height=1.5}
+ggplot(out, aes(x = conc, y = pm25_omni)) +
+  geom_point() +
+  #geom_smooth(method = "lm", formula = "y ~ x", se = FALSE) +
+  theme_bw() +
+  geom_abline(slope = 1, intercept = 0) +
+  ylim(0,NA) + xlim(0,NA) +
+  ylab("OMNI (ug/m^3)") + xlab("Filter (ug/m^3)")
+```
 
 ---
 
