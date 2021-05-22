@@ -252,7 +252,7 @@ cluster_plots <- function(
 ```
 
 ```{r, eval = FALSE}
-#
+# 2 feasible ac units...
 cluster_df <- cluster.maker('001', c('heat 6','ac'))
 cluster_tests(cluster_df)
 cluster_plots(cluster_df,3)
@@ -262,75 +262,75 @@ cluster_df <- cluster.maker('002', c('furnace','ac 2'))
 cluster_tests(cluster_df)
 cluster_plots(cluster_df,3)
 
-#
-cluster_df <- cluster.maker('003', c('heat 6','ac'))
-cluster_tests(cluster_df)
-cluster_plots(cluster_df,3)
+# # home 3 not available?
+# cluster_df <- cluster.maker('003', c('heat 6','ac'))
+# cluster_tests(cluster_df)
+# cluster_plots(cluster_df,3)
 
-#
-cluster_df <- cluster.maker('004', c('furnace','always on'))
+# no AC for home 4
+cluster_df <- cluster.maker('004', c('furnace'))
 cluster_tests(cluster_df)
-cluster_plots(cluster_df,3)
+cluster_plots(cluster_df,2)
 
 #
 cluster_df <- cluster.maker('006', c('heat 1','ac'))
 cluster_tests(cluster_df)
 cluster_plots(cluster_df,3)
 
-#
+# 
 cluster_df <- cluster.maker('007', c('heat 2','ac'))
 cluster_tests(cluster_df)
 cluster_plots(cluster_df,3)
 
-#
-cluster_df <- cluster.maker('008', c('heat 4','ac'))
+# many heats that could be feasible...
+cluster_df <- cluster.maker('008', c('heat 1','ac'))
 cluster_tests(cluster_df)
 cluster_plots(cluster_df,3)
 
-#
+# many heats that could be feasible...
 cluster_df <- cluster.maker('009', c('furnace','ac'))
 cluster_tests(cluster_df)
 cluster_plots(cluster_df,3)
 
-#
-cluster_df <- cluster.maker('010', c('heat 6','ac'))
+# no ac (later enrollment), also no one heat that makes complete sense by itself...
+cluster_df <- cluster.maker('010', c('heat 2','always on'))
+cluster_tests(cluster_df)
+cluster_plots(cluster_df,3)
+
+# no ac (later enrollment)
+cluster_df <- cluster.maker('011', c('heat 6','always on'))
 cluster_tests(cluster_df)
 cluster_plots(cluster_df,3)
 
 #
-cluster_df <- cluster.maker('011', c('heat 6','ac'))
+cluster_df <- cluster.maker('012', c('heat 2','ac'))
 cluster_tests(cluster_df)
 cluster_plots(cluster_df,3)
 
 #
-cluster_df <- cluster.maker('012', c('heat 6','ac'))
+cluster_df <- cluster.maker('013', c('heat 2','ac'))
 cluster_tests(cluster_df)
 cluster_plots(cluster_df,3)
 
-#
-cluster_df <- cluster.maker('013', c('heat 6','ac'))
+# heat doesn't look feasible...
+cluster_df <- cluster.maker('014', c('heat 1','ac'))
 cluster_tests(cluster_df)
 cluster_plots(cluster_df,3)
 
-#
-cluster_df <- cluster.maker('014', c('heat 6','ac'))
+# on ac, multiple feasible heats
+cluster_df <- cluster.maker('015', c('heat 4','always on'))
 cluster_tests(cluster_df)
 cluster_plots(cluster_df,3)
 
-#
-cluster_df <- cluster.maker('015', c('heat 6','ac'))
-cluster_tests(cluster_df)
-cluster_plots(cluster_df,3)
+# # not available
+# cluster_df <- cluster.maker('016', c('heat 6','ac'))
+# cluster_tests(cluster_df)
+# cluster_plots(cluster_df,3)
 
-#
-cluster_df <- cluster.maker('016', c('heat 6','ac'))
-cluster_tests(cluster_df)
-cluster_plots(cluster_df,3)
-
-#
-cluster_df <- cluster.maker('017', c('heat 6','ac'))
-cluster_tests(cluster_df)
-cluster_plots(cluster_df,3)
+# # not available
+# cluster_df <- cluster.maker('017', c('heat 6','ac'))
+# cluster_tests(cluster_df)
+# cluster_plots(cluster_df,3)
 
 
 ```
