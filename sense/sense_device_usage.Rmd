@@ -81,7 +81,7 @@ ggplot(home_001_f, aes(x = hod, y = pct) ) +
 
 # Daily
 
-```{r, include = FALSE, eval = TRUE}
+```{r, include = FALSE, eval = FALSE}
 
 # function to test daily usage per device by home
 
@@ -119,7 +119,7 @@ coord_cartesian(ylim = c(0,100))+
 
 ```
 
-```{r, eval = TRUE}
+```{r, eval = FALSE}
 
 # apply above function to all homes
 lapply(levels(as.factor(data$job_id)), daily.usage)
@@ -131,7 +131,7 @@ lapply(levels(as.factor(data$job_id)), daily.usage)
 ## Compare all homes
 
 
-```{r cluster_functions, include = FALSE}
+```{r cluster_functions, include = FALSE, eval = TRUE}
 
 
 cluster.maker <- function(home_id, # home id, in form: '003'
@@ -166,7 +166,7 @@ a <- data %>%
 }
 
 # function to run multiple tests determining optimal cluster number
-cluster_tests <- function(
+cluster.tests <- function(
   df # dataframe resulting from cluster_maker function
 ) {
   
@@ -190,7 +190,8 @@ cluster_tests <- function(
 
 
 # function to separate daily data into clusters and plot
-cluster_plots <- function(
+cluster.plots <- function(
+  home_id, # home id, in form: '003', just for labeling plot
   df, # dataframe resulting from cluster_maker function
   cluster_amount # sepcifed amount of clusters
 ) {
@@ -202,9 +203,12 @@ cluster_plots <- function(
   
   cluster_colors <- c('red', 'blue', 'darkgreen', 'darkorange', 'purple')
   
-  # Visualize pam clustering
-  pca_cluster_plot <- fviz_cluster(pam.res, geom = "point", ellipse.type = "norm",
-                                   palette = cluster_colors)
+  # Visualize pam clustering if more than one device is used 
+  pca_cluster_plot <- if(ncol(df)>1) {
+    fviz_cluster(pam.res, geom = "point", ellipse = FALSE,
+                                   palette = cluster_colors,
+                 main = paste('Home', home_id))
+  } else {NULL}
   
   #make function to define color based on cluster
   color.find <- function(x)  cluster_colors[x]
@@ -244,93 +248,110 @@ cluster_plots <- function(
       axis.title.y = element_blank(),
       axis.text.y = element_blank(),
       axis.ticks.y = element_blank()
-    )
+    )+
+    ggtitle(paste('Home', home_id))
   
   return(list(pca_cluster_plot, time_cluster_plot))
 }
 
 ```
 
-```{r, eval = FALSE}
+```{r, eval = TRUE, fig.width=10, fig.height=3}
+hm <- '001'
 # 2 feasible ac units...
-cluster_df <- cluster.maker('001', c('heat 6','ac'))
-cluster_tests(cluster_df)
-cluster_plots(cluster_df,3)
+cluster_df <- cluster.maker(hm, c('heat 6','ac'))
+# cluster.tests(cluster_df)
+cluster.plots(hm, cluster_df,3)
 
+hm <- '002'
 #
-cluster_df <- cluster.maker('002', c('furnace','ac 2'))
-cluster_tests(cluster_df)
-cluster_plots(cluster_df,3)
+cluster_df <- cluster.maker(hm, c('furnace','ac 2'))
+# cluster.tests(cluster_df)
+cluster.plots(hm, cluster_df,3)
 
+hm <- '003'
 # # home 3 not available?
-# cluster_df <- cluster.maker('003', c('heat 6','ac'))
-# cluster_tests(cluster_df)
-# cluster_plots(cluster_df,3)
+# cluster_df <- cluster.maker(hm, c('heat 6','ac'))
+# # cluster.tests(cluster_df)
+# cluster.plots(hm, cluster_df,3)
 
-# no AC for home 4
-cluster_df <- cluster.maker('004', c('furnace'))
-cluster_tests(cluster_df)
-cluster_plots(cluster_df,2)
+hm <- '004'
+# no AC
+cluster_df <- cluster.maker(hm, c('furnace'))
+# cluster.tests(cluster_df)
+cluster.plots(hm, cluster_df,2)
 
+hm <- '006'
 #
-cluster_df <- cluster.maker('006', c('heat 1','ac'))
-cluster_tests(cluster_df)
-cluster_plots(cluster_df,3)
+cluster_df <- cluster.maker(hm, c('heat 1','ac'))
+# cluster.tests(cluster_df)
+cluster.plots(hm, cluster_df,3)
 
+hm <- '007'
 # 
-cluster_df <- cluster.maker('007', c('heat 2','ac'))
-cluster_tests(cluster_df)
-cluster_plots(cluster_df,3)
+cluster_df <- cluster.maker(hm, c('heat 2','ac'))
+# cluster.tests(cluster_df)
+cluster.plots(hm, cluster_df,3)
 
+hm <- '008'
 # many heats that could be feasible...
-cluster_df <- cluster.maker('008', c('heat 1','ac'))
-cluster_tests(cluster_df)
-cluster_plots(cluster_df,3)
+cluster_df <- cluster.maker(hm, c('heat 1','ac'))
+# cluster.tests(cluster_df)
+cluster.plots(hm, cluster_df,3)
 
+hm <- '009'
 # many heats that could be feasible...
-cluster_df <- cluster.maker('009', c('furnace','ac'))
-cluster_tests(cluster_df)
-cluster_plots(cluster_df,3)
+cluster_df <- cluster.maker(hm, c('furnace','ac'))
+# cluster.tests(cluster_df)
+cluster.plots(hm, cluster_df,3)
 
+hm <- '010'
 # no ac (later enrollment), also no one heat that makes complete sense by itself...
-cluster_df <- cluster.maker('010', c('heat 2','always on'))
-cluster_tests(cluster_df)
-cluster_plots(cluster_df,3)
+cluster_df <- cluster.maker(hm, c('heat 2'))
+# cluster.tests(cluster_df)
+cluster.plots(hm, cluster_df,2)
 
+hm <- '011'
 # no ac (later enrollment)
-cluster_df <- cluster.maker('011', c('heat 6','always on'))
-cluster_tests(cluster_df)
-cluster_plots(cluster_df,3)
+cluster_df <- cluster.maker(hm, c('heat 6'))
+# cluster.tests(cluster_df)
+cluster.plots(hm, cluster_df,2)
 
+hm <- '012'
 #
-cluster_df <- cluster.maker('012', c('heat 2','ac'))
-cluster_tests(cluster_df)
-cluster_plots(cluster_df,3)
+cluster_df <- cluster.maker(hm, c('heat 2','ac'))
+# cluster.tests(cluster_df)
+cluster.plots(hm, cluster_df,3)
 
+hm <- '013'
 #
-cluster_df <- cluster.maker('013', c('heat 2','ac'))
-cluster_tests(cluster_df)
-cluster_plots(cluster_df,3)
+cluster_df <- cluster.maker(hm, c('heat 2','ac'))
+# cluster.tests(cluster_df)
+cluster.plots(hm, cluster_df,3)
 
+hm <- '014'
 # heat doesn't look feasible...
-cluster_df <- cluster.maker('014', c('heat 1','ac'))
-cluster_tests(cluster_df)
-cluster_plots(cluster_df,3)
+cluster_df <- cluster.maker(hm, c('heat 1','ac'))
+# cluster.tests(cluster_df)
+cluster.plots(hm, cluster_df,3)
 
+hm <- '015'
 # on ac, multiple feasible heats
-cluster_df <- cluster.maker('015', c('heat 4','always on'))
-cluster_tests(cluster_df)
-cluster_plots(cluster_df,3)
+cluster_df <- cluster.maker(hm, c('heat 4'))
+# cluster.tests(cluster_df)
+cluster.plots(hm, cluster_df,2)
 
+hm <- '016'
 # # not available
-# cluster_df <- cluster.maker('016', c('heat 6','ac'))
-# cluster_tests(cluster_df)
-# cluster_plots(cluster_df,3)
+# cluster_df <- cluster.maker(hm, c('heat 6','ac'))
+# # cluster.tests(cluster_df)
+# cluster.plots(hm, cluster_df,3)
 
+hm <- '017'
 # # not available
-# cluster_df <- cluster.maker('017', c('heat 6','ac'))
-# cluster_tests(cluster_df)
-# cluster_plots(cluster_df,3)
+# cluster_df <- cluster.maker(hm, c('heat 6','ac'))
+# # cluster.tests(cluster_df)
+# cluster.plots(hm, cluster_df,3)
 
 
 ```
