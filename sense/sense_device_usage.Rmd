@@ -79,7 +79,7 @@ ggplot(home_001_f, aes(x = hod, y = pct) ) +
 
 ---
 
-# Daily
+# Daily Fraction On
 
 ```{r, include = FALSE, eval = FALSE}
 
@@ -208,7 +208,15 @@ cluster.plots <- function(
     fviz_cluster(pam.res, geom = "point", ellipse = FALSE,
                                    palette = cluster_colors,
                  main = paste('Home', home_id))
-  } else {NULL}
+  } else {
+    # if only one device was used, show average scaled values for each cluster
+    df %>%
+  as.data.frame() %>%
+    ##add a cludter column to dataframe
+    mutate(cluster = pam.res$clustering) %>%
+  group_by(cluster) %>%
+  summarise_all(mean, na.rm = TRUE) %>%
+  ungroup()}
   
   #make function to define color based on cluster
   color.find <- function(x)  cluster_colors[x]
@@ -253,6 +261,7 @@ cluster.plots <- function(
   
   return(list(pca_cluster_plot, time_cluster_plot))
 }
+
 
 ```
 
@@ -355,5 +364,4 @@ hm <- '017'
 
 
 ```
-
 
