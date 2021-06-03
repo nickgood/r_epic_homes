@@ -162,8 +162,8 @@ coord_cartesian(ylim = c(0,100))+
 ```
 
 ```{r, eval = FALSE}
-a <- data %>% pull(job_id) %>% as.factor() %>% levels()
-daily.consumption('003')
+# homes 3 and 16 do not have data available
+
 # apply above function to all homes
 lapply(levels(as.factor(data$job_id)), daily.consumption)
 ```
