@@ -134,6 +134,7 @@ lapply(levels(as.factor(data$job_id)), daily.usage)
 ```{r cluster_functions, include = FALSE, eval = TRUE}
 
 
+
 cluster.maker <- function(home_id, # home id, in form: '003'
                        devices # character vector of devices from which to make clusters
                        ) {
@@ -143,32 +144,36 @@ a <- data %>%
          sense_device_name = if_else(is.na(sense_device_name),
                                      device_id, sense_device_name)) %>%
   group_by(sense_device_name, dateday) %>%
-  summarise(
+ summarise(
     mins = n(), # amount of minutes device was on during specified day
+    consumption = sum(consumption_kwh, na.rm = TRUE),
     .groups = "drop") %>%
   mutate(d_min =  60 * 24, # amoutn of minutes in each day
          pct = mins * 100 / d_min,
          pct = if_else(pct == Inf, 0, pct),
-         pct = if_else(d_min < 50, 0, pct)) %>%
-  
-  # make cluster of time periods
+         pct = if_else(d_min < 50, 0, pct)) %>% # make cluster of time periods
   
     select(-c(mins,d_min))%>%
-    pivot_wider(names_from = sense_device_name, values_from = pct,
+    pivot_wider(names_from = sense_device_name, values_from = c(pct, consumption),
                 values_fill = 0 # make device usage minutes zero if not registered
                 # in a certain day
     ) %>%
-    select(dateday, all_of(devices)) %>%
+      select(dateday, ends_with(all_of(devices))) %>%
     tibble::column_to_rownames(var = 'dateday') %>%
     ##scale the data to prepare for cluster analysis
     scale()
-
 }
+
 
 # function to run multiple tests determining optimal cluster number
 cluster.tests <- function(
-  df # dataframe resulting from cluster_maker function
-) {
+  df, # dataframe resulting from cluster_maker function
+  measure # what will be evaluated for the device? either 'pct' or 'consumption'
+  ) {
+  
+  df <- df %>%
+    as.data.frame() %>%
+    select(starts_with(measure))
   
   #####decide how many clusters to use using different methods:
   #silhouette
@@ -193,9 +198,14 @@ cluster.tests <- function(
 cluster.plots <- function(
   home_id, # home id, in form: '003', just for labeling plot
   df, # dataframe resulting from cluster_maker function
-  cluster_amount # sepcifed amount of clusters
+  cluster_amount, # sepcifed amount of clusters
+    measure # what will be evaluated for the device? either 'pct' or 'consumption'
+  
 ) {
   
+    df <- df %>%
+    as.data.frame() %>%
+    select(starts_with(measure))
   
   ###plot with decided number of clusters
   ##use pam package
@@ -257,26 +267,34 @@ cluster.plots <- function(
       axis.text.y = element_blank(),
       axis.ticks.y = element_blank()
     )+
-    ggtitle(paste('Home', home_id))
+    ggtitle(paste('Home', home_id, measure))
   
   return(list(pca_cluster_plot, time_cluster_plot))
 }
 
 
+
 ```
 
 ```{r, eval = TRUE, fig.width=10, fig.height=3}
+
+
+
 hm <- '001'
 # 2 feasible ac units...
 cluster_df <- cluster.maker(hm, c('heat 6','ac'))
-# cluster.tests(cluster_df)
-cluster.plots(hm, cluster_df,3)
+# cluster.tests(cluster_df, 'pct')
+cluster.plots(hm, cluster_df,3, 'pct')
+cluster.plots(hm, cluster_df,3, 'consumption')
+
+
 
 hm <- '002'
 #
 cluster_df <- cluster.maker(hm, c('furnace','ac 2'))
 # cluster.tests(cluster_df)
-cluster.plots(hm, cluster_df,3)
+cluster.plots(hm, cluster_df,3, 'pct')
+cluster.plots(hm, cluster_df,3, 'consumption')
 
 hm <- '003'
 # # home 3 not available?
@@ -288,67 +306,78 @@ hm <- '004'
 # no AC
 cluster_df <- cluster.maker(hm, c('furnace'))
 # cluster.tests(cluster_df)
-cluster.plots(hm, cluster_df,2)
+cluster.plots(hm, cluster_df,2, 'pct')
+cluster.plots(hm, cluster_df,3, 'consumption')
 
 hm <- '006'
 #
 cluster_df <- cluster.maker(hm, c('heat 1','ac'))
 # cluster.tests(cluster_df)
-cluster.plots(hm, cluster_df,3)
+cluster.plots(hm, cluster_df,3, 'pct')
+cluster.plots(hm, cluster_df,3, 'consumption')
 
 hm <- '007'
 # 
 cluster_df <- cluster.maker(hm, c('heat 2','ac'))
 # cluster.tests(cluster_df)
-cluster.plots(hm, cluster_df,3)
+cluster.plots(hm, cluster_df,3, 'pct')
+cluster.plots(hm, cluster_df,3, 'consumption')
 
 hm <- '008'
 # many heats that could be feasible...
 cluster_df <- cluster.maker(hm, c('heat 1','ac'))
 # cluster.tests(cluster_df)
-cluster.plots(hm, cluster_df,3)
+cluster.plots(hm, cluster_df,3, 'pct')
+cluster.plots(hm, cluster_df,3, 'consumption')
 
 hm <- '009'
 # many heats that could be feasible...
 cluster_df <- cluster.maker(hm, c('furnace','ac'))
 # cluster.tests(cluster_df)
-cluster.plots(hm, cluster_df,3)
+cluster.plots(hm, cluster_df,3, 'pct')
+cluster.plots(hm, cluster_df,3, 'consumption')
 
 hm <- '010'
 # no ac (later enrollment), also no one heat that makes complete sense by itself...
 cluster_df <- cluster.maker(hm, c('heat 2'))
 # cluster.tests(cluster_df)
-cluster.plots(hm, cluster_df,2)
+cluster.plots(hm, cluster_df,2, 'pct')
+cluster.plots(hm, cluster_df,3, 'consumption')
 
 hm <- '011'
 # no ac (later enrollment)
 cluster_df <- cluster.maker(hm, c('heat 6'))
 # cluster.tests(cluster_df)
-cluster.plots(hm, cluster_df,2)
+cluster.plots(hm, cluster_df,2, 'pct')
+cluster.plots(hm, cluster_df,3, 'consumption')
 
 hm <- '012'
 #
 cluster_df <- cluster.maker(hm, c('heat 2','ac'))
 # cluster.tests(cluster_df)
-cluster.plots(hm, cluster_df,3)
+cluster.plots(hm, cluster_df,3, 'pct')
+cluster.plots(hm, cluster_df,3, 'consumption')
 
 hm <- '013'
 #
 cluster_df <- cluster.maker(hm, c('heat 2','ac'))
 # cluster.tests(cluster_df)
-cluster.plots(hm, cluster_df,3)
+cluster.plots(hm, cluster_df,3, 'pct')
+cluster.plots(hm, cluster_df,3, 'consumption')
 
 hm <- '014'
 # heat doesn't look feasible...
 cluster_df <- cluster.maker(hm, c('heat 1','ac'))
 # cluster.tests(cluster_df)
-cluster.plots(hm, cluster_df,3)
+cluster.plots(hm, cluster_df,3, 'pct')
+cluster.plots(hm, cluster_df,3, 'consumption')
 
 hm <- '015'
 # on ac, multiple feasible heats
 cluster_df <- cluster.maker(hm, c('heat 4'))
 # cluster.tests(cluster_df)
-cluster.plots(hm, cluster_df,2)
+cluster.plots(hm, cluster_df,2, 'pct')
+cluster.plots(hm, cluster_df,3, 'consumption')
 
 hm <- '016'
 # # not available
