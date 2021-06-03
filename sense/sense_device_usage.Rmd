@@ -76,7 +76,6 @@ ggplot(home_001_f, aes(x = hod, y = pct) ) +
 
 
 
-
 ---
 
 # Daily Fraction On
@@ -85,7 +84,7 @@ ggplot(home_001_f, aes(x = hod, y = pct) ) +
 
 # function to test daily usage per device by home
 
-daily.usage <- function(home_id # home id, in form: '003'
+daily.fraction <- function(home_id # home id, in form: '003'
                        ) {
 a <- data %>%
   filter(job_id == home_id) %>%
@@ -122,13 +121,57 @@ coord_cartesian(ylim = c(0,100))+
 ```{r, eval = FALSE}
 
 # apply above function to all homes
-lapply(levels(as.factor(data$job_id)), daily.usage)
+lapply(levels(as.factor(data$job_id)), daily.fraction)
 ```
 
 
-## Cluster days based on heating and ac behaviours  
+# Daily Consumption
 
-## Compare all homes
+```{r, include = FALSE, eval = FALSE}
+
+# function to test daily usage per device by home
+
+daily.consumption <- function(home_id # home id, in form: '003'
+                       ) {
+a <- data %>%
+  filter(job_id == home_id) %>%
+  mutate(dateday = floor_date(datetime, unit = 'day'),
+         sense_device_name = if_else(is.na(sense_device_name),
+                                     device_id, sense_device_name)) %>%
+  group_by(sense_device_name, dateday) %>%
+  summarise(
+    consumption = sum(consumption_kwh, na.rm = TRUE),
+    .groups = "drop")
+
+# plot for specified home
+ggplot(a, aes(x = dateday, y = consumption) ) +
+geom_segment(aes(xend = dateday, y = 0, yend = consumption)) +
+    theme(panel.grid.minor.y = element_blank(),
+      panel.grid.major.y = element_blank(),
+      legend.position="none") +
+coord_cartesian(ylim = c(0,100))+
+  # scale_x_continuous(breaks = c(0, 3, 6, 9, 12, 15, 18, 21, 24)) +
+    xlab("Date") +
+    ylab("Consumption (kwh)") +
+    #scale_x_log10() +
+  facet_wrap(~sense_device_name, ncol = 4, scales = "free")+
+  ggtitle(paste('Home', home_id))
+}
+
+
+```
+
+```{r, eval = FALSE}
+a <- data %>% pull(job_id) %>% as.factor() %>% levels()
+daily.consumption('003')
+# apply above function to all homes
+lapply(levels(as.factor(data$job_id)), daily.consumption)
+```
+
+
+# Cluster days based on heating and ac behaviours  
+
+# Compare all homes
 
 
 ```{r cluster_functions, include = FALSE, eval = TRUE}
