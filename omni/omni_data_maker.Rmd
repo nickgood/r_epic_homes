@@ -1,0 +1,272 @@
+---
+title: "Summarize Location"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: paper
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.path = 'figures/',
+  warning = FALSE,
+  message = FALSE,
+  echo = FALSE,
+  fig.width = 10, fig.height = 3,
+  cache = FALSE)
+```
+
+---
+
+```{r}
+library(dplyr)
+library(purrr)
+library(tidyr)
+library(openair)
+library(ggplot2)
+library(readr)
+library(googlesheets4)
+library(lubridate)
+```
+
+```{r}
+clean_data <- function(x){
+  #print(x)
+  f <- read_rds(x)
+ if(length(f$data) > 0){
+  data_long <- as_tibble(f) %>%
+  unnest_wider(data) %>%
+  select(-indices) %>%
+  mutate(df = map(sensors, ~ .x %>% map_df(magrittr::extract, c("comp", "value")))) %>%
+  unnest(df) %>%
+  select(-sensors, -score) %>%
+  pivot_wider(names_from = "comp", values_from = "value") %>%
+  mutate(datetime = format(as.POSIXct(strptime(timestamp,format = "%FT%H:%M:%S",tz = "GMT")),
+                          tz = "US/Mountain",
+                          usetz = TRUE),
+         filename = x)
+ }else{
+   tibble(timestamp = NA_character_,
+          co2 = NA_real_,
+          voc = NA_real_,
+          temp = NA_real_,
+          lux = NA_real_,
+          humid = NA_real_,
+          pm25 = NA_real_,
+          score = NA_real_,
+          spl_a  = NA_real_,    
+          datetime = NA_character_,
+          filename = NA_character_)
+ }
+}
+
+
+```
+
+# 001 Outdoor
+
+```{r}
+
+id_home <- "001"
+location <- "outdoor"
+pattern = paste0(".*", id_home, "_", location, ".*.rds$")
+files <- list.files("../output/omni", pattern = pattern, full.names = TRUE)
+```
+
+```{r}
+data <- map(files, clean_data) %>%
+  bind_rows() %>%
+  mutate_at(vars(contains("time")), ymd_hms) %>%
+  na.omit() %>%
+  mutate(home = id_home, location = location)
+
+```
+
+```{r list_files}
+id_home <- '007'
+location <- 'garage'
+pattern <- paste0(".*", id_home, "_", location, ".*.rds$")
+
+a <- list.files("../output/omni", pattern = pattern, full.names = TRUE)
+
+# isolate error files
+clean_data_test <- function(x){
+  #print(x)
+  f <- read_rds(x)
+  tryCatch(
+ if(length(f$data) > 0){
+  data_long <- as_tibble(f) %>%
+  unnest_wider(data) %>%
+  select(-indices) %>%
+  mutate(df = map(sensors, ~ .x %>% map_df(magrittr::extract, c("comp", "value")))) %>%
+  unnest(df) %>%
+  select(-sensors, -score) %>%
+  pivot_wider(names_from = "comp", values_from = "value") %>%
+  mutate(datetime = format(as.POSIXct(strptime(timestamp,format = "%FT%H:%M:%S",tz = "GMT")),
+                          tz = "US/Mountain",
+                          usetz = TRUE),
+         filename = x)
+ }else{
+   tibble(timestamp = NA_character_,
+          co2 = NA_real_,
+          voc = NA_real_,
+          temp = NA_real_,
+          lux = NA_real_,
+          humid = NA_real_,
+          pm25 = NA_real_,
+          score = NA_real_,
+          spl_a  = NA_real_,    
+          datetime = NA_character_,
+          filename = NA_character_)
+ },
+ error = function(e) paste('ERROR', x)
+  )
+}
+
+test <- map(a, clean_data_test)
+
+# columns change on 2021-01-27_2021-01-28 to include pm10est? cause error in kitchen007
+# columns change on 2021-01-17_2021-01-18 to stop including pm10est? cause error in garage007
+
+pattern <- '.*007_kitchen_2021-01-27'
+d <- list.files("../output/omni", pattern = pattern, full.names = TRUE)
+g <- read_rds(d) # file on this day is a conneciton error message
+
+test <- clean_data_new(d)
+
+
+# find if we can overwrite files with these specific error messages
+clean_data_new <- function(x){
+  #print(x)
+  f <- read_rds(x)
+  
+  # make blank dataframe for files with no data
+  # or specific error message
+  blank_df <- 
+    tibble(timestamp = NA_character_,
+          co2 = NA_real_,
+          voc = NA_real_,
+          temp = NA_real_,
+          lux = NA_real_,
+          humid = NA_real_,
+          pm25 = NA_real_,
+          score = NA_real_,
+          spl_a  = NA_real_,    
+          datetime = NA_character_,
+          filename = NA_character_)
+  
+  # insert blank dataframe if connection error occurs on a day
+  if(grepl("upstream connect error or disconnect/reset before headers.",
+           f, fixed = TRUE)) blank_df
+  
+  else if(length(f$data) > 0){
+  data_long <- as_tibble(f) %>%
+  unnest_wider(data) %>%
+  select(-indices) %>%
+  mutate(df = map(sensors, ~ .x %>% map_df(magrittr::extract, c("comp", "value")))) %>%
+  unnest(df) %>%
+  select(-sensors, -score) %>%
+  pivot_wider(names_from = "comp", values_from = "value") %>%
+  mutate(datetime = format(as.POSIXct(strptime(timestamp,format = "%FT%H:%M:%S",tz = "GMT")),
+                          tz = "US/Mountain",
+                          usetz = TRUE),
+         filename = x)
+  
+    # insert blank dataframe if no data is recorded on a day
+ } else blank_df
+}
+
+# see if data works now
+test <- map(a, clean_data_new) %>%
+  bind_rows() %>%
+  mutate_at(vars(contains("time")), ymd_hms) %>%
+  na.omit() %>%
+  mutate(home = id_home, location = location)
+
+
+# #test that all columns were actually written
+# b <- map(a, clean_data_new)
+# 
+# # 2021-02-10 was one date that had only 11 columns
+# # check that it is in data
+# c <- test %>%
+#   filter(datetime > as.POSIXct('2021-02-09 00:00:00', tz = 'MST'))
+# # so the current function is deleting days that only have 11 columns
+# # if there are days with 12 columns
+
+
+
+
+# only omit a row if every value is NA
+test2 <- map(a, clean_data_new) %>%
+  bind_rows() %>%
+  mutate_at(vars(contains("time")), ymd_hms) %>%
+  filter(rowSums(is.na(.)) != ncol(.)) %>%
+  mutate(home = id_home, location = location)
+  
+  
+  
+  #check how many columns each of the files I've downloaded have
+  col.check <- function(hm, rm) {
+  read.table(paste0("../output/omni_clean/omni_", hm, "_", rm, ".csv"),             # Read only header of example data
+           head = TRUE,
+           nrows = 1,
+           sep = ',') %>%
+      colnames()
+  }
+    
+  home <- '009'
+
+  lapply(c('living', 'bedroom', 'kitchen', 'outdoor', 'garage'), col.check,
+         hm = home)
+
+  
+
+```
+
+
+```{r}
+
+# function to make files for multiple homes/locations
+
+data.maker <- function(id_home, location) {
+pattern = paste0(".*", id_home, "_", location, ".*.rds$")
+files <- list.files("../output/omni", pattern = pattern, full.names = TRUE)
+
+data <- map(files, clean_data) %>%
+  bind_rows() %>%
+  mutate_at(vars(contains("time")), ymd_hms) %>%
+  na.omit() %>%
+  mutate(home = id_home)
+
+write_csv(data, paste0('../output/omni_clean/omni_', id_home, '_', location, '.csv'))
+}
+
+rooms_all <- c( 'bedroom', 'living', 'kitchen', 'garage', 'outdoor')
+
+# doesn't work for home_007 kitchen and garage
+lapply(rooms_all, data.maker, id_home = '017')
+
+
+
+```
+
+```{r fig_pm25, fig.width=10, fig.height= 5}
+timeVariation(data %>% rename(date = datetime),
+              pollutant = "pm25",
+              ylab = "pm2.5 (ug/m3)")
+```
+
+```{r fig_co2, fig.width=10, fig.height= 5}
+timeVariation(data %>% rename(date = datetime),
+              pollutant = "co2",
+              ylab = "CO2 (ppmV)")
+```
+
+```{r fig_temp, fig.width=10, fig.height= 5}
+timeVariation(data %>% rename(date = datetime) %>% filter(temp < 45),
+              pollutant = "temp",
+              ylab = "Temperature (oC)")
+```
+
+---
