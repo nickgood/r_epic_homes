@@ -163,7 +163,7 @@ geom_segment(aes(xend = dateday, y = 0, yend = consumption)) +
 
 ```
 
-```{r daily_consum_overview, eval = TRUE}
+```{r daily_consum_overview, eval = FALSE}
 # homes 3 and 16 do not have data available
 
 # apply above function to all homes
@@ -336,7 +336,7 @@ cluster.plots <- function(
 ```
 
 
-```{r cluster_maker, eval = TRUE}
+```{r cluster_maker, eval = FALSE}
 
 hm <- '001'
 # 2 feasible ac units...
@@ -444,7 +444,7 @@ hm <- '003'
 
 
 hm <- '004'
-
+# cluster.tests(get(paste0('cluster_df_', hm)), 'pct')
 cluster.plots(hm, get(paste0('cluster_df_', hm)),2, 'pct')
 
 
@@ -469,12 +469,12 @@ cluster.plots(hm, get(paste0('cluster_df_', hm)),3, 'pct')
 
 
 hm <- '010'
-
+cluster.tests(get(paste0('cluster_df_', hm)), 'pct')
 cluster.plots(hm, get(paste0('cluster_df_', hm)),2, 'pct')
 
 
 hm <- '011'
-
+cluster.tests(get(paste0('cluster_df_', hm)), 'pct')
 cluster.plots(hm, get(paste0('cluster_df_', hm)),2, 'pct')
 
 
@@ -484,7 +484,7 @@ cluster.plots(hm, get(paste0('cluster_df_', hm)),3, 'pct')
 
 
 hm <- '013'
-
+cluster.tests(get(paste0('cluster_df_', hm)), 'pct')
 cluster.plots(hm, get(paste0('cluster_df_', hm)),2, 'pct')
 
 
@@ -494,6 +494,7 @@ cluster.plots(hm, get(paste0('cluster_df_', hm)),3, 'pct')
 
 
 hm <- '015'
+cluster.tests(get(paste0('cluster_df_', hm)), 'pct')
 cluster.plots(hm, get(paste0('cluster_df_', hm)),2, 'pct')
 
 
@@ -502,7 +503,7 @@ cluster.plots(hm, get(paste0('cluster_df_', hm)),2, 'pct')
 ```
 
 ## By Per-Device Consumption
-```{r cluster_plot_consum, eval = TRUE, fig.width=10, fig.height=3}
+```{r cluster_plot_consum, eval = FALSE, fig.width=10, fig.height=3}
 
 # make plots for all homes
 hm <- '001'
@@ -575,147 +576,165 @@ cluster.plots(hm, get(paste0('cluster_df_', hm)),2, 'consumption')
 
 ```
 
-```{r cluster_functions_summed, include = FALSE, eval = TRUE}
+## By Summed Heat/AC consumption
+```{r cluster_maker_summed, eval = TRUE}
+
+hm <- '001'
+# 2 feasible ac units...
+cluster_df_001 <- cluster.maker(hm, c('heat','ac'), group_heat_ac = TRUE)
 
 
 
 
-cluster.maker <- function(home_id, # home id, in form: '003'
-                       devices # character vector of devices from which to make clusters
-                       ) {
-a <- data %>%
-  filter(job_id == home_id) %>%
-  mutate(dateday = floor_date(datetime, unit = 'day'),
-         sense_device_name = if_else(is.na(sense_device_name),
-                                     device_id, sense_device_name)) %>%
-  group_by(sense_device_name, dateday) %>%
- summarise(
-    mins = n(), # amount of minutes device was on during specified day
-    consumption = sum(consumption_kwh, na.rm = TRUE),
-    .groups = "drop") %>%
-  mutate(d_min =  60 * 24, # amoutn of minutes in each day
-         pct = mins * 100 / d_min,
-         pct = if_else(pct == Inf, 0, pct),
-         pct = if_else(d_min < 50, 0, pct)) %>% # make cluster of time periods
-  
-    select(-c(mins,d_min))%>%
-    pivot_wider(names_from = sense_device_name, values_from = c(pct, consumption),
-                values_fill = 0 # make device usage minutes zero if not registered
-                # in a certain day
-    ) %>%
-      select(dateday, ends_with(all_of(devices))) %>%
-    tibble::column_to_rownames(var = 'dateday') %>%
-    ##scale the data to prepare for cluster analysis
-    scale()
-}
+hm <- '002'
+#
+cluster_df_002 <- cluster.maker(hm, c('heat','ac'), group_heat_ac = TRUE)
 
 
-# function to run multiple tests determining optimal cluster number
-cluster.tests <- function(
-  df, # dataframe resulting from cluster_maker function
-  measure # what will be evaluated for the device? either 'pct' or 'consumption'
-  ) {
-  
-  df <- df %>%
-    as.data.frame() %>%
-    select(starts_with(measure))
-  
-  #####decide how many clusters to use using different methods:
-  #silhouette
-  a <- fviz_nbclust(df, pam, method = 'silhouette')
-  
-  #knee bend
-  b <- fviz_nbclust(df, pam, method = 'wss')
-  
-  
-  # Gap statistic
-  # nboot = 50 to keep the function speedy. 
-  # recommended value: nboot= 500 for your analysis.
-  # Use verbose = FALSE to hide computing progression.
-  c<-  fviz_nbclust(df, kmeans, nstart = 25,  method = "gap_stat", nboot = 50)+
-    labs(subtitle = "Gap statistic method")
-  
-  return(list(a,b,c))
-}
+hm <- '003'
+# # home 3 not available?
+# cluster_df <- cluster.maker(hm, c('heat 6','ac'))
 
 
-# function to separate daily data into clusters and plot
-cluster.plots <- function(
-  home_id, # home id, in form: '003', just for labeling plot
-  df, # dataframe resulting from cluster_maker function
-  cluster_amount, # sepcifed amount of clusters
-    measure # what will be evaluated for the device? either 'pct' or 'consumption'
-  
-) {
-  
-    df <- df %>%
-    as.data.frame() %>%
-    select(starts_with(measure))
-  
-  ###plot with decided number of clusters
-  ##use pam package
-  pam.res <- pam(df, cluster_amount)
-  
-  cluster_colors <- c('red', 'blue', 'darkgreen', 'darkorange', 'purple')
-  
-  # Visualize pam clustering if more than one device is used 
-  pca_cluster_plot <- if(ncol(df)>1) {
-    fviz_cluster(pam.res, geom = "point", ellipse = FALSE,
-                                   palette = cluster_colors,
-                 main = paste('Home', home_id, measure))
-  } else {
-    # if only one device was used, show average scaled values for each cluster
-    df %>%
-  as.data.frame() %>%
-    ##add a cludter column to dataframe
-    mutate(cluster = pam.res$clustering) %>%
-  group_by(cluster) %>%
-  summarise_all(mean, na.rm = TRUE) %>%
-  ungroup()}
-  
-  #make function to define color based on cluster
-  color.find <- function(x)  cluster_colors[x]
-  
-  df_clust <- df %>%
-    as.data.frame() %>%
-    ##add a cludter column to dataframe and put date back in as column
-    mutate(cluster = pam.res$clustering) %>%
-    mutate(clust_color = color.find(cluster)) %>% # add column for color based on cluster
-    tibble::rownames_to_column(var = 'date')%>%
-    #convert date column from character to date
-    #and cluster to factor
-    mutate(date = as.Date(date), cluster = as.factor(cluster))
-  
-  
-  
-  
-  # #plot the cluster number over date to see if there is a
-  # #"trend" or identification of fire time period
-  # ggplot(df_clust, aes(x = date, y = cluster)) +
-  #   geom_col(orientation = 'x')+
-  #   scale_x_date(date_breaks = "1 month", date_labels = '%B')
-  
-  # map color column to cluster number column
-  # from https://stackoverflow.com/questions/35279570/assign-point-color-depending-on-data-frame-column-value-r
-  col <- as.character(df_clust$clust_color)
-  names(col) <- as.character(df_clust$cluster)
-  
-  #plot the cluster number over date to see if there is a "trend"
-  time_cluster_plot <- ggplot(df_clust, aes(x = date, y = 1)) +
-    # color data point by cluster
-    geom_tile(aes(fill = cluster))+
-    scale_fill_manual(values = col)+
-    scale_x_date(date_breaks = "1 month", date_labels = '%B')+
-    theme_bw()+
-    theme(
-      axis.title.y = element_blank(),
-      axis.text.y = element_blank(),
-      axis.ticks.y = element_blank()
-    )+
-    ggtitle(paste('Home', home_id, measure))
-  
-  return(list(pca_cluster_plot, time_cluster_plot))
-}
+hm <- '004'
+# no AC
+cluster_df_004 <- cluster.maker(hm, c('heat'), group_heat_ac = TRUE)
+
+
+hm <- '006'
+#
+cluster_df_006 <- cluster.maker(hm, c('heat','ac'), group_heat_ac = TRUE)
+
+hm <- '007'
+# 
+cluster_df_007 <- cluster.maker(hm, c('heat','ac'), group_heat_ac = TRUE)
+
+
+hm <- '008'
+# many heats that could be feasible...
+# heat 1 and 2 on approx same fraction, but 2 consumes more energy
+cluster_df_008 <- cluster.maker(hm, c('heat','ac'), group_heat_ac = TRUE)
+
+
+hm <- '009'
+# many heats that could be feasible...
+# consider summing consumption from heat 2 and 3 with furnace to cluster
+cluster_df_009 <- cluster.maker(hm, c('heat','ac'), group_heat_ac = TRUE)
+
+
+hm <- '010'
+# no ac (later enrollment), also no one heat that makes complete sense by itself...
+cluster_df_010 <- cluster.maker(hm, c('heat'), group_heat_ac = TRUE)
+
+
+hm <- '011'
+# no ac (later enrollment)
+cluster_df_011 <- cluster.maker(hm, c('heat'), group_heat_ac = TRUE)
+
+
+hm <- '012'
+#
+cluster_df_012 <- cluster.maker(hm, c('heat','ac'), group_heat_ac = TRUE)
+
+
+hm <- '013'
+# only 4 days of ac detected, so not used to cluster
+# no heats consume much, but heat 2 is on most often/constently
+cluster_df_013 <- cluster.maker(hm, c('heat'), group_heat_ac = TRUE)
+
+
+hm <- '014'
+# heat doesn't look feasible...
+# ac on at unexpected months
+cluster_df_014 <- cluster.maker(hm, c('heat','ac'), group_heat_ac = TRUE)
+
+
+hm <- '015'
+# on ac, multiple feasible heats
+cluster_df_015 <- cluster.maker(hm, c('heat'), group_heat_ac = TRUE)
+
+
+hm <- '016'
+# # not available
+# cluster_df <- cluster.maker(hm, c('heat 6','ac'))
+
+
+hm <- '017'
+# # not available
+# cluster_df <- cluster.maker(hm, c('heat 6','ac'))
+
+
+
+```
+
+```{r cluster_plot_consum_summed, eval = TRUE, fig.width=10, fig.height=3}
+
+# make plots for all homes
+hm <- '001'
+
+cluster.plots(hm, get(paste0('cluster_df_', hm)),3, 'consumption')
+
+hm <- '002'
+
+cluster.plots(hm, get(paste0('cluster_df_', hm)),3, 'consumption')
+
+hm <- '003'
+# # home 3 not available?
+
+
+hm <- '004'
+
+cluster.plots(hm, get(paste0('cluster_df_', hm)),2, 'consumption')
+
+
+hm <- '006'
+#
+cluster.plots(hm, get(paste0('cluster_df_', hm)),3, 'consumption')
+
+
+hm <- '007'
+# 
+cluster.plots(hm, get(paste0('cluster_df_', hm)),3, 'consumption')
+
+
+hm <- '008'
+
+cluster.plots(hm, get(paste0('cluster_df_', hm)),3, 'consumption')
+
+
+hm <- '009'
+
+cluster.plots(hm, get(paste0('cluster_df_', hm)),3, 'consumption')
+
+
+hm <- '010'
+
+cluster.plots(hm, get(paste0('cluster_df_', hm)),2, 'consumption')
+
+
+hm <- '011'
+
+cluster.plots(hm, get(paste0('cluster_df_', hm)),2, 'consumption')
+
+
+hm <- '012'
+#
+cluster.plots(hm, get(paste0('cluster_df_', hm)),3, 'consumption')
+
+
+hm <- '013'
+
+cluster.plots(hm, get(paste0('cluster_df_', hm)),2, 'consumption')
+
+
+hm <- '014'
+
+cluster.plots(hm, get(paste0('cluster_df_', hm)),3, 'consumption')
+
+
+hm <- '015'
+cluster.plots(hm, get(paste0('cluster_df_', hm)),2, 'consumption')
+
 
 
 
