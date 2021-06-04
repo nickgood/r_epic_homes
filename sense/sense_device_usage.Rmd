@@ -14,7 +14,7 @@ knitr::opts_chunk$set(fig.path = 'figures/',
 
 ```
 
-```{r souorce_functions_libraries, eval = TRUE}
+```{r source_functions_libraries, eval = TRUE}
 # reads source
 source("../functions_epic.R")
 # add extra libraries for cluster analysis
@@ -112,7 +112,7 @@ coord_cartesian(ylim = c(0,100))+
     ylab("Time in use (%)") +
     #scale_x_log10() +
   facet_wrap(~sense_device_name, ncol = 4, scales = "free")+
-  ggtitle(paste('Home', home_id))
+  ggtitle(paste('Home', home_id, 'Fraction On'))
 }
 
 
@@ -155,7 +155,7 @@ coord_cartesian(ylim = c(0,100))+
     ylab("Consumption (kwh)") +
     #scale_x_log10() +
   facet_wrap(~sense_device_name, ncol = 4, scales = "free")+
-  ggtitle(paste('Home', home_id))
+  ggtitle(paste('Home', home_id, 'Consumption'))
 }
 
 
