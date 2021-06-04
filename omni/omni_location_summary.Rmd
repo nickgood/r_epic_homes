@@ -163,5 +163,4 @@ rooms_all <- c( 'bedroom', 'living', 'kitchen', 'garage', 'outdoor')
 lapply(rooms_all, data.maker, id_home = '007')
 
 
-
 ```
