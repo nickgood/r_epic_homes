@@ -111,7 +111,7 @@ coord_cartesian(ylim = c(0,100))+
     xlab("Date") +
     ylab("Time in use (%)") +
     #scale_x_log10() +
-  facet_wrap(~sense_device_name, ncol = 4, scales = "free")+
+  facet_wrap(~sense_device_name, ncol = 4, scales = "fixed")+
   ggtitle(paste('Home', home_id, 'Fraction On'))
 }
 
@@ -149,12 +149,12 @@ geom_segment(aes(xend = dateday, y = 0, yend = consumption)) +
     theme(panel.grid.minor.y = element_blank(),
       panel.grid.major.y = element_blank(),
       legend.position="none") +
-coord_cartesian(ylim = c(0,100))+
+# coord_cartesian(ylim = c(0,100))+
   # scale_x_continuous(breaks = c(0, 3, 6, 9, 12, 15, 18, 21, 24)) +
     xlab("Date") +
     ylab("Consumption (kwh)") +
     #scale_x_log10() +
-  facet_wrap(~sense_device_name, ncol = 4, scales = "free")+
+  facet_wrap(~sense_device_name, ncol = 4, scales = "fixed")+
   ggtitle(paste('Home', home_id, 'Consumption'))
 }
 
@@ -350,7 +350,7 @@ hm <- '004'
 cluster_df <- cluster.maker(hm, c('furnace'))
 # cluster.tests(cluster_df)
 cluster.plots(hm, cluster_df,2, 'pct')
-cluster.plots(hm, cluster_df,3, 'consumption')
+cluster.plots(hm, cluster_df,2, 'consumption')
 
 hm <- '006'
 #
@@ -368,13 +368,15 @@ cluster.plots(hm, cluster_df,3, 'consumption')
 
 hm <- '008'
 # many heats that could be feasible...
-cluster_df <- cluster.maker(hm, c('heat 1','ac'))
+# heat 1 and 2 on approx same fraction, but 2 consumes more energy
+cluster_df <- cluster.maker(hm, c('heat 2','ac'))
 # cluster.tests(cluster_df)
 cluster.plots(hm, cluster_df,3, 'pct')
 cluster.plots(hm, cluster_df,3, 'consumption')
 
 hm <- '009'
 # many heats that could be feasible...
+# consider summing consumption from heat 2 and 3 with furnace to cluster
 cluster_df <- cluster.maker(hm, c('furnace','ac'))
 # cluster.tests(cluster_df)
 cluster.plots(hm, cluster_df,3, 'pct')
@@ -385,31 +387,33 @@ hm <- '010'
 cluster_df <- cluster.maker(hm, c('heat 2'))
 # cluster.tests(cluster_df)
 cluster.plots(hm, cluster_df,2, 'pct')
-cluster.plots(hm, cluster_df,3, 'consumption')
+cluster.plots(hm, cluster_df,2, 'consumption')
 
 hm <- '011'
 # no ac (later enrollment)
 cluster_df <- cluster.maker(hm, c('heat 6'))
 # cluster.tests(cluster_df)
 cluster.plots(hm, cluster_df,2, 'pct')
-cluster.plots(hm, cluster_df,3, 'consumption')
+cluster.plots(hm, cluster_df,2, 'consumption')
 
 hm <- '012'
 #
-cluster_df <- cluster.maker(hm, c('heat 2','ac'))
+cluster_df <- cluster.maker(hm, c('furnace','ac'))
 # cluster.tests(cluster_df)
 cluster.plots(hm, cluster_df,3, 'pct')
 cluster.plots(hm, cluster_df,3, 'consumption')
 
 hm <- '013'
-#
-cluster_df <- cluster.maker(hm, c('heat 2','ac'))
+# only 4 days of ac detected, so not used to cluster
+# no heats consume much, but heat 2 is on most often/constently
+cluster_df <- cluster.maker(hm, c('heat 2'))
 # cluster.tests(cluster_df)
-cluster.plots(hm, cluster_df,3, 'pct')
-cluster.plots(hm, cluster_df,3, 'consumption')
+cluster.plots(hm, cluster_df,2, 'pct')
+cluster.plots(hm, cluster_df,2, 'consumption')
 
 hm <- '014'
 # heat doesn't look feasible...
+# ac on at unexpected months
 cluster_df <- cluster.maker(hm, c('heat 1','ac'))
 # cluster.tests(cluster_df)
 cluster.plots(hm, cluster_df,3, 'pct')
@@ -417,10 +421,10 @@ cluster.plots(hm, cluster_df,3, 'consumption')
 
 hm <- '015'
 # on ac, multiple feasible heats
-cluster_df <- cluster.maker(hm, c('heat 4'))
+cluster_df <- cluster.maker(hm, c('furnace'))
 # cluster.tests(cluster_df)
 cluster.plots(hm, cluster_df,2, 'pct')
-cluster.plots(hm, cluster_df,3, 'consumption')
+cluster.plots(hm, cluster_df,2, 'consumption')
 
 hm <- '016'
 # # not available
