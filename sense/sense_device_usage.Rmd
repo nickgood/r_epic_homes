@@ -14,7 +14,7 @@ knitr::opts_chunk$set(fig.path = 'figures/',
 
 ```
 
-```{r, eval = TRUE}
+```{r souorce_functions_libraries, eval = TRUE}
 # reads source
 source("../functions_epic.R")
 # add extra libraries for cluster analysis
@@ -24,7 +24,7 @@ library('factoextra')
 
 ```
 
-```{r, eval = TRUE}
+```{r data_import, eval = TRUE}
 data <- read_rds("../output/sense_all.rds")
 ```
 
@@ -80,7 +80,7 @@ ggplot(home_001_f, aes(x = hod, y = pct) ) +
 
 # Daily Fraction On
 
-```{r, include = FALSE, eval = FALSE}
+```{r daily_frac_func, include = FALSE, eval = FALSE}
 
 # function to test daily usage per device by home
 
@@ -118,7 +118,7 @@ coord_cartesian(ylim = c(0,100))+
 
 ```
 
-```{r, eval = FALSE}
+```{r daily_frac_overview, eval = FALSE}
 
 # apply above function to all homes
 lapply(levels(as.factor(data$job_id)), daily.fraction)
@@ -127,7 +127,7 @@ lapply(levels(as.factor(data$job_id)), daily.fraction)
 
 # Daily Consumption
 
-```{r, include = FALSE, eval = FALSE}
+```{r daily_consum_functions, include = FALSE, eval = TRUE}
 
 # function to test daily usage per device by home
 
@@ -161,7 +161,7 @@ coord_cartesian(ylim = c(0,100))+
 
 ```
 
-```{r, eval = FALSE}
+```{r daily_consum_overview, eval = TRUE}
 # homes 3 and 16 do not have data available
 
 # apply above function to all homes
@@ -319,7 +319,7 @@ cluster.plots <- function(
 
 ```
 
-```{r, eval = TRUE, fig.width=10, fig.height=3}
+```{r cluster_plots, eval = TRUE, fig.width=10, fig.height=3}
 
 
 
