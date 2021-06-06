@@ -742,13 +742,8 @@ cluster.plots(hm, get(paste0('cluster_df_', hm)),2, 'consumption')
 
 
 # Compare Clustering Methods  
-```{r cluster_compare, eval = TRUE, fig.width=10, fig.height=5}
+```{r cluster_compare_function, eval = TRUE}
 
-# define variables
-# just compare methods for daily fraction of time-on (pct)
-measure <- 'pct'
-home_id <- '002'
-devices <- c('furnace', 'ac 2')
 
 cluster.methods <- function(home_id, devices,
                             n_clust = 3 # number of clusters
@@ -884,10 +879,15 @@ cluster_time_plot <- ggplot(a_cl, aes(x = as.Date(dateday), y = 1)) +
 return(list( boxplot, cluster_point_plot, cluster_time_plot))
 }
 
+```
+
+```{r cluster_compare_plots, eval = TRUE, fig.width=10, fig.height=5}
 
 ###############################################################
 
-
+# define variables
+# just compare methods for daily fraction of time-on (pct)
+measure <- 'pct'
 
 hm <- '001'
 # 2 feasible ac units...
@@ -970,6 +970,7 @@ hm <- '016'
 hm <- '017'
 # # not available
 # cluster_df <- cluster.maker(hm, c('heat 6','ac'))
+
 
 
 
