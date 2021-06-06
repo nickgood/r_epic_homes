@@ -747,9 +747,12 @@ cluster.plots(hm, get(paste0('cluster_df_', hm)),2, 'consumption')
 # define variables
 # just compare methods for daily fraction of time-on (pct)
 measure <- 'pct'
+home_id <- '002'
+devices <- c('furnace', 'ac 2')
 
-
-cluster.methods <- function(home_id, devices) {
+cluster.methods <- function(home_id, devices,
+                            n_clust = 3 # number of clusters
+                            ) {
 
 a <- data %>%
   filter(job_id == home_id) %>%
@@ -787,22 +790,24 @@ boxplot <- ggplot(a_dev, aes(y = usage))+
   ggtitle(home_id)
 
 
-
 a <- a  %>%
   # add in scaled column for cluster making
   mutate_at(vars(-dateday), list(scaled = scale))
 
-
+# perform PAM Clustering with euclidean distance
+  pam_calc <- pam(a %>% select(c(heat_scaled, ac_scaled)), n_clust)
+  
+# perform hierarchical clustering
 dist_mat <- dist(a %>% select(-c(dateday, heat, ac)))
 
 # make cuts from different hierarchical methods
-cut_avg <- cutree(hclust(dist_mat, method = 'average' ), k = 3)
-cut_sing <- cutree(hclust(dist_mat, method = 'single'), k = 3)
-cut_ward <- cutree(hclust(dist_mat, method = 'ward.D' ), k = 3)
-cut_ward2 <- cutree(hclust(dist_mat, method = 'ward.D2'), k = 3)
-cut_comp <- cutree(hclust(dist_mat, method = 'complete' ), k = 3)
-cut_mcq <- cutree(hclust(dist_mat, method = 'mcquitty'), k = 3)
-cut_cent <- cutree(hclust(dist_mat, method = 'centroid'), k = 3)
+cut_avg <- cutree(hclust(dist_mat, method = 'average' ), k = n_clust)
+cut_sing <- cutree(hclust(dist_mat, method = 'single'), k = n_clust)
+cut_ward <- cutree(hclust(dist_mat, method = 'ward.D' ), k = n_clust)
+cut_ward2 <- cutree(hclust(dist_mat, method = 'ward.D2'), k = n_clust)
+cut_comp <- cutree(hclust(dist_mat, method = 'complete' ), k = n_clust)
+cut_mcq <- cutree(hclust(dist_mat, method = 'mcquitty'), k = n_clust)
+cut_cent <- cutree(hclust(dist_mat, method = 'centroid'), k = n_clust)
 
 
 # make cluster color scale
@@ -813,6 +818,8 @@ color.find <- function(x)  cluster_colors[x]
 
 # make a df with all clustering methods
 a_cl <- a %>%
+  ### add in manual clustering method
+  
   # make level of use columns for heat and ac (unscaled)
   # heat based on quantile
   # ac based on value
@@ -824,10 +831,16 @@ a_cl <- a %>%
     heat_use == 'low' & ac_use == 'low' ~ 3
   )) %>%
   select(-c(heat_use, ac_use))%>%
-  mutate(cluster_avg = cut_avg, cluster_sing = cut_sing, cluster_ward = cut_ward,
+  ### add in all other methods
+  mutate(
+    # pam
+    cluster_pam = pam_calc$clustering,
+    # hierarchical
+           cluster_avg = cut_avg, cluster_sing = cut_sing, cluster_ward = cut_ward,
          cluster_ward2 = cut_ward2, cluster_comp = cut_comp, cluster_mcq = cut_mcq,
          cluster_cent = cut_cent) %>%
-  pivot_longer(cols = c(cluster_avg,cluster_sing, cluster_ward, cluster_ward2,
+  pivot_longer(cols = c(cluster_pam,
+                        cluster_avg, cluster_sing, cluster_ward, cluster_ward2,
                         cluster_comp, cluster_mcq, cluster_cent,
                         cluster_manual
                         ),
