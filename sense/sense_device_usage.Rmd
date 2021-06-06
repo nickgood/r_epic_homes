@@ -805,6 +805,12 @@ cut_mcq <- cutree(hclust(dist_mat, method = 'mcquitty'), k = 3)
 cut_cent <- cutree(hclust(dist_mat, method = 'centroid'), k = 3)
 
 
+# make cluster color scale
+cluster_colors <- c('red', 'blue', 'darkgreen')
+
+#make function to define color based on cluster
+color.find <- function(x)  cluster_colors[x]
+
 # make a df with all clustering methods
 a_cl <- a %>%
   # make level of use columns for heat and ac (unscaled)
@@ -841,12 +847,6 @@ cluster_point_plot <-
 
 
 
-
-# make cluster color scale
-cluster_colors <- c('red', 'blue', 'darkgreen')
-
-#make function to define color based on cluster
-color.find <- function(x)  cluster_colors[x]
 
 # map color column to cluster number column
 # from https://stackoverflow.com/questions/35279570/assign-point-color-depending-on-data-frame-column-value-r
