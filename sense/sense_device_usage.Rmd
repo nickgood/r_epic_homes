@@ -982,7 +982,7 @@ hm <- '017'
 
 cluster.manual <- function(home_id, devices,
                             n_clust = 3 # number of clusters
-                            ) {
+                           ) {
 
 a <- data %>%
   filter(job_id == home_id) %>%
@@ -1033,8 +1033,8 @@ a_cl <- a %>%
   # make level of use columns for heat and ac (unscaled)
   # heat based on quantile
   # ac based on value
-  mutate(heat_use = if_else(heat>quantile(heat, 0.5), 'high', 'low'),
-         ac_use = if_else(ac> 5, 'high', 'low')) %>%
+  mutate(heat_use = if_else(heat>quantile(heat, heat_percentile_thresh), 'high', 'low'),
+         ac_use = if_else(ac> ac_usage_thresh, 'high', 'low')) %>%
   mutate(cluster_manual = case_when(
     heat_use == 'high' ~ 1,
     heat_use == 'low' & ac_use == 'high' ~ 2,
@@ -1080,7 +1080,11 @@ cluster_time_plot <- ggplot(a_cl, aes(x = as.Date(dateday), y = 1)) +
     # facet_wrap(vars(cluster_method))+
   ggtitle(paste('Home', home_id, measure))
 
-return(list( boxplot, cluster_point_plot, cluster_time_plot))
+return(list(
+  # boxplot,
+  # cluster_point_plot,
+  cluster_time_plot
+  ))
 }
 
 
@@ -1136,7 +1140,7 @@ a_cl <- a %>%
   
   # make level of use columns for heat and ac (unscaled)
   # heat based on quantile
-  mutate(heat_use = if_else(heat>quantile(heat, 0.5), 'high', 'low')) %>%
+  mutate(heat_use = if_else(heat>quantile(heat, heat_percentile_thresh), 'high', 'low')) %>%
   mutate(cluster_manual = case_when(
     heat_use == 'high' ~ 1,
     heat_use == 'low'  ~ 3,
@@ -1181,18 +1185,35 @@ cluster_time_plot <- ggplot(a_cl, aes(x = as.Date(dateday), y = 1)) +
     # facet_wrap(vars(cluster_method))+
   ggtitle(paste('Home', home_id, measure))
 
-return(list( boxplot, 
-             # cluster_point_plot, 
-             cluster_time_plot))
+return(list(
+  # boxplot,
+  # cluster_point_plot,
+  cluster_time_plot
+  ))
 }
 
 ```
 
-```{r cluster_manual_plots, eval = TRUE, fig.width=10, fig.height=3}
-
+```{r cluster_manual_define_variables, eval = TRUE}
 # define variables
+
+homes_ac <- c('001', '002', '006', '007', '008', '009', '012', '014')
+homes_no_ac <- c('004', '010', '011', '013', '015')
+
 # just compare methods for daily fraction of time-on (pct)
 measure <- 'pct'
+heat_percentile_thresh <- 0.25
+ac_usage_thresh <- 0
+```
+
+heating threshold set at `r heat_percentile_thresh` percentile for daily % time on
+
+ac threshold set at `r ac_usage_thresh`% for daily % time on
+
+```{r cluster_manual_plots, eval = TRUE, fig.width=8, fig.height=1}
+
+
+
 
 hm <- '001'
 # 2 feasible ac units...
