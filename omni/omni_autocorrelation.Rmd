@@ -5,149 +5,36 @@ date: "1/13/2021"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = FALSE)
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.path = 'figures/',
+  warning = FALSE,
+  message = FALSE,
+  echo = FALSE,
+  fig.width = 10, fig.height = 3,
+  cache = FALSE)
+```
 
-
-##Adapted from Collin Brehmer code---------------------------
-list.of.packages <- c("ggthemes", "tidyverse", "lubridate", "tidyselect",
-                      "googlesheets4", #for importing questionnaires from Drive
-                      "ggpubr", #for normality testing
-                      'gridExtra', #for making ggplot autocorrelation plots
-                      'irr') #for calculating ICC
-
-##install any packages in the above list that are not already installed
-new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
-if(length(new.packages)) install.packages(new.packages)
-
-lapply(list.of.packages, library, character.only = TRUE)
-
-
-#insert your email here to authorize access to questionnaire
-gs4_auth(email = "apurgiel@rams.colostate.edu")
+```{r}
+library(dplyr)
+library(purrr)
+library(tidyr)
+library(openair)
+library(ggplot2)
+library(readr)
+library(googlesheets4)
+library(lubridate)
+library(gridExtra) #for making ggplot autocorrelation plots
 
 ```
 
+
 ```{r data_import}
 
-# CSV Data Import ---------------------------------------------------------
+export_date <- '2021-06-07'
 
 ##Import CSV with Real Time Data
-rtdata<- read_csv("./OMNIdata_clean.csv",
-                  col_types = cols(
-                    date = col_datetime(),
-                    home = col_factor(),
-                    room = col_factor(),
-                    pm25 = col_number(),
-                    temp = col_number(),
-                    rh = col_number()), na = "NA")
-
-##Import CSV with Real Time Data
-hourly<- read_csv("./OMNIdata_hourly.csv",
-                  col_types = cols(
-                    date = col_datetime(),
-                    home = col_factor(),
-                    room = col_factor(),
-                    pm25 = col_number(),
-                    temp = col_number(),
-                    rh = col_number()), na = "NA")
-
-
-##Import CSV with Real Time Data
-daily<- read_csv("./OMNIdata_daily.csv",
-                  col_types = cols(
-                    date = col_datetime(),
-                    home = col_factor(),
-                    room = col_factor(),
-                    pm25 = col_number(),
-                    temp = col_number(),
-                    rh = col_number()), na = "NA")
-
-##Import CSV with Real Time Data
-weekly<- read_csv("./OMNIdata_weekly.csv",
-                  col_types = cols(
-                    date = col_datetime(),
-                    home = col_factor(),
-                    room = col_factor(),
-                    pm25 = col_number(),
-                    temp = col_number(),
-                    rh = col_number()), na = "NA")
-
-
-# Questionnaire Data Import -----------------------------------------------
-
-
-# ##Import questionnaire Data from Google Drive
-# 
-# ##Appliance Questionnaire
-# appq <- read_sheet("https://docs.google.com/spreadsheets/d/154vgySyseWzcUYLubFWOYqQ_IZkgckqiyEIwzFkphzY/edit?usp=sharing")
-# 
-# ##Home Questionnaire
-# homeq <- read_sheet("https://docs.google.com/spreadsheets/d/1ZMAggLlA64uDy05lfLupGyBcbyVvEN8AbRzTmxuJpZA/edit?usp=sharing")
-# 
-# ## Home data from energy assessments
-# adata <- read_sheet('https://docs.google.com/spreadsheets/d/12vWpqdmzIII0vEKH79xpmICUYGuzc8PjfBT2_3YjIHU/edit?usp=sharing')
-# 
-# 
-# ##https://stackoverflow.com/questions/24459752/can-dplyr-package-be-used-for-conditional-mutating
-# ##See the above link for alternative methods to this mutate
-# qdata <- full_join(appq, homeq, by = c('Participant ID', 'Visit')) %>%
-#   
-#   ##make home column
-#   ##and change certain column names to be concise
-#   mutate(home = str_remove(`Participant ID`, 'P'),
-#          vent_kit = `How is your kitchen ventilated?`,
-#          kit_filter = `When the kitchen is IN USE, how often do you and your household use this method to ventilate your kitchen? [recirculating filter]`,
-#          kit_exhaust = `When the kitchen is IN USE, how often do you and your household use this method to ventilate your kitchen? [outside exhaust]`,
-#          kit_window = `When the kitchen is IN USE, how often do you and your household use this method to ventilate your kitchen? [window(s)]`,
-#          kit_fan = `When the kitchen is IN USE, how often do you and your household use this method to ventilate your kitchen? [wall fan]`,
-#          window_summer = `In an average week in the SUMMER, how often are your windows and blinds / shades open? [windows]`,
-#          window_fall = `In an average week in the FALL, how often are your windows and blinds / shades open? [windows]`,
-#          window_winter = `In an average week in the WINTER, how often are your windows and blinds / shades open? [windows]`,
-#          window_spring = `In an average week in the SPRING, how often are your windows and blinds / shades open? [windows]`,
-#          oven_use = `Cooking appliances [How many times do you use your oven (not including stove)?]`) %>%
-# 
-#   #make oven_use col ready for analysis
-#   mutate(oven_use = if_else(str_detect(oven_use,
-#                                        '1 per day|2 per day'), 'daily',
-#                             'weekly') %>%
-#            as.factor()) %>%
-#   
-#     ##make kitchen ventilation column
-#   mutate(vent = if_else(str_detect(vent_kit, 'outside exhaust'), 'exhaust',
-#                         if_else(str_detect(vent_kit, 'recirculating filter|wall fan'),
-#                                 'filt_fan',
-#                                 if_else(str_detect(vent_kit, 'window\\(s\\)|passive vent'),
-#                                         'passive', 'none'))) %>%
-#            as.factor()) %>%
-#   
-#   #make a column for kitchen mechanical vent use
-#   mutate(
-#     #sometimes/always if they answered that they at least sometimes or always
-#     #use mechanical ventialtion when kitchen is in use
-#     #(fan, filter, or outside exhaust)
-#     #rarely/never if they never/rarely use, or don't have
-#     kit_mech = if_else(str_detect(kit_filter,
-#                                        'sometimes|always') |
-#                               str_detect(kit_exhaust,
-#                                          'sometimes|always') |
-#                               str_detect(kit_fan,
-#                                          'sometimes|always') ,
-#                             'sometimes/always',
-#                             'rarely/never') %>%
-#       as.factor()) %>%
-#   
-#   #join with appliance data
-#   full_join(adata) %>%
-#   #make specific estimated leakage rate col
-#   mutate(sela = ela/est_vol)
-# 
-# 
-
-qdata <- read.csv(file = 'survey_data.csv')
-
-
-
+rtdata<- read_csv(paste0('../output/omni_clean/OMNIdata_clean/',
+                         'omni_all_locations_', export_date, '.csv'))
 
 
 ```
