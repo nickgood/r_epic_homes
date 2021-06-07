@@ -148,19 +148,87 @@ data.maker <- function(id_home, location) {
 pattern = paste0(".*", id_home, "_", location, ".*.rds$")
 files <- list.files("../output/omni", pattern = pattern, full.names = TRUE)
 
+end_date <- map(files, function(x) {
+  # extract ending date of file from file name
+  substr(x, nchar(x)-13, nchar(x)-4)
+}
+) %>%
+  # find most recent dated file for given home/sensor
+  unlist() %>%
+  as.Date() %>%
+  max()
+
 data <- map(files, clean_data) %>%
   bind_rows() %>%
   mutate_at(vars(contains("time")), ymd_hms) %>%
   filter(rowSums(is.na(.)) != ncol(.)) %>% # omit a row if every value is NA
   mutate(home = id_home, location = location) # add home and location id
 
-write_csv(data, paste0('../output/omni_clean/omni_', id_home, '_', location, '.csv'))
+write_csv(data, paste0('../output/omni_clean/omni_', id_home, '_', location,
+                       '_', end_date, '.csv'))
 }
 
 rooms_all <- c( 'bedroom', 'living', 'kitchen', 'garage', 'outdoor')
+
 
 # doesn't work for home_007 kitchen and garage
 lapply(rooms_all, data.maker, id_home = '007')
 
 
+
+
 ```
+
+```{r data_merger, eval = FALSE}
+
+# function to make files for multiple homes/locations
+
+data.merger <- function(id_home, location) {
+ 
+   pattern_csv <- paste0(".*omni_", id_home, "_", location, ".*.csv$")
+   
+file_csv <- list.files("../output/omni_clean", pattern = pattern_csv, full.names = TRUE)
+
+
+# end date of existing csv, used as start date for downoading data
+start_date <- substr(file_csv, nchar(file_csv)-13, nchar(file_csv)-4)
+
+pattern = paste0(".*", id_home, "_", location, ".*.rds$")
+files <- list.files("../output/omni", pattern = pattern, full.names = TRUE)
+
+end_date <- map(files, function(x) {
+  # extract ending date of file from file name
+  substr(x, nchar(x)-13, nchar(x)-4)
+}
+) %>%
+  unlist() %>%
+  as.Date() %>%
+  # find most recent dated file for given home/sensor
+  max()
+
+
+
+# find where starting date of rds file is equal to most recent csv date
+# or before?????
+file_start <- map(files, function(x) {
+  # extract starting date of file from file name
+  substr(x, nchar(x)-24, nchar(x)-15)
+}
+) %>%
+  unlist() %>%
+  as.Date() %>%
+  # find most recent dated file for given home/sensor
+  max() #################
+
+
+data <- map(files, clean_data) %>%
+  bind_rows() %>%
+  mutate_at(vars(contains("time")), ymd_hms) %>%
+  filter(rowSums(is.na(.)) != ncol(.)) %>% # omit a row if every value is NA
+  mutate(home = id_home, location = location) # add home and location id
+
+write_csv(data, paste0('../output/omni_clean/omni_', id_home, '_', location,
+                       '_', end_date, '.csv'))
+}
+```
+
