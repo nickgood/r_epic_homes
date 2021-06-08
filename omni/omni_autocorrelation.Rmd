@@ -40,7 +40,7 @@ rtdata<- read_csv(paste0('../output/omni_clean/OMNIdata_clean/',
 ```
 
 
-```{r define_functions}
+```{r functions_misc}
 
 ##Define a char vector of home numbers using a number vector,
 ##ex: x <- home.list(c(1:15)) for homes 1-15
@@ -66,7 +66,90 @@ ggdensity(pull(data, all_of(x)),
           xlab = x)
 }
 
+```
 
+```{r define_variables, eval = TRUE}
+
+
+#define list of homes for analysis
+all_homes <- home.list(c(1:4, 7:16))
+
+```
+
+```{r function_count_missing_values, include = FALSE}
+
+##function to count missing day values for a home/room
+count.missing <- function(data, hm, loc, metric,
+                          # if start/end date not specified, first and last
+                          # date for specified home/location used
+                          start_date = '1971-01-01 00:00:00',
+                          end_date = '2099-01-01 00:00:00',
+                          unit = 'day') {
+  
+  
+    if (unit == 'hour') {
+
+  avg_data <- data %>%
+  filter(home == hm & location == loc) %>%
+    filter(datetime > ymd_hms(start_date) & datetime < ymd_hms(end_date)) %>%
+  mutate(date = floor_date(datetime, unit = 'hours')) %>%
+  group_by(date) %>%
+  summarize_if(is.numeric, list(~mean(., na.rm = TRUE))) %>%
+  ungroup() %>%
+        complete(date = seq(ymd_hms(min(date)), ymd_hms(max(date)),
+        dhours(1)))
+
+  
+
+    }
+  
+  if (unit == 'day') {
+
+          avg_data <- data %>%
+  filter(home == hm & location == loc) %>%
+                filter(datetime > ymd_hms(start_date) & datetime < ymd_hms(end_date)) %>%
+  mutate(date = floor_date(datetime, unit = 'days')) %>%
+  group_by(date) %>%
+  summarize_if(is.numeric, list(~mean(., na.rm = TRUE))) %>%
+  ungroup() %>%
+    complete(date = seq(min(date), max(date), by="day"))
+
+  }
+  
+      a<- avg_data %>%
+    select(all_of(metric)) %>%
+    is.na() %>%
+    sum()
+      
+  return(a)
+}
+
+```
+
+```{r count_missing_values, include = FALSE}
+
+
+# see which homes/locations do not have missing daily average values
+ sapply(all_homes, count.missing,
+        loc = 'living',
+        data = data_all,
+       metric = 'pm25')
+
+ ```
+
+
+```{r functions_autocorrelation, include= FALSE}
+# filter data to one home/location and arrange by date
+data <- data_all %>%
+  filter(home == '003' & location == 'living') %>%
+  mutate(date = floor_date(datetime, unit = 'days')) %>%
+  group_by(date) %>%
+  summarize_if(is.numeric, list(~mean(., na.rm = TRUE))) %>%
+  ungroup()  
+
+
+# count values of avilable pairs (when neither value is NA)
+# for a given lag value
 
 
 ##Define an autocorrelation plot function in ggplot
@@ -119,46 +202,6 @@ ggacf <- function(x, ci=0.95, type="correlation",
 
 
 
-##function to count missing day values for a home/room
-##in a certain time period
-count.missing <- function(hm, rm, start_date, end_date, unit) {
-  
-    if (unit == 'hour') {
-      #define date column as all hours
-  date_col <-
-    seq(as.POSIXct(start_date, tz = 'UTC'), as.POSIXct(end_date, tz = 'UTC'),
-        dhours(1))%>%
-    as.data.frame() %>%
-    rename('date' = '.')
-  
-  data <- hourly
-  
-
-    }
-  
-  if (unit == 'day') {
-          #define date column as all days
-    date_col <- 
-    seq(as.POSIXct(start_date, format = "%Y-%m-%d", na = "NA", tz = 'UTC'),
-      as.POSIXct(end_date, format = "%Y-%m-%d", na = "NA", tz = 'UTC'),
-      ddays(1)) %>%
-    as.data.frame() %>%
-    rename('date' = '.')
-    
-    data <- daily
-  
-  }
-  
-      a<- data %>%
-    filter(home == hm, room == rm) %>%
-    right_join(date_col) %>%
-    select('pm25') %>%
-    is.na() %>%
-    sum()
-      
-  return(a)
-}
-
 
 
 ##function to make acf plot for a given room and home and metric
@@ -172,7 +215,7 @@ acf.plot.nomiss <- function (hm, rm,
   if (unit == 'hour') {
       #define date column as all hours
   date_col <-
-    seq(as.POSIXct(start_date, tz = 'UTC'), as.POSIXct(end_date, tz = 'UTC'),
+    seq(ymd_hms(start_date), ymd_hms(end_date),
         dhours(1))%>%
     as.data.frame() %>%
     rename('date' = '.')
@@ -185,8 +228,8 @@ acf.plot.nomiss <- function (hm, rm,
   if (unit == 'day') {
           #define date column as all days
     date_col <- 
-    seq(as.POSIXct(start_date, format = "%Y-%m-%d", na = "NA", tz = 'UTC'),
-      as.POSIXct(end_date, format = "%Y-%m-%d", na = "NA", tz = 'UTC'),
+    seq(ymd_hms(start_date), ymd_hms(end_date),
+
       ddays(1)) %>%
     as.data.frame() %>%
     rename('date' = '.')
@@ -256,24 +299,8 @@ acf.grid.nomiss <- function(hms, rm, metric, lag.max,
 
 
 
-
-#define list of homes for analysis
-home_num <- home.list(1:16)
-
-
-
-
-
-
-# test variables
-metric <- 'pm25'
-rm <- 'living'
-lag.max <- 7
-hms <- home.list(c(1:7))
-unit <- 'day'
-
-
 ```
+
 
 # Autocorrelation Raw Values
 
@@ -284,11 +311,6 @@ unit <- 'day'
 ################Avoid claculation of AC if there are missing values
 
 
-
- sapply(home_num, count.missing, rm = 'living',
-       '2020-11-15 00:00:00',
-       '2020-12-15 00:00:00',
-       unit = 'hour')
 
 
 
