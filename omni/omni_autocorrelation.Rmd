@@ -135,73 +135,139 @@ count.missing <- function(data, hm, loc, metric,
         data = data_all,
        metric = 'pm25')
 
- ```
+```
 
 
 ```{r functions_autocorrelation, include= FALSE}
-# filter data to one home/location and arrange by date
-data <- data_all %>%
-  filter(home == '003' & location == 'living') %>%
+
+hm <- '003'
+loc <- 'living'
+
+# # filter data to one home/location and arrange by date
+#           avg_data <- data %>%
+#   filter(home == hm & location == loc) %>%
+#                 filter(datetime > ymd_hms(start_date) & datetime < ymd_hms(end_date)) %>%
+#   mutate(date = floor_date(datetime, unit = 'days')) %>%
+#   group_by(date) %>%
+#   summarize_if(is.numeric, list(~mean(., na.rm = TRUE))) %>%
+#   ungroup() %>%
+#     complete(date = seq(min(date), max(date), by="day")) %>%
+#   arrange(date)
+
+# all homes/locations in one dataframe
+avg_test_data <- data_all %>%
   mutate(date = floor_date(datetime, unit = 'days')) %>%
-  group_by(date) %>%
+  group_by(home, location, date) %>%
   summarize_if(is.numeric, list(~mean(., na.rm = TRUE))) %>%
-  ungroup()  
+    complete(date = seq(min(date), max(date), by="day")) %>%
+  ungroup()%>%
+  arrange(home, location, date)
 
 
-# count values of avilable pairs (when neither value is NA)
-# for a given lag value
+# # to insert NA rows between each group (could modify to add multiple NAs)
+# # from https://stackoverflow.com/questions/43403282/add-row-in-each-group-using-dplyr-and-add-row
+# indices <- seq(nrow(a)) %>%
+#     split(group_indices(a, home, location)) %>%
+#     map(~c(.x, rep(NA,10))) %>% # add in ten rows after each group
+#     unlist()
+
+
+
+# # find actual n value (doesn't count when one of the data in a pair is NA)
+# lags <- c(1:lag.max)
+# 
+# a <- map(lags, function(x) {
+#   avg_data_all %>%
+#               filter(home == '009' & location == 'garage')%>%
+#   pull(all_of(metric)) %>%
+#   diff(lag = x) %>%
+#     is.na() %>%
+#     `!` %>% #count how many are not NA
+#     sum()
+# }
+# ) %>% 
+#   unlist() %>%
+#   as.data.frame()%>%
+#   rename('n_lag'= '.') %>%
+#   mutate(lag = lags)
+
+
 
 
 ##Define an autocorrelation plot function in ggplot
 
 ###Make acf function in ggplot
 ##from: https://stackoverflow.com/questions/28857241/r-combine-plots-that-use-parmfrow-internally
-ggacf <- function(x, ci=0.95, type="correlation",
+ggacf <- function(data,  hm, loc, lag.max, metric,
+                  ci=0.95, type="correlation",
                   xlab="Lag", ylab=NULL,
-                  ylim=NULL, main=NULL,
-                  ci.col="blue", lag.max=NULL) {
+                  ylim=NULL, simple = FALSE,
+                  ci.col="blue") {
   
-  x <- as.data.frame(x)
+  x <- data %>% 
+    filter(home == hm & location == loc) %>%
+    pull(all_of(metric))
   
-  x.acf <- acf(x, plot=F, lag.max=lag.max, type=type)
+  x.acf <- acf(x, plot=F, lag.max=lag.max, type=type,
                
                ##if missing a value, continue calculation
                ##with line below in acf function
+               na.action = na.pass
+               )
   
-               # na.action = na.pass)
-  
-  ci.line <- qnorm((1 - ci) / 2) / sqrt(x.acf$n.used)
-  
+
   d.acf <- data.frame(lag=x.acf$lag, acf=x.acf$acf)
   
+  # find actual n value (doesn't count when one of the data in a pair is NA)
+lags <- c(1:lag.max)
+
+lag_counts <- map(lags, function(x) {
+  data %>%
+              filter(home == hm & location == loc)%>%
+  pull(all_of(metric)) %>%
+  diff(lag = x) %>%
+    is.na() %>%
+    `!` %>% #count how many are not NA
+    sum()
+}
+) %>% 
+  unlist() %>%
+  as.data.frame()%>%
+  rename('n_lag'= '.') %>%
+  mutate(lag = lags)
+  
+#plot
   g <- ggplot(d.acf, aes(x=lag, y=acf)) +
     geom_hline(yintercept=0) +
     geom_segment(aes(xend=lag, yend=0)) +
-    geom_hline(yintercept=ci.line, color=ci.col,
-               linetype="dashed") +
-    geom_hline(yintercept=-ci.line, color=ci.col,
-               linetype="dashed") +
+    geom_line(data = lag_counts, aes(lag, qnorm((1 - ci) / 2) / sqrt(n_lag)),
+              linetype = 'dashed', color = ci.col)+
+    geom_line(data = lag_counts, aes(lag, -qnorm((1 - ci) / 2) / sqrt(n_lag)),
+              linetype = 'dashed', color = ci.col)+
     theme_bw() +
-    # xlab("Lag") +
-    ggtitle(ifelse(is.null(main), "", main)) +
-    theme(axis.title = element_blank(),
-          axis.text = element_blank(),
-          axis.ticks = element_blank(),
-          panel.grid.major = element_blank(),
-          panel.grid.minor = element_blank(),
-          panel.border = element_blank(),
-          plot.title = element_text(hjust = 0.5))
-  #   if (is.null(ylab))
-  #     ylab(ifelse(type=="partial", "PACF", "ACF"))
-  # else
-  #   ylab(ylab)
+    xlab("Lag") +
+    ggtitle(if_else(simple == TRUE, "", paste(hm, loc))) +
+    # theme(axis.title = element_blank(),
+    #       axis.text = element_blank(),
+    #       axis.ticks = element_blank(),
+    #       panel.grid.major = element_blank(),
+    #       panel.grid.minor = element_blank(),
+    #       panel.border = element_blank(),
+    #       plot.title = element_text(hjust = 0.5))+
+    if (is.null(ylab))
+      ylab(ifelse(type=="partial", "PACF", "ACF"))
+  else
+    ylab(ylab)
   
   g
 }
 
+# test ggacf function
 
+ggacf(avg_test_data, '003', 'living', 10, 'pm25')
 
-
+lapply(all_homes, ggacf,
+       data = avg_test_data, loc = 'living', lag.max = 10, metric = 'pm25')
 
 
 ##function to make acf plot for a given room and home and metric
