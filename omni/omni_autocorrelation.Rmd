@@ -71,9 +71,19 @@ ggdensity(pull(data, all_of(x)),
 ```{r define_variables, eval = TRUE}
 
 
-#define list of homes for analysis
-all_homes <- home.list(c(1:4, 7:16))
+#define homes for analysis
+homes_all <- home.list(c(1:4, 7:16))
 
+# define indoor rooms
+locations_indoor <- c('living', 'bedroom', 'kitchen')
+
+# define homes that have data for all indoor rooms
+homes_avail <- homes_all[-2]
+
+# define metrics for acf testing
+metrics_all <- c('pm25', 'voc', 'co2')
+
+#define sizes for plot text
 xsmall <- 2
 small <- 4
 medium <- 12
@@ -135,7 +145,7 @@ count.missing <- function(data, hm, loc, metric,
 
 
 # see which homes/locations do not have missing daily average values
- sapply(all_homes, count.missing,
+ sapply(homes_all, count.missing,
         loc = 'living',
         data = omni_data,
        metric = 'pm25')
@@ -226,6 +236,9 @@ ggacf <- function(data,  hm, loc, lag_max_plot, metric,
     filter(home == hm & location == loc) %>%
     pull(all_of(metric))
   
+  # count days in monitoring period with available data
+  days_avail <- sum(!is.na(x))
+  
   # count percentage of missing values
   missing <- sum(is.na(x))/length(x)*100
   
@@ -273,10 +286,10 @@ df_acf <- data.frame(lag=x_acf$lag, acf=x_acf$acf,
     geom_line(aes(x = lag, y = ci_low),
               linetype = 'dashed', color = ci.col)+
     geom_text(aes(x = lag, y = acf+0.05, label = n_lag),
-              size = xsmall)+
+              size = xsmall)+ # annotate w/ n used to calculate acf for each lag
     theme_bw() +
     xlab("Lag") +
-    ggtitle(if_else(simple == TRUE, "", paste(hm, loc))) +
+    ggtitle(if_else(simple == TRUE, "", paste(hm, loc, metric))) +
     annotate( 'text', x = Inf, y = Inf, hjust = 1, vjust = 1,
               label = paste("*missing", signif(missing,3), "% of daily values\n",
                             "in home sampling period"), size = small)+
@@ -301,7 +314,8 @@ df_acf <- data.frame(lag=x_acf$lag, acf=x_acf$acf,
   lag_signif <- ifelse(length(a)>0, min(a), Inf) %>%
     as.data.frame() %>%
     rename('lag_signif' = '.') %>%
-    mutate(home = hm, location = loc)
+    mutate(home = hm, location = loc, metric = metric,
+           days_avail = days_avail, missing_pct = missing)
   
     return(list('lag_signif' = lag_signif, 'plot' = plot))
 }
@@ -316,7 +330,7 @@ acf(omni_daily_data %>%
       select(pm25),
     na.action = na.pass, lag.max = 10)
 
-map(all_homes, function (x){
+map(homes_all, function (x){
   acf(omni_daily_data %>% filter(home == x & location == 'living') %>%select(pm25),
       na.action = na.pass,
       lag.max = 48)
@@ -326,7 +340,7 @@ map(all_homes, function (x){
 # acf(omni_hourly_data %>% filter(home == '002' & location == 'living') %>%select(pm25),
 #     na.action = na.pass, lag.max = 240)
 # 
-# map(all_homes, function (x){
+# map(homes_all, function (x){
 #   acf(omni_hourly_data %>% filter(home == x & location == 'living') %>%select(pm25),
 #                              na.action = na.pass,
 #       lag.max = 240)
@@ -339,105 +353,81 @@ acf(omni_daily_data %>%
       select(pm25),
     na.action = na.pass, lag.max = 10)
 
-lapply(all_homes, ggacf,
+lapply(homes_all, ggacf,
        data = omni_daily_data, loc = 'living', lag.max = 48, metric = 'pm25')
 
 # how does the total amount of days sampled affect the plot?
 
 # all dates
-# return data
-acf_lags <- lapply(all_homes, function(x) {
-  ggacf(hm = x,
-        data = omni_daily_data,
-        loc = 'living', lag_max_plot = 14, metric = 'pm25'
-  )[['lag_signif']]
-}
-) %>%
-  bind_rows()
 
-# plot results
-lapply(all_homes, function(x) {
+# plot results for one location and metric
+lapply(homes_all, function(x) {
   ggacf(hm = x,
         data = omni_daily_data,
-        loc = 'living', lag_max_plot = 14, metric = 'pm25'
+        loc = 'living', lag_max_plot = 14, metric = 'voc'
   )[['plot']]
 }
 )
 
 
+# return data for all homes, locations, and metrics
+acf_lags <- 
+  lapply(metrics_all, function(x_metric) {
+    
+    lapply(locations_indoor, function(x_location) {
+      
+      lapply(homes_avail, function(x_home) {
+        ggacf(hm = x_home,
+              data = omni_daily_data,
+              loc = x_location, lag_max_plot = 14, metric = x_metric
+        )[['lag_signif']]
+      }
+      ) %>%
+        bind_rows()
+    }
+    ) %>%
+      bind_rows()
+  }
+  ) %>%
+  bind_rows()
+
+
+
+
+
+
+
 
 # one month
-  lapply(all_homes, ggacf,
+  lapply(homes_all, ggacf,
          data = omni_daily_data %>%
            filter(date> ymd('2020-11-15') & date <ymd('2020-12-15')),
          loc = 'living', lag_max_plot = 14, metric = 'pm25')
   
   
   
-  
-##function to make acf plot for a given room and home and metric
-##that also includes all date/times within sampling time period
-##gaps in dates will not be ignored
-acf.plot.nomiss <- function (hm, rm,
-                      metric, lag.max,
-                      start_date, end_date, unit,
-                      simple = FALSE) {
-    
-  if (unit == 'hour') {
-      #define date column as all hours
-  date_col <-
-    seq(ymd_hms(start_date), ymd_hms(end_date),
-        dhours(1))%>%
-    as.data.frame() %>%
-    rename('date' = '.')
-  
-  data <- hourly
-  title <- 'hourly'
-
-    }
-  
-  if (unit == 'day') {
-          #define date column as all days
-    date_col <- 
-    seq(ymd_hms(start_date), ymd_hms(end_date),
-
-      ddays(1)) %>%
-    as.data.frame() %>%
-    rename('date' = '.')
-    
-    data <- daily
-    title <- 'daily'
-
-  }
-  
-  #make title just home number if simple == TRUE
-  title <- if_else(simple == TRUE, hm,
-                                    paste(hm, title, metric))
-   ##Plot data
-    ##tryCatch to bypass plots that dont have data
-    tryCatch(data %>%
-               filter(home == hm, room == rm) %>%
-               
-               ##instead, define hour col between first and last date
-               ##of the home/room specific data?
-               right_join(date_col) %>%
-               select(metric) %>%
-               ggacf(lag.max = lag.max,
-                     main = title),
-             
-             ##return NULL if there is an error
-             ##due to no data for a home or room
-             error = function(e) NULL)
-
-
-  
-}
-
-
+ 
 
 
 ###########
 
+
+
+
+```
+
+```{r lag_dependence_n}
+# test hoe dependent the significant lag value seems to be on n
+
+acf_lags_no_inf <- acf_lags %>%
+  mutate(lag_signif = if_else(is.infinite(lag_signif), 35, lag_signif))
+
+ggplot(data = acf_lags_no_inf , aes(x = days_avail, y = lag_signif))+
+  geom_point()
+```
+
+
+```{r grid_plot_function}
 acf.grid.nomiss <- function(hms, rm, metric, lag.max,
                                 start_date, end_date, unit,
                      ncol = 5) {
@@ -467,8 +457,6 @@ acf.grid.nomiss <- function(hms, rm, metric, lag.max,
                             ncol = ncol))
   
 }
-
-
 
 ```
 
