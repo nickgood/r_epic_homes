@@ -33,7 +33,7 @@ library(gridExtra) #for making ggplot autocorrelation plots
 export_date <- '2021-06-07'
 
 ##Import CSV with Real Time Data
-rtdata<- read_csv(paste0('../output/omni_clean/OMNIdata_clean/',
+omni_data<- read_csv(paste0('../output/omni_clean/',
                          'omni_all_locations_', export_date, '.csv'))
 
 
@@ -73,6 +73,11 @@ ggdensity(pull(data, all_of(x)),
 
 #define list of homes for analysis
 all_homes <- home.list(c(1:4, 7:16))
+
+xsmall <- 2
+small <- 8
+medium <- 12
+large <- 16
 
 ```
 
@@ -132,7 +137,7 @@ count.missing <- function(data, hm, loc, metric,
 # see which homes/locations do not have missing daily average values
  sapply(all_homes, count.missing,
         loc = 'living',
-        data = data_all,
+        data = omni_data,
        metric = 'pm25')
 
 ```
@@ -140,8 +145,6 @@ count.missing <- function(data, hm, loc, metric,
 
 ```{r functions_autocorrelation, include= FALSE}
 
-hm <- '003'
-loc <- 'living'
 
 # # filter data to one home/location and arrange by date
 #           avg_data <- data %>%
@@ -154,12 +157,23 @@ loc <- 'living'
 #     complete(date = seq(min(date), max(date), by="day")) %>%
 #   arrange(date)
 
+
 # all homes/locations in one dataframe
-avg_test_data <- data_all %>%
+omni_daily_data <- omni_data %>%
   mutate(date = floor_date(datetime, unit = 'days')) %>%
   group_by(home, location, date) %>%
   summarize_if(is.numeric, list(~mean(., na.rm = TRUE))) %>%
     complete(date = seq(min(date), max(date), by="day")) %>%
+  ungroup()%>%
+  arrange(home, location, date)
+
+# all homes/locations in one dataframe
+omni_hourly_data <- omni_data %>%
+  mutate(date = floor_date(datetime, unit = 'hours')) %>%
+  group_by(home, location, date) %>%
+  summarize_if(is.numeric, list(~mean(., na.rm = TRUE))) %>%
+  complete(date = seq(ymd_hms(min(date)), ymd_hms(max(date)),
+                      dhours(1))) %>%
   ungroup()%>%
   arrange(home, location, date)
 
@@ -216,7 +230,6 @@ ggacf <- function(data,  hm, loc, lag.max, metric,
                )
   
 
-  d.acf <- data.frame(lag=x.acf$lag, acf=x.acf$acf)
   
   # find actual n value (doesn't count when one of the data in a pair is NA)
 lags <- c(1:lag.max)
@@ -235,15 +248,23 @@ lag_counts <- map(lags, function(x) {
   as.data.frame()%>%
   rename('n_lag'= '.') %>%
   mutate(lag = lags)
+
+d.acf <- data.frame(lag=x.acf$lag, acf=x.acf$acf,
+                    n_lag = c(NA,lag_counts$n_lag),
+                    ci_high = qnorm((1 - ci) / 2) / sqrt(n_lag),
+                    ci_low = -qnorm((1 - ci) / 2) / sqrt(n_lag))
+
   
 #plot
   g <- ggplot(d.acf, aes(x=lag, y=acf)) +
     geom_hline(yintercept=0) +
     geom_segment(aes(xend=lag, yend=0)) +
-    geom_line(data = lag_counts, aes(lag, qnorm((1 - ci) / 2) / sqrt(n_lag)),
+    geom_line(aes(x = lag, y = ci_high),
               linetype = 'dashed', color = ci.col)+
-    geom_line(data = lag_counts, aes(lag, -qnorm((1 - ci) / 2) / sqrt(n_lag)),
+    geom_line(aes(x = lag, y = ci_high),
               linetype = 'dashed', color = ci.col)+
+    geom_text(aes(x = lag, y = acf+0.05, label = n_lag),
+              size = xsmall)+
     theme_bw() +
     xlab("Lag") +
     ggtitle(if_else(simple == TRUE, "", paste(hm, loc))) +
@@ -262,14 +283,51 @@ lag_counts <- map(lags, function(x) {
   g
 }
 
-# test ggacf function
+##### test ggacf function
+# is the point at which data crosses conf_int
+# affected by resolution of data?
 
-ggacf(avg_test_data, '003', 'living', 10, 'pm25')
+# daily
+acf(omni_daily_data %>%
+      filter(home == '002' & location == 'living') %>%
+      select(pm25),
+    na.action = na.pass, lag.max = 10)
+
+map(all_homes, function (x){
+  acf(omni_daily_data %>% filter(home == x & location == 'living') %>%select(pm25),
+      na.action = na.pass,
+      lag.max = 48)
+})
+
+# hourly
+acf(omni_hourly_data %>% filter(home == '002' & location == 'living') %>%select(pm25),
+    na.action = na.pass, lag.max = 240)
+
+map(all_homes, function (x){
+  acf(omni_hourly_data %>% filter(home == x & location == 'living') %>%select(pm25),
+                             na.action = na.pass,
+      lag.max = 240)
+  })
+
+# does my function compare to the default acf, just with different conf_int?
+
+acf(omni_daily_data %>%
+      filter(home == '002' & location == 'living') %>%
+      select(pm25),
+    na.action = na.pass, lag.max = 10)
 
 lapply(all_homes, ggacf,
-       data = avg_test_data, loc = 'living', lag.max = 10, metric = 'pm25')
+       data = omni_daily_data, loc = 'living', lag.max = 48, metric = 'pm25')
 
+# how does the total amount of days sampled affect the plot?
 
+  lapply(all_homes, ggacf,
+         data = omni_daily_data %>%
+           filter(date> ymd('2020-11-15') & date <ymd('2020-12-15')),
+         loc = 'living', lag.max = 14, metric = 'pm25')
+  
+  
+  
 ##function to make acf plot for a given room and home and metric
 ##that also includes all date/times within sampling time period
 ##gaps in dates will not be ignored
