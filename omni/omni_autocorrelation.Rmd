@@ -75,7 +75,7 @@ ggdensity(pull(data, all_of(x)),
 all_homes <- home.list(c(1:4, 7:16))
 
 xsmall <- 2
-small <- 8
+small <- 4
 medium <- 12
 large <- 16
 
@@ -167,15 +167,15 @@ omni_daily_data <- omni_data %>%
   ungroup()%>%
   arrange(home, location, date)
 
-# all homes/locations in one dataframe
-omni_hourly_data <- omni_data %>%
-  mutate(date = floor_date(datetime, unit = 'hours')) %>%
-  group_by(home, location, date) %>%
-  summarize_if(is.numeric, list(~mean(., na.rm = TRUE))) %>%
-  complete(date = seq(ymd_hms(min(date)), ymd_hms(max(date)),
-                      dhours(1))) %>%
-  ungroup()%>%
-  arrange(home, location, date)
+# # all homes/locations in one dataframe, hourly
+# omni_hourly_data <- omni_data %>%
+#   mutate(date = floor_date(datetime, unit = 'hours')) %>%
+#   group_by(home, location, date) %>%
+#   summarize_if(is.numeric, list(~mean(., na.rm = TRUE))) %>%
+#   complete(date = seq(ymd_hms(min(date)), ymd_hms(max(date)),
+#                       dhours(1))) %>%
+#   ungroup()%>%
+#   arrange(home, location, date)
 
 
 # # to insert NA rows between each group (could modify to add multiple NAs)
@@ -205,14 +205,18 @@ omni_hourly_data <- omni_data %>%
 #   rename('n_lag'= '.') %>%
 #   mutate(lag = lags)
 
-
-
+# # variables or testing
+# data <- omni_daily_data
+# hm <- '003'
+# loc <- 'living'
+# metric <- 'pm25'
+# lag.max <- 14
 
 ##Define an autocorrelation plot function in ggplot
 
 ###Make acf function in ggplot
 ##from: https://stackoverflow.com/questions/28857241/r-combine-plots-that-use-parmfrow-internally
-ggacf <- function(data,  hm, loc, lag.max, metric,
+ggacf <- function(data,  hm, loc, lag_max_plot, metric,
                   ci=0.95, type="correlation",
                   xlab="Lag", ylab=NULL,
                   ylim=NULL, simple = FALSE,
@@ -222,17 +226,21 @@ ggacf <- function(data,  hm, loc, lag.max, metric,
     filter(home == hm & location == loc) %>%
     pull(all_of(metric))
   
-  x.acf <- acf(x, plot=F, lag.max=lag.max, type=type,
+  # count percentage of missing values
+  missing <- sum(is.na(x))/length(x)*100
+  
+  # set limit of how many lags for which the function performs calculations
+  lag_max_calc <- if_else(length(x)<=31, length(x)-1, 30)
+
+    x.acf <- acf(x, plot=F, lag.max=lag_max_calc, type=type,
                
                ##if missing a value, continue calculation
                ##with line below in acf function
                na.action = na.pass
                )
   
-
-  
   # find actual n value (doesn't count when one of the data in a pair is NA)
-lags <- c(1:lag.max)
+lags <- c(1:lag_max_calc)
 
 lag_counts <- map(lags, function(x) {
   data %>%
@@ -250,9 +258,10 @@ lag_counts <- map(lags, function(x) {
   mutate(lag = lags)
 
 d.acf <- data.frame(lag=x.acf$lag, acf=x.acf$acf,
-                    n_lag = c(NA,lag_counts$n_lag),
-                    ci_high = qnorm((1 - ci) / 2) / sqrt(n_lag),
-                    ci_low = -qnorm((1 - ci) / 2) / sqrt(n_lag))
+                    n_lag = c(NA,lag_counts$n_lag)) %>%
+  mutate(
+    ci_low = qnorm((1 - ci) / 2) / sqrt(n_lag),
+    ci_high = -qnorm((1 - ci) / 2) / sqrt(n_lag))
 
   
 #plot
@@ -261,13 +270,17 @@ d.acf <- data.frame(lag=x.acf$lag, acf=x.acf$acf,
     geom_segment(aes(xend=lag, yend=0)) +
     geom_line(aes(x = lag, y = ci_high),
               linetype = 'dashed', color = ci.col)+
-    geom_line(aes(x = lag, y = ci_high),
+    geom_line(aes(x = lag, y = ci_low),
               linetype = 'dashed', color = ci.col)+
     geom_text(aes(x = lag, y = acf+0.05, label = n_lag),
               size = xsmall)+
     theme_bw() +
     xlab("Lag") +
     ggtitle(if_else(simple == TRUE, "", paste(hm, loc))) +
+    annotate( 'text', x = Inf, y = Inf, hjust = 1, vjust = 1,
+              label = paste("*missing", signif(missing,3), "% of daily values\n",
+                            "in home sampling period"), size = small)+
+    coord_cartesian(xlim=c(0, lag_max_plot), ylim = c(-1,1))+
     # theme(axis.title = element_blank(),
     #       axis.text = element_blank(),
     #       axis.ticks = element_blank(),
@@ -279,6 +292,7 @@ d.acf <- data.frame(lag=x.acf$lag, acf=x.acf$acf,
       ylab(ifelse(type=="partial", "PACF", "ACF"))
   else
     ylab(ylab)
+    
   
   g
 }
@@ -299,15 +313,15 @@ map(all_homes, function (x){
       lag.max = 48)
 })
 
-# hourly
-acf(omni_hourly_data %>% filter(home == '002' & location == 'living') %>%select(pm25),
-    na.action = na.pass, lag.max = 240)
-
-map(all_homes, function (x){
-  acf(omni_hourly_data %>% filter(home == x & location == 'living') %>%select(pm25),
-                             na.action = na.pass,
-      lag.max = 240)
-  })
+# # hourly
+# acf(omni_hourly_data %>% filter(home == '002' & location == 'living') %>%select(pm25),
+#     na.action = na.pass, lag.max = 240)
+# 
+# map(all_homes, function (x){
+#   acf(omni_hourly_data %>% filter(home == x & location == 'living') %>%select(pm25),
+#                              na.action = na.pass,
+#       lag.max = 240)
+#   })
 
 # does my function compare to the default acf, just with different conf_int?
 
@@ -321,10 +335,16 @@ lapply(all_homes, ggacf,
 
 # how does the total amount of days sampled affect the plot?
 
+# all dates
+lapply('002', ggacf,
+       data = omni_daily_data,
+       loc = 'living', lag_max_plot = 14, metric = 'pm25')
+
+# one month
   lapply(all_homes, ggacf,
          data = omni_daily_data %>%
            filter(date> ymd('2020-11-15') & date <ymd('2020-12-15')),
-         loc = 'living', lag.max = 14, metric = 'pm25')
+         loc = 'living', lag_max_plot = 14, metric = 'pm25')
   
   
   
