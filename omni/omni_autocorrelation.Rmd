@@ -232,7 +232,7 @@ ggacf <- function(data,  hm, loc, lag_max_plot, metric,
   # set limit of how many lags for which the function performs calculations
   lag_max_calc <- if_else(length(x)<=31, length(x)-1, 30)
 
-    x.acf <- acf(x, plot=F, lag.max=lag_max_calc, type=type,
+    x_acf <- acf(x, plot=F, lag.max=lag_max_calc, type=type,
                
                ##if missing a value, continue calculation
                ##with line below in acf function
@@ -257,15 +257,15 @@ lag_counts <- map(lags, function(x) {
   rename('n_lag'= '.') %>%
   mutate(lag = lags)
 
-d.acf <- data.frame(lag=x.acf$lag, acf=x.acf$acf,
+df_acf <- data.frame(lag=x_acf$lag, acf=x_acf$acf,
                     n_lag = c(NA,lag_counts$n_lag)) %>%
   mutate(
     ci_low = qnorm((1 - ci) / 2) / sqrt(n_lag),
     ci_high = -qnorm((1 - ci) / 2) / sqrt(n_lag))
 
-  
+
 #plot
-  g <- ggplot(d.acf, aes(x=lag, y=acf)) +
+  plot <- ggplot(df_acf, aes(x=lag, y=acf)) +
     geom_hline(yintercept=0) +
     geom_segment(aes(xend=lag, yend=0)) +
     geom_line(aes(x = lag, y = ci_high),
@@ -293,8 +293,17 @@ d.acf <- data.frame(lag=x.acf$lag, acf=x.acf$acf,
   else
     ylab(ylab)
     
+  # find first lag point when acf goes inside confidence intervals
+  a <- df_acf %>%
+    filter(acf <= ci_high & acf >= ci_low) %>%
+    pull(lag)
   
-  g
+  lag_signif <- ifelse(length(a)>0, min(a), Inf) %>%
+    as.data.frame() %>%
+    rename('lag_signif' = '.') %>%
+    mutate(home = hm, location = loc)
+  
+    return(list('lag_signif' = lag_signif, 'plot' = plot))
 }
 
 ##### test ggacf function
@@ -336,15 +345,33 @@ lapply(all_homes, ggacf,
 # how does the total amount of days sampled affect the plot?
 
 # all dates
-lapply('002', ggacf,
-       data = omni_daily_data,
-       loc = 'living', lag_max_plot = 14, metric = 'pm25')
+# return data
+acf_lags <- lapply(all_homes, function(x) {
+  ggacf(hm = x,
+        data = omni_daily_data,
+        loc = 'living', lag_max_plot = 14, metric = 'pm25'
+  )[['lag_signif']]
+}
+) %>%
+  bind_rows()
+
+# plot results
+lapply(all_homes, function(x) {
+  ggacf(hm = x,
+        data = omni_daily_data,
+        loc = 'living', lag_max_plot = 14, metric = 'pm25'
+  )[['plot']]
+}
+)
+
+
 
 # one month
   lapply(all_homes, ggacf,
          data = omni_daily_data %>%
            filter(date> ymd('2020-11-15') & date <ymd('2020-12-15')),
          loc = 'living', lag_max_plot = 14, metric = 'pm25')
+  
   
   
   
