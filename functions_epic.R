@@ -11,6 +11,7 @@ library(readr)
 library(stringr)
 library(googlesheets4)
 library(hrbrthemes)
+library(kableExtra)
 
 #_______________________________________________________________________________
 # clean names
