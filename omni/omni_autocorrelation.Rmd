@@ -81,7 +81,7 @@ locations_indoor <- c('living', 'bedroom', 'kitchen')
 homes_avail <- homes_all[-2]
 
 # define metrics for acf testing
-metrics_all <- c('pm25', 'voc', 'co2')
+metrics_all <- c('pm25', 'voc', 'co2', 'temp', 'humid')
 
 #define sizes for plot text
 xsmall <- 2
@@ -273,9 +273,11 @@ lag_counts <- map(lags, function(x) {
 df_acf <- data.frame(lag=x_acf$lag, acf=x_acf$acf,
                     n_lag = c(NA,lag_counts$n_lag)) %>%
   mutate(
-    ci_low = qnorm((1 - ci) / 2) / sqrt(n_lag),
-    ci_high = -qnorm((1 - ci) / 2) / sqrt(n_lag))
-
+# from UMich Notes, Sales et al. 1980
+    ci_high = -qnorm((1-ci)/2)/sqrt(n_lag),
+    ci_low = qnorm((1-ci)/2)/sqrt(n_lag)
+    
+    )
 
 #plot
   plot <- ggplot(df_acf, aes(x=lag, y=acf)) +
@@ -308,7 +310,9 @@ df_acf <- data.frame(lag=x_acf$lag, acf=x_acf$acf,
     
   # find first lag point when acf goes inside confidence intervals
   a <- df_acf %>%
-    filter(acf <= ci_high & acf >= ci_low) %>%
+    filter(acf <= ci_high
+           & acf >= ci_low
+           ) %>%
     pull(lag)
   
   lag_signif <- ifelse(length(a)>0, min(a), Inf) %>%
@@ -364,7 +368,7 @@ lapply(homes_all, ggacf,
 lapply(homes_all, function(x) {
   ggacf(hm = x,
         data = omni_daily_data,
-        loc = 'living', lag_max_plot = 14, metric = 'voc'
+        loc = 'living', lag_max_plot = 14, metric = 'pm25'
   )[['plot']]
 }
 )
@@ -419,11 +423,23 @@ acf_lags <-
 ```{r lag_dependence_n}
 # test hoe dependent the significant lag value seems to be on n
 
+  # convert values that were infinite to above the maximum tested value
 acf_lags_no_inf <- acf_lags %>%
   mutate(lag_signif = if_else(is.infinite(lag_signif), 35, lag_signif))
 
+# look at possible effects of sample size
 ggplot(data = acf_lags_no_inf , aes(x = days_avail, y = lag_signif))+
-  geom_point()
+  geom_point(aes(color = location))+
+  facet_wrap(vars(metric))
+
+# boxplots by location
+ggplot(data = acf_lags_no_inf , aes(x = location, y = lag_signif))+
+  geom_boxplot()+
+  facet_wrap(vars(metric))
+
+
+
+
 ```
 
 
