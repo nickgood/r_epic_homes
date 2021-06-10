@@ -91,6 +91,7 @@ large <- 16
 
 ```
 
+
 ```{r function_count_missing_values, include = FALSE}
 
 ##function to count missing day values for a home/room
@@ -152,23 +153,10 @@ count.missing <- function(data, hm, loc, metric,
 
 ```
 
-
-```{r functions_autocorrelation, include= FALSE}
-
-
-# # filter data to one home/location and arrange by date
-#           avg_data <- data %>%
-#   filter(home == hm & location == loc) %>%
-#                 filter(datetime > ymd_hms(start_date) & datetime < ymd_hms(end_date)) %>%
-#   mutate(date = floor_date(datetime, unit = 'days')) %>%
-#   group_by(date) %>%
-#   summarize_if(is.numeric, list(~mean(., na.rm = TRUE))) %>%
-#   ungroup() %>%
-#     complete(date = seq(min(date), max(date), by="day")) %>%
-#   arrange(date)
-
+```{r create_dfs}
 
 # all homes/locations in one dataframe
+## daily
 omni_daily_data <- omni_data %>%
   mutate(date = floor_date(datetime, unit = 'days')) %>%
   group_by(home, location, date) %>%
@@ -177,7 +165,14 @@ omni_daily_data <- omni_data %>%
   ungroup()%>%
   arrange(home, location, date)
 
-# # all homes/locations in one dataframe, hourly
+# # to insert NA rows between each group (could modify to add multiple NAs)
+# # from https://stackoverflow.com/questions/43403282/add-row-in-each-group-using-dplyr-and-add-row
+# indices <- seq(nrow(a)) %>%
+#     split(group_indices(a, home, location)) %>%
+#     map(~c(.x, rep(NA,10))) %>% # add in ten rows after each group
+#     unlist()
+
+# ## hourly
 # omni_hourly_data <- omni_data %>%
 #   mutate(date = floor_date(datetime, unit = 'hours')) %>%
 #   group_by(home, location, date) %>%
@@ -188,32 +183,12 @@ omni_daily_data <- omni_data %>%
 #   arrange(home, location, date)
 
 
-# # to insert NA rows between each group (could modify to add multiple NAs)
-# # from https://stackoverflow.com/questions/43403282/add-row-in-each-group-using-dplyr-and-add-row
-# indices <- seq(nrow(a)) %>%
-#     split(group_indices(a, home, location)) %>%
-#     map(~c(.x, rep(NA,10))) %>% # add in ten rows after each group
-#     unlist()
+```
 
 
 
-# # find actual n value (doesn't count when one of the data in a pair is NA)
-# lags <- c(1:lag.max)
-# 
-# a <- map(lags, function(x) {
-#   avg_data_all %>%
-#               filter(home == '009' & location == 'garage')%>%
-#   pull(all_of(metric)) %>%
-#   diff(lag = x) %>%
-#     is.na() %>%
-#     `!` %>% #count how many are not NA
-#     sum()
-# }
-# ) %>% 
-#   unlist() %>%
-#   as.data.frame()%>%
-#   rename('n_lag'= '.') %>%
-#   mutate(lag = lags)
+
+```{r functions_autocorrelation, include= FALSE}
 
 # # variables or testing
 # data <- omni_daily_data
@@ -227,10 +202,10 @@ omni_daily_data <- omni_data %>%
 ###Make acf function in ggplot
 ##from: https://stackoverflow.com/questions/28857241/r-combine-plots-that-use-parmfrow-internally
 ggacf <- function(data,  hm, loc, lag_max_plot, metric,
-                  ci=0.95, type="correlation",
-                  xlab="Lag", ylab=NULL,
-                  ylim=NULL, simple = FALSE,
-                  ci.col="blue") {
+                       ci=0.95, type="correlation",
+                       xlab="Lag", ylab=NULL,
+                       ylim=NULL, simple = FALSE,
+                       ci.col="blue") {
   
   x <- data %>% 
     filter(home == hm & location == loc) %>%
@@ -244,42 +219,44 @@ ggacf <- function(data,  hm, loc, lag_max_plot, metric,
   
   # set limit of how many lags for which the function performs calculations
   lag_max_calc <- if_else(length(x)<=31, length(x)-1, 30)
-
-    x_acf <- acf(x, plot=F, lag.max=lag_max_calc, type=type,
+  
+  x_acf <- acf(x, plot=F, lag.max=lag_max_calc, type=type,
                
                ##if missing a value, continue calculation
                ##with line below in acf function
                na.action = na.pass
-               )
+  )
   
   # find actual n value (doesn't count when one of the data in a pair is NA)
-lags <- c(1:lag_max_calc)
-
-lag_counts <- map(lags, function(x) {
-  data %>%
-              filter(home == hm & location == loc)%>%
-  pull(all_of(metric)) %>%
-  diff(lag = x) %>%
-    is.na() %>%
-    `!` %>% #count how many are not NA
-    sum()
-}
-) %>% 
-  unlist() %>%
-  as.data.frame()%>%
-  rename('n_lag'= '.') %>%
-  mutate(lag = lags)
-
-df_acf <- data.frame(lag=x_acf$lag, acf=x_acf$acf,
-                    n_lag = c(NA,lag_counts$n_lag)) %>%
-  mutate(
-# from UMich Notes, Sales et al. 1980
-    ci_high = -qnorm((1-ci)/2)/sqrt(n_lag),
-    ci_low = qnorm((1-ci)/2)/sqrt(n_lag)
-    
+  lags <- c(1:lag_max_calc)
+  
+  lag_counts <- map(lags, function(x) {
+    data %>%
+      filter(home == hm & location == loc)%>%
+      pull(all_of(metric)) %>%
+      diff(lag = x) %>%
+      is.na() %>%
+      `!` %>% #count how many are not NA
+      sum()
+  }
+  ) %>% 
+    unlist() %>%
+    as.data.frame()%>%
+    rename('n_lag'= '.') %>%
+    mutate(lag = lags)
+  
+  df_acf <- data.frame(lag=x_acf$lag, acf=x_acf$acf,
+                       n_lag = if(type == 'correlation') {
+                         c(NA,lag_counts$n_lag)
+                       } else if(type == 'partial') lag_counts$n_lag ) %>%
+    mutate(
+      # from UMich Notes, Sales et al. 1980
+      ci_high = -qnorm((1-ci)/2)/sqrt(n_lag),
+      ci_low = qnorm((1-ci)/2)/sqrt(n_lag)
+      
     )
-
-#plot
+  
+  #plot
   plot <- ggplot(df_acf, aes(x=lag, y=acf)) +
     geom_hline(yintercept=0) +
     geom_segment(aes(xend=lag, yend=0)) +
@@ -307,22 +284,29 @@ df_acf <- data.frame(lag=x_acf$lag, acf=x_acf$acf,
       ylab(ifelse(type=="partial", "PACF", "ACF"))
   else
     ylab(ylab)
-    
+  
   # find first lag point when acf goes inside confidence intervals
   a <- df_acf %>%
     filter(acf <= ci_high
            & acf >= ci_low
-           ) %>%
+    ) %>%
     pull(lag)
   
   lag_signif <- ifelse(length(a)>0, min(a), Inf) %>%
     as.data.frame() %>%
     rename('lag_signif' = '.') %>%
     mutate(home = hm, location = loc, metric = metric,
-           days_avail = days_avail, missing_pct = missing)
+           days_avail = days_avail, missing_pct = missing, acf_type = type)
   
-    return(list('lag_signif' = lag_signif, 'plot' = plot))
+  return(list('lag_signif' = lag_signif, 'plot' = plot))
 }
+
+
+
+```
+
+
+```{r testing_ggacf_function}
 
 ##### test ggacf function
 # is the point at which data crosses conf_int
@@ -368,7 +352,7 @@ lapply(homes_all, ggacf,
 lapply(homes_all, function(x) {
   ggacf(hm = x,
         data = omni_daily_data,
-        loc = 'living', lag_max_plot = 14, metric = 'pm25'
+        loc = 'living', lag_max_plot = 14, metric = 'pm25',
   )[['plot']]
 }
 )
@@ -396,12 +380,6 @@ acf_lags <-
   bind_rows()
 
 
-
-
-
-
-
-
 # one month
   lapply(homes_all, ggacf,
          data = omni_daily_data %>%
@@ -409,16 +387,21 @@ acf_lags <-
          loc = 'living', lag_max_plot = 14, metric = 'pm25')
   
   
-  
- 
-
-
-###########
-
-
-
-
 ```
+
+```{r ggacf_partial}
+
+# plot results for one location and metric
+lapply(homes_all, function(x) {
+  ggacf(hm = x,
+        data = omni_daily_data,
+        loc = 'living', lag_max_plot = 14, metric = 'pm25', type = 'partial'
+  )[['plot']]
+}
+)
+```
+
+
 
 ```{r lag_dependence_n}
 # test hoe dependent the significant lag value seems to be on n
