@@ -169,16 +169,8 @@ out %>% group_by(g) %>% count()
 ```
 
 
-```{r}
-pm25_mean <- function(start, end, df){
-  df %>% filter(datetime >= start & datetime <= end) %>%
-    pull(pm25) %>%
-    mean(., na.rm = TRUE)
-}
-```
-
 ```{r fig_omni_vs_filter, fig.width=1.5, fig.height=1.5}
-ggplot(out, aes(x = conc, y = pm25_omni)) +
+ggplot(out, aes(x = conc, y = pm25_omni, color = location)) +
   geom_point() +
   #geom_smooth(method = "lm", formula = "y ~ x", se = FALSE) +
   theme_bw() +
@@ -186,6 +178,16 @@ ggplot(out, aes(x = conc, y = pm25_omni)) +
   ylim(0,NA) + xlim(0,NA) +
   ylab("OMNI (ug/m^3)") + xlab("Filter (ug/m^3)")
 ```
+
+```{r}
+model <- lm("pm25_omni~conc", data = out)
+
+broom::tidy(model, conf.int = TRUE) %>%
+  kable(digits = c(NA, 1, 1, 1, 6 , 1, 1), caption = "OMNI vs. Filter PM2.5") %>%
+  kable_paper(bootstrap_options = "striped", full_width = F)
+```
+
+
 
 ---
 
