@@ -185,6 +185,34 @@ omni_daily_data <- omni_data %>%
 
 ```
 
+```{r stationarity, eval = TRUE}
+# check stationarity before doing acf calcs and plots
+
+# make time seris plot for all available sensors
+map(
+  homes_avail, function(x_home) {
+    map(
+      locations_indoor, function(x_location){
+        
+        ggplot(omni_daily_data %>% filter(home == x_home & location == x_location),
+               aes(x = as.Date(date), y = pm25))+
+          geom_line()+
+          ggtitle(paste(x_home, x_location))
+        
+      }
+    )
+  }
+)
+
+hm <- '002'
+loc <- 'living'
+# for one home
+ggplot(omni_daily_data %>% filter(home == hm & location == loc),
+       aes(x = as.Date(date), y = pm25))+
+  geom_line()+
+  ggtitle(paste(hm, loc))
+
+```
 
 
 
