@@ -390,14 +390,24 @@ lapply('002', function(x) {
 ###Make acf function in ggplot
 ##from: https://stackoverflow.com/questions/28857241/r-combine-plots-that-use-parmfrow-internally
 ggacf <- function(data,  hm, loc, lag_max_plot, metric,
+                  cluster = NULL,
                        ci=0.95, type="correlation",
                        xlab="Lag", ylab=NULL,
                        ylim=NULL, simple = FALSE,
                        ci.col="blue") {
+
+    x <- data %>% 
+    filter(home == hm & location == loc)
   
-  x <- data %>% 
-    filter(home == hm & location == loc) %>%
-    pull(all_of(metric))
+  x<- if(!is.null(cluster)) {
+    # filter by cluster if cluster is specified
+    x %>% 
+      filter(energy_cluster == cluster) %>%
+      pull(all_of(metric))
+    }else {
+    x %>% 
+      pull(all_of(metric))
+    }
   
   # count days in monitoring period with available data
   days_avail <- sum(!is.na(x))
@@ -456,7 +466,7 @@ ggacf <- function(data,  hm, loc, lag_max_plot, metric,
               size = xsmall)+ # annotate w/ n used to calculate acf for each lag
     theme_bw() +
     xlab("Lag") +
-    ggtitle(if_else(simple == TRUE, "", paste(hm, loc, metric))) +
+    ggtitle(if_else(simple == TRUE, "", paste(hm, loc, metric, cluster))) +
     annotate( 'text', x = Inf, y = Inf, hjust = 1, vjust = 1,
               label = paste("*missing", signif(missing,3), "% of daily values\n",
                             "in home sampling period"), size = small)+
@@ -484,12 +494,11 @@ ggacf <- function(data,  hm, loc, lag_max_plot, metric,
     as.data.frame() %>%
     rename('lag_signif' = '.') %>%
     mutate(home = hm, location = loc, metric = metric,
-           days_avail = days_avail, missing_pct = missing, acf_type = type)
+           days_avail = days_avail, missing_pct = missing, acf_type = type,
+           energy_cluster = cluster)
   
   return(list('lag_signif' = lag_signif, 'plot' = plot))
 }
-
-
 
 ```
 
@@ -537,7 +546,7 @@ lapply(homes_all, ggacf,
 # all dates
 
 # plot results for one location and metric
-lapply(homes_all, function(x) {
+lapply(homes_avail, function(x) {
   ggacf(hm = x,
         data = omni_daily_data,
         loc = 'living', lag_max_plot = 14, metric = 'pm25',
