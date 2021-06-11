@@ -652,7 +652,7 @@ acf_lags_no_cluster <-
   }
   ) %>%
   bind_rows() %>%
-  mutate(energy_cluster = 'all')
+  mutate(energy_cluster = 'all_dates')
 
 
 # return data for all homes, locations, and metrics (with clusters)
@@ -687,6 +687,7 @@ acf_lags_cluster <-
   ) %>%
   bind_rows()
 
+
 # bind results into one dataframe
 acf_lags <- acf_lags_cluster %>% bind_rows(acf_lags_no_cluster)
 ```
@@ -709,37 +710,19 @@ lapply(homes_all, function(x) {
 
 ```{r lag_plots}
 
+######## one metric
 met <- 'pm25'
 
-###### no clusters
   # convert values that were infinite to above the maximum tested value
-acf_lags_no_inf <- acf_lags %>%
-  mutate(lag_signif = if_else(is.infinite(lag_signif), 35, lag_signif))
+# and omit samples that have less than 21 available days
+# and omit samples with a missing pct greater than 1/9
+acf_lags_filter <- acf_lags %>%
+  mutate(lag_signif = if_else(is.infinite(lag_signif), 35, lag_signif)) %>%
+  filter(days_avail >=21 & missing_pct <= (1/9*100))
 
 
-a <- acf_lags_no_inf %>% 
-  filter(energy_cluster %in% c('ac', 'shoulder', 'heat', 'all')) %>%
-  filter(metric == met)
-
-# look at possible effects of sample size
-ggplot(data = a , aes(x = days_avail, y = lag_signif))+
-  geom_point(aes(color = location))+
-  facet_wrap(vars(energy_cluster))
-
-
-# boxplots by location
-ggplot(data = a , aes(x = location, y = lag_signif))+
-  geom_boxplot(outlier.shape = NULL)+
-  geom_jitter()+
-  facet_wrap(vars(energy_cluster))
-###### clusters
-  # convert values that were infinite to above the maximum tested value
-acf_lags_cluster_no_inf <- acf_lags_cluster %>%
-  mutate(lag_signif = if_else(is.infinite(lag_signif), 35, lag_signif))
-
-
-a <- acf_lags_cluster_no_inf %>% 
-  filter(energy_cluster %in% c('ac', 'shoulder', 'heat')) %>%
+a <- acf_lags_filter %>% 
+  filter(energy_cluster %in% c('ac', 'shoulder', 'heat', 'all_dates')) %>%
   filter(metric == met)
 
 # look at possible effects of sample size
@@ -754,6 +737,24 @@ ggplot(data = a , aes(x = location, y = lag_signif))+
   geom_jitter()+
   facet_wrap(vars(energy_cluster))
 
+# boxplots by location, pooled clusters
+ggplot(data = a %>% filter(energy_cluster != 'all_dates') ,
+       aes(x = location, y = lag_signif))+
+  geom_boxplot(outlier.shape = NULL)+
+  geom_jitter()
+
+
+####### compare all metrics, pooled cluster periods
+
+a <- acf_lags_filter %>% 
+  filter(energy_cluster %in% c('ac', 'shoulder', 'heat', 'all_dates'))
+
+# boxplots by location, pooled clusters
+ggplot(data = a %>% filter(energy_cluster != 'all_dates') ,
+       aes(x = location, y = lag_signif))+
+  geom_boxplot(outlier.shape = NULL)+
+  geom_jitter()+
+  facet_wrap(vars(metric))
 
 
 
