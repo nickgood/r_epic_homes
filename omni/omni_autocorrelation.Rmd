@@ -164,7 +164,9 @@ omni_daily_data <- omni_data %>%
   summarize_if(is.numeric, list(~mean(., na.rm = TRUE))) %>%
     complete(date = seq(min(date), max(date), by="day")) %>%
   ungroup()%>%
+  mutate(date = ymd(date)) %>%
   arrange(home, location, date)
+
 
 # # to insert NA rows between each group (could modify to add multiple NAs)
 # # from https://stackoverflow.com/questions/43403282/add-row-in-each-group-using-dplyr-and-add-row
@@ -215,10 +217,15 @@ energy_cluster_df<- tribble(~home, ~type, ~start_date, ~end_date,
                      '013', 'heat', '2020-11-08', '2021-03-31',
                      '013', 'none_2', '2021-04-01', '2021-05-23',
                      '015', 'none_1', '2020-08-01', '2020-11-23',
-                     '015', 'none', '2020-11-24', '2021-03-28',
+                     '015', 'heat', '2020-11-24', '2021-03-28',
                      '015', 'none_2', '2021-03-29', '2021-05-23',
 ) %>%
-  mutate(across(start_date, as.POSIXct), across(end_date, as.POSIXct))
+  mutate(across(start_date, ymd), across(end_date, ymd))
+
+between(a$date2[1], ymd('2020-07-20'), ymd('2020-07-22'))
+between(ymd('2020-07-20'), ymd('2020-07-20'), ymd('2020-07-22'))
+
+
 
 
 
@@ -285,6 +292,7 @@ for(i in 1:length(homes_clustered)) {
 ```{r stationarity, eval = TRUE}
 # check stationarity before doing acf calcs and plots
 
+
 # make time series plot for all available sensors
 map(
   homes_avail, function(x_home) {
@@ -292,7 +300,24 @@ map(
       locations_indoor, function(x_location){
         
         ggplot(omni_daily_data %>% filter(home == x_home & location == x_location),
-               aes(x = as.Date(date), y = pm25, color = energy_cluster))+
+               aes(x = as.Date(date), y = pm25,
+                   color=case_when(grepl('heat', energy_cluster)~ 'red',
+                                   energy_cluster == 'ac' ~ 'blue',
+                                   grepl('none|shoulder', energy_cluster)~ 'darkgreen',
+                                   is.na(energy_cluster) ~ 'black')))+
+          scale_color_identity(name = "Cluster",
+                               breaks = c("blue", "darkgreen", "red", "black"),
+                               labels = c("AC", "Shoulder", "Heat", "Unclassified"),
+                               guide = "legend")+
+                   # make color depend on energy cluster if available for home
+                   # color = if(
+                   #   omni_daily_data %>%
+                   #     filter(home == x_home) %>%
+                   #     pull(energy_cluster) %>%
+                   #     as.factor() %>%
+                   #     levels() %>%
+                   #   length() >1) {energy_cluster
+                   #   } else {'black'}))+
           geom_line()+
           ggtitle(paste(x_home, x_location))
         
