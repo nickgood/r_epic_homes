@@ -633,7 +633,7 @@ lapply(homes_avail, function(x) {
 ```{r acf_dataframes}
 
 # return data for all homes, locations, and metrics (no clusters)
-acf_lags <- 
+acf_lags_no_cluster <- 
   lapply(metrics_all, function(x_metric) {
     
     lapply(locations_indoor, function(x_location) {
@@ -651,7 +651,9 @@ acf_lags <-
       bind_rows()
   }
   ) %>%
-  bind_rows()
+  bind_rows() %>%
+  mutate(energy_cluster = 'all')
+
 
 # return data for all homes, locations, and metrics (with clusters)
 acf_lags_cluster <- 
@@ -685,6 +687,8 @@ acf_lags_cluster <-
   ) %>%
   bind_rows()
 
+# bind results into one dataframe
+acf_lags <- acf_lags_cluster %>% bind_rows(acf_lags_no_cluster)
 ```
 
 
@@ -703,14 +707,36 @@ lapply(homes_all, function(x) {
 
 
 
-```{r lag_dependence_n}
-# test hoe dependent the significant lag value seems to be on n
+```{r lag_plots}
 
+met <- 'pm25'
+
+###### no clusters
+  # convert values that were infinite to above the maximum tested value
+acf_lags_no_inf <- acf_lags %>%
+  mutate(lag_signif = if_else(is.infinite(lag_signif), 35, lag_signif))
+
+
+a <- acf_lags_no_inf %>% 
+  filter(energy_cluster %in% c('ac', 'shoulder', 'heat', 'all')) %>%
+  filter(metric == met)
+
+# look at possible effects of sample size
+ggplot(data = a , aes(x = days_avail, y = lag_signif))+
+  geom_point(aes(color = location))+
+  facet_wrap(vars(energy_cluster))
+
+
+# boxplots by location
+ggplot(data = a , aes(x = location, y = lag_signif))+
+  geom_boxplot(outlier.shape = NULL)+
+  geom_jitter()+
+  facet_wrap(vars(energy_cluster))
+###### clusters
   # convert values that were infinite to above the maximum tested value
 acf_lags_cluster_no_inf <- acf_lags_cluster %>%
   mutate(lag_signif = if_else(is.infinite(lag_signif), 35, lag_signif))
 
-met <- 'pm25'
 
 a <- acf_lags_cluster_no_inf %>% 
   filter(energy_cluster %in% c('ac', 'shoulder', 'heat')) %>%
@@ -724,7 +750,8 @@ ggplot(data = a , aes(x = days_avail, y = lag_signif))+
 
 # boxplots by location
 ggplot(data = a , aes(x = location, y = lag_signif))+
-  geom_boxplot()+
+  geom_boxplot(outlier.shape = NULL)+
+  geom_jitter()+
   facet_wrap(vars(energy_cluster))
 
 
