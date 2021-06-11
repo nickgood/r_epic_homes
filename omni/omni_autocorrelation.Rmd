@@ -283,6 +283,10 @@ for(i in 1:length(homes_clustered)) {
   }
 }
 
+# convert any NA clusters to "unclasssified"
+omni_daily_data <- omni_daily_data %>%
+  mutate(energy_cluster = if_else(is.na(energy_cluster), 'unclassified', energy_cluster))
+
 # other possible method?
 # https://stackoverflow.com/questions/35636315/replace-values-in-a-dataframe-based-on-lookup-table
 
@@ -304,7 +308,7 @@ map(
                    color=case_when(grepl('heat', energy_cluster)~ 'red',
                                    energy_cluster == 'ac' ~ 'blue',
                                    grepl('none|shoulder', energy_cluster)~ 'darkgreen',
-                                   is.na(energy_cluster) ~ 'black')))+
+                                   energy_cluster == 'unclassified' ~ 'black')))+
           scale_color_identity(name = "Cluster",
                                breaks = c("blue", "darkgreen", "red", "black"),
                                labels = c("AC", "Shoulder", "Heat", "Unclassified"),
@@ -389,6 +393,7 @@ lapply('002', function(x) {
 
 ###Make acf function in ggplot
 ##from: https://stackoverflow.com/questions/28857241/r-combine-plots-that-use-parmfrow-internally
+
 ggacf <- function(data,  hm, loc, lag_max_plot, metric,
                   cluster = NULL,
                        ci=0.95, type="correlation",
@@ -408,6 +413,8 @@ ggacf <- function(data,  hm, loc, lag_max_plot, metric,
     x %>% 
       pull(all_of(metric))
     }
+
+  if(length(x) == 0) return()
   
   # count days in monitoring period with available data
   days_avail <- sum(!is.na(x))
@@ -543,9 +550,9 @@ lapply(homes_all, ggacf,
 
 # how does the total amount of days sampled affect the plot?
 
-# all dates
+# plot results for one location and metric at each home
 
-# plot results for one location and metric
+# all dates
 lapply(homes_avail, function(x) {
   ggacf(hm = x,
         data = omni_daily_data,
@@ -554,8 +561,78 @@ lapply(homes_avail, function(x) {
 }
 )
 
+# one month
+lapply(homes_avail, function(x) {
+  ggacf(hm = x,
+        data = omni_daily_data %>%
+          filter(date> ymd('2020-11-15') & date <ymd('2020-12-15')),
+        loc = 'living', lag_max_plot = 14, metric = 'pm25',
+  )[['plot']]
+}
+)
 
-# return data for all homes, locations, and metrics
+
+
+
+
+  
+  
+```
+
+```{r acf_plots}
+
+# plots for all homes, locations, and metrics (no clusters)
+  lapply(metrics_all, function(x_metric) {
+    
+    lapply(locations_indoor, function(x_location) {
+      
+      lapply(homes_avail, function(x_home) {
+        ggacf(hm = x_home,
+              data = omni_daily_data,
+              loc = x_location, lag_max_plot = 14, metric = x_metric
+        )[['plot']]
+      }
+      ) %>%
+        bind_rows()
+    }
+    ) %>%
+      bind_rows()
+  }
+  ) %>%
+  bind_rows()
+
+# plots for all homes, locations, and metrics (with clusters)
+  lapply(metrics_all, function(x_metric) {
+    
+    lapply(locations_indoor, function(x_location) {
+      
+      lapply(homes_avail, function(x_home) {
+        
+        lapply(omni_daily_data %>%
+                 filter(home == x_home) %>%
+                 pull(energy_cluster) %>%
+                 as.factor() %>% levels(),
+               function(x_cluster) {
+                 
+        ggacf(hm = x_home,
+              data = omni_daily_data,
+              loc = x_location, lag_max_plot = 14, metric = x_metric,
+              cluster = x_cluster
+        )[['plot']]
+               }
+      ) 
+      }
+      ) 
+    }
+    ) 
+  }
+  ) 
+```
+
+
+```{r acf_dataframes}
+
+# return data for all homes, locations, and metrics (no clusters)
 acf_lags <- 
   lapply(metrics_all, function(x_metric) {
     
@@ -576,15 +653,41 @@ acf_lags <-
   ) %>%
   bind_rows()
 
+# return data for all homes, locations, and metrics (with clusters)
+acf_lags_cluster <- 
+  lapply(metrics_all, function(x_metric) {
+    
+    lapply(locations_indoor, function(x_location) {
+      
+      lapply(homes_avail, function(x_home) {
+        
+        lapply(omni_daily_data %>%
+                 filter(home == x_home) %>%
+                 pull(energy_cluster) %>%
+                 as.factor() %>% levels(),
+               function(x_cluster) {
+                 
+        ggacf(hm = x_home,
+              data = omni_daily_data,
+              loc = x_location, lag_max_plot = 14, metric = x_metric,
+              cluster = x_cluster
+        )[['lag_signif']]
+               }
+      ) %>%
+        bind_rows()
+      }
+      ) %>%
+        bind_rows()
+    }
+    ) %>%
+      bind_rows()
+  }
+  ) %>%
+  bind_rows()
 
-# one month
-  lapply(homes_all, ggacf,
-         data = omni_daily_data %>%
-           filter(date> ymd('2020-11-15') & date <ymd('2020-12-15')),
-         loc = 'living', lag_max_plot = 14, metric = 'pm25')
-  
-  
 ```
+
+
 
 ```{r ggacf_partial}
 
@@ -604,18 +707,25 @@ lapply(homes_all, function(x) {
 # test hoe dependent the significant lag value seems to be on n
 
   # convert values that were infinite to above the maximum tested value
-acf_lags_no_inf <- acf_lags %>%
+acf_lags_cluster_no_inf <- acf_lags_cluster %>%
   mutate(lag_signif = if_else(is.infinite(lag_signif), 35, lag_signif))
 
+met <- 'pm25'
+
+a <- acf_lags_cluster_no_inf %>% 
+  filter(energy_cluster %in% c('ac', 'shoulder', 'heat')) %>%
+  filter(metric == met)
+
 # look at possible effects of sample size
-ggplot(data = acf_lags_no_inf , aes(x = days_avail, y = lag_signif))+
+ggplot(data = a , aes(x = days_avail, y = lag_signif))+
   geom_point(aes(color = location))+
-  facet_wrap(vars(metric))
+  facet_wrap(vars(energy_cluster))
+
 
 # boxplots by location
-ggplot(data = acf_lags_no_inf , aes(x = location, y = lag_signif))+
+ggplot(data = a , aes(x = location, y = lag_signif))+
   geom_boxplot()+
-  facet_wrap(vars(metric))
+  facet_wrap(vars(energy_cluster))
 
 
 
@@ -876,225 +986,3 @@ daily <- daily_original
 
 ```
 
-
-# Autocorrelation for different time periods
-
-  * (subset of homes for comparibility)
-
-```{r autocorrelation_seasonal, message = FALSE}
-
- sapply(home_num, count.missing, rm = 'living',
-       '2020-9-15 00:00:00',
-       '2020-10-15 00:00:00',
-       unit = 'hour')
-
- sapply(home_num, count.missing, rm = 'living',
-       '2020-11-15 00:00:00',
-       '2020-12-15 00:00:00',
-       unit = 'hour')
- 
- start_1 <- '2020-11-15 00:00:00'
-  end_1 <- '2020-12-15 00:00:00'
-   start_2 <- '2020-9-15 00:00:00'
-  end_2 <- '2020-10-15 00:00:00'
-
- 
-  
-  
-#make temporary definitions of data to preserve it for the rest of code chunks
-hourly_original <- hourly
-daily_original <- daily
-  
-  
-  
-
-######################### hourly
-
-unit_temp <- 'hour'
-
-#deinfe list of homes that have available data for given data range
- homes_available1 <-
-  sapply(home_num, count.missing, rm = 'living',
-       start_1, end_1,
-       unit = unit_temp) %>%
-  as.data.frame() %>%
-  rownames_to_column() %>%
-  setNames(c('home', 'missing')) %>%
-  filter( missing == 0) %>%
-  pull(home)
-
- #match with available homes from another date range
- homes_available <- sapply(home_num, count.missing, rm = 'living',
-       start_2, end_2,
-       unit = unit_temp) %>%
-  as.data.frame() %>%
-  rownames_to_column() %>%
-  setNames(c('home', 'missing')) %>%
-  filter( missing == 0 & home %in% homes_available1) %>%
-  pull(home)
-
-
-
-#filter out certain homes
-
-hourly <- hourly_original %>%
-  filter(home %in% homes_available)
-
-
-
-
-
-## hourly bewteen two date ranges
-
-# PM
-a<- acf.grid.nomiss(hms = home_num, rm = 'living',
-                    metric = 'pm25_ihs',  lag.max = 24,
-                    start_date = start_1,
-                    end_date = end_1,
-                unit = unit_temp)
-
-b<- acf.grid.nomiss(hms = home_num, rm = 'living',
-                    metric = 'pm25_ihs',  lag.max = 24,
-                    start_date = start_2,
-                    end_date = end_2,
-                unit = unit_temp)
-
-
-plots <- list(a,b)
-
-do.call('grid.arrange', c(plots, ncol = 2))
-
-
-# VOC
-
-a<- acf.grid.nomiss(hms = home_num, rm = 'living',
-                    metric = 'voc_ihs',  lag.max = 24,
-                    start_date = start_1,
-                    end_date = end_1,
-                unit = unit_temp)
-
-b<- acf.grid.nomiss(hms = home_num, rm = 'living',
-                    metric = 'voc_ihs',  lag.max = 24,
-                    start_date = start_2,
-                    end_date = end_2,
-                unit = unit_temp)
-
-
-plots <- list(a,b)
-
-do.call('grid.arrange', c(plots, ncol = 2))
-
-#reset hourly and daily data to original
-hourly <- hourly_original
-daily <- daily_original
-
-
-
-
-
-
-
-######################### daily
-
-unit_temp <- 'day'
-
-#deinfe list of homes that have available data for given data range
- homes_available1 <- 
-  sapply(home_num, count.missing, rm = 'living',
-       start_1, end_1,
-       unit = unit_temp) %>%
-  as.data.frame() %>%
-  rownames_to_column() %>%
-  setNames(c('home', 'missing')) %>%
-  filter( missing == 0) %>%
-  pull(home)
- 
- #match with available homes from another date range
- homes_available <- sapply(home_num, count.missing, rm = 'living',
-       start_2, end_2,
-       unit = unit_temp) %>%
-  as.data.frame() %>%
-  rownames_to_column() %>%
-  setNames(c('home', 'missing')) %>%
-  filter( missing == 0 & home %in% homes_available1) %>%
-  pull(home)
- 
- 
-
-#filter out certain homes
-
-daily <- daily_original %>%
-  filter(home %in% homes_available)
-
-
-
-
-
-## daily bewteen two date ranges
-# PM2.5
-
-a<- acf.grid.nomiss(hms = home_num, rm = 'living',
-                    metric = 'pm25_ihs',  lag.max = 7,
-                    start_date = start_1,
-                    end_date = end_1,
-                unit = unit_temp)
-
-b<- acf.grid.nomiss(hms = home_num, rm = 'living',
-                    metric = 'pm25_ihs',  lag.max = 7,
-                    start_date = start_2,
-                    end_date = end_2,
-                unit = unit_temp)
-
-
-plots <- list(a,b)
-
-do.call('grid.arrange', c(plots, ncol = 2))
-
-
-# VOC
-a<- acf.grid.nomiss(hms = home_num, rm = 'living',
-                    metric = 'voc_ihs',  lag.max = 7,
-                    start_date = start_1,
-                    end_date = end_1,
-                unit = unit_temp)
-
-b<- acf.grid.nomiss(hms = home_num, rm = 'living',
-                    metric = 'voc_ihs',  lag.max = 7,
-                    start_date = start_2,
-                    end_date = end_2,
-                unit = unit_temp)
-
-
-plots <- list(a,b)
-
-do.call('grid.arrange', c(plots, ncol = 2))
-
-#reset hourly and daily data to original
-hourly <- hourly_original
-daily <- daily_original
-
-
-
-```
-
-# Ensure that the starting point does not affect autocorrelation
-
-```{r starting_point, echo = TRUE}
-
-# define 2 sequences, one that is translated by a value of pi/12
-x1 <- seq(0,4*pi, pi/4)
-x2 <- seq(pi/4,4*pi + pi/4, pi/4)
-
-# take sine of both sequences
-# simulating if we started calculating acf for a time series at 3am as opposed to 12 am
-# or tuesday as opposed to wednesday (assuming the pattern repeats)
-y1 <- sin(x1)
-y2 <- sin(x2)
-
-acf1<- acf(y1)
-acf2<-acf(y2)
-
-
-
-
-```
