@@ -188,7 +188,7 @@ omni_daily_data <- omni_data %>%
 
 ```{r add_clusters}
 
-cluster_df<- tribble(~home, ~type, ~start_date, ~end_date,
+energy_cluster_df<- tribble(~home, ~type, ~start_date, ~end_date,
                      '001', 'ac', '2020-08-01', '2020-10-01',
                      '001', 'shoulder', '2020-10-02', '2020-12-02',
                      '001', 'heat', '2020-12-03', '2021-05-23',
@@ -217,13 +217,67 @@ cluster_df<- tribble(~home, ~type, ~start_date, ~end_date,
                      '015', 'none_1', '2020-08-01', '2020-11-23',
                      '015', 'none', '2020-11-24', '2021-03-28',
                      '015', 'none_2', '2021-03-29', '2021-05-23',
-)
+) %>%
+  mutate(across(start_date, as.POSIXct), across(end_date, as.POSIXct))
 
 
 
+# make an empty column to fill with cluster function
+omni_daily_data$energy_cluster <- NA
 
-test <- omni_daily_data %>%
-  mutate(cluster = case_when(home == '001' ))
+
+# # using lapply
+# lapply('001', function(x_home) {
+#   
+#   lapply(
+#     # apply the function to all the energy clusters for a given home
+#     c(1:length(which(energy_clusters$home == hm))),
+#      function(cluster_type_index) {
+#       
+#       omni_daily_data$energy_cluster[
+#         which(omni_daily_data$home == x_home &
+#                 between(omni_daily_data$date,
+#                         energy_clusters[which(energy_clusters$home == x_home)[cluster_type_index],
+#                                         'start_date'][[1]],
+#                         energy_clusters[which(energy_clusters$home == x_home)[cluster_type_index],
+#                                         'end_date'][[1]])
+#         )
+#       ]<- energy_clusters[which(energy_clusters$home == x_home)[cluster_type_index], 'type'][[1]]
+#     }
+#   )
+# }
+# )
+
+
+# using for loop
+#specify all homes that have specified energy clusters
+homes_clustered <- levels(as.factor(energy_cluster_df$home))
+
+for(i in 1:length(homes_clustered)) { 
+  # for each home
+  # identify the df matrix index of each cluster type
+  cluster_type_indeces <- which(energy_cluster_df$home == homes_clustered[i])
+
+    for(j in 1:length(cluster_type_indeces)) {
+    # for each cluster type in each home in the energycluster dataframe
+      # indentify the values in the data that are match the home
+      # and are within the dates specified by the cluster
+    omni_daily_data$energy_cluster[
+      which(omni_daily_data$home == homes_clustered[i] &
+              between(omni_daily_data$date,
+                      energy_cluster_df[cluster_type_indeces[j],
+                                      'start_date'][[1]],
+                      energy_cluster_df[cluster_type_indeces[j],
+                                      'end_date'][[1]])
+      )
+      # add the identified cluster type of each value
+      # in the new column in the data
+    ] <- energy_cluster_df[cluster_type_indeces[j], 'type'][[1]]
+  }
+}
+
+# other possible method?
+# https://stackoverflow.com/questions/35636315/replace-values-in-a-dataframe-based-on-lookup-table
 
 
 ```
@@ -231,14 +285,14 @@ test <- omni_daily_data %>%
 ```{r stationarity, eval = TRUE}
 # check stationarity before doing acf calcs and plots
 
-# make time seris plot for all available sensors
+# make time series plot for all available sensors
 map(
   homes_avail, function(x_home) {
     map(
       locations_indoor, function(x_location){
         
         ggplot(omni_daily_data %>% filter(home == x_home & location == x_location),
-               aes(x = as.Date(date), y = pm25))+
+               aes(x = as.Date(date), y = pm25, color = energy_cluster))+
           geom_line()+
           ggtitle(paste(x_home, x_location))
         
