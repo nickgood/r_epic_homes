@@ -156,6 +156,7 @@ count.missing <- function(data, hm, loc, metric,
 ```{r create_dfs}
 
 # all homes/locations in one dataframe
+# with missing dates put in as NA values
 ## daily
 omni_daily_data <- omni_data %>%
   mutate(date = floor_date(datetime, unit = 'days')) %>%
@@ -185,6 +186,48 @@ omni_daily_data <- omni_data %>%
 
 ```
 
+```{r add_clusters}
+
+cluster_df<- tribble(~home, ~type, ~start_date, ~end_date,
+                     '001', 'ac', '2020-08-01', '2020-10-01',
+                     '001', 'shoulder', '2020-10-02', '2020-12-02',
+                     '001', 'heat', '2020-12-03', '2021-05-23',
+                     '002', 'ac', '2020-08-01', '2020-08-27',
+                     '002', 'shoulder', '2020-08-28', '2020-10-07',
+                     '002', 'heat', '2020-10-08', '2021-05-23',
+                     '004', 'none', '2020-08-10', '2020-10-12',
+                     '004', 'heat', '2020-10-13', '2021-05-23',
+                     '007', 'ac', '2020-08-01', '2020-09-04',
+                     '007', 'shoulder', '2020-09-05', '2020-10-12',
+                     '007', 'heat', '2020-10-13', '2021-05-23',
+                     '009', 'ac', '2020-08-01', '2020-09-23',
+                     '009', 'shoulder', '2020-09-24', '2020-10-31',
+                     '009', 'heat', '2020-11-01', '2021-05-23',                     
+                     '010', 'heat_1', '2020-08-01', '2020-10-18',
+                     '010', 'none', '2020-10-19', '2020-12-01',
+                     '010', 'heat_2', '2020-12-02', '2021-05-23',
+                     '011', 'none', '2020-08-01', '2020-12-01',
+                     '011', 'heat', '2020-12-02', '2021-05-23',
+                     '012', 'ac', '2020-08-01', '2020-09-26',
+                     '012', 'shoulder', '2020-09-27', '2020-11-07',
+                     '012', 'heat', '2020-11-08', '2021-05-23',
+                     '013', 'none_1', '2020-08-01', '2020-11-07',
+                     '013', 'heat', '2020-11-08', '2021-03-31',
+                     '013', 'none_2', '2021-04-01', '2021-05-23',
+                     '015', 'none_1', '2020-08-01', '2020-11-23',
+                     '015', 'none', '2020-11-24', '2021-03-28',
+                     '015', 'none_2', '2021-03-29', '2021-05-23',
+)
+
+
+
+
+test <- omni_daily_data %>%
+  mutate(cluster = case_when(home == '001' ))
+
+
+```
+
 ```{r stationarity, eval = TRUE}
 # check stationarity before doing acf calcs and plots
 
@@ -206,11 +249,49 @@ map(
 
 hm <- '002'
 loc <- 'living'
+metric <- 'pm25'
+
 # for one home
 ggplot(omni_daily_data %>% filter(home == hm & location == loc),
-       aes(x = as.Date(date), y = pm25))+
+       aes(x = as.Date(date), y = metric))+
   geom_line()+
   ggtitle(paste(hm, loc))
+
+diff_data <- omni_daily_data %>%
+  filter(home == hm & location == loc) %>%
+  mutate(diff = c(NA, diff(pull(., all_of(metric),1))))
+
+
+# plot differenced time series
+
+diff_data <- omni_daily_data %>%
+  filter(home == hm & location == loc) %>%
+  # make column of metric differenced with itself by one day
+  mutate(diff = c(NA, diff(pull(., all_of(metric),1))))
+  # # set up for faceting
+  # pivot_longer(cols = c(all_of(metric), diff),
+  #              names_to = 'data_set', values_to = 'value') %>%
+  # mutate(data_set = if_else(data_set == 'diff',
+  #                           paste0(quo_name(metric), '_diff'),
+  #                           data_set))
+
+ggplot(diff_data,
+       aes(x = as.Date(date), y = value))+
+  geom_line()+
+  ggtitle(paste(hm, loc))+
+  facet_wrap(vars(data_set), scales = 'free')
+
+diff_data2 <- diff_data[-c(1,101),]
+
+# plot results for one location and metric
+lapply('002', function(x) {
+  ggacf(hm = x,
+        data = diff_data2,
+        loc = 'living', lag_max_plot = 14, metric = 'diff',
+  )[['plot']]
+}
+)
+
 
 ```
 
