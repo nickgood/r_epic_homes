@@ -192,14 +192,27 @@ omni_daily_data <- omni_data %>%
 
 ```{r add_clusters}
 
-energy_cluster_df<- tribble(~home, ~type, ~start_date, ~end_date,
+# classify homes into "types" based on cluster pattern
+homes_tier3<-home.list(c(1,2,7,9,12)) # ac-shoulder-heat
+homes_tier2<-home.list(c(4,10,11,13,15)) # shoulder-heat (sometimes second shoulder)
+homes_tier1<-home.list(c(6,8,14))
+
+omni_daily_data<- omni_daily_data %>%
+  mutate(home_type = case_when(
+    home %in% homes_tier3 ~ 'tier3',
+    home %in% homes_tier2 ~ 'tier2',
+    home %in% homes_tier1 ~ 'tier1',
+    TRUE ~ 'unclassified'))
+
+energy_cluster_df<- tribble(~home, ~cluster_type,
+                            ~start_date, ~end_date,
                      '001', 'ac', '2020-08-01', '2020-10-01',
                      '001', 'shoulder', '2020-10-02', '2020-12-02',
                      '001', 'heat', '2020-12-03', '2021-05-23',
                      '002', 'ac', '2020-08-01', '2020-08-27',
                      '002', 'shoulder', '2020-08-28', '2020-10-07',
                      '002', 'heat', '2020-10-08', '2021-05-23',
-                     '004', 'none', '2020-08-10', '2020-10-12',
+                     '004', 'shoulder', '2020-08-10', '2020-10-12',
                      '004', 'heat', '2020-10-13', '2021-05-23',
                      '007', 'ac', '2020-08-01', '2020-09-04',
                      '007', 'shoulder', '2020-09-05', '2020-10-12',
@@ -207,9 +220,7 @@ energy_cluster_df<- tribble(~home, ~type, ~start_date, ~end_date,
                      '009', 'ac', '2020-08-01', '2020-09-23',
                      '009', 'shoulder', '2020-09-24', '2020-10-31',
                      '009', 'heat', '2020-11-01', '2021-05-23',                     
-                     '010', 'heat_1', '2020-08-01', '2020-10-18',
-                     '010', 'none', '2020-10-19', '2020-12-01',
-                     '010', 'heat_2', '2020-12-02', '2021-05-23',
+                     '010', 'heat', '2020-12-02', '2021-05-23',
                      '011', 'none', '2020-08-01', '2020-12-01',
                      '011', 'heat', '2020-12-02', '2021-05-23',
                      '012', 'ac', '2020-08-01', '2020-09-26',
@@ -259,7 +270,7 @@ homes_clustered <- levels(as.factor(energy_cluster_df$home))
 
 for(i in 1:length(homes_clustered)) { 
   # for each home
-  # identify the df matrix index of each cluster type
+  # identify the df matrix index of each cluster cluster_type
   cluster_type_indeces <- which(energy_cluster_df$home == homes_clustered[i])
 
     for(j in 1:length(cluster_type_indeces)) {
@@ -276,7 +287,7 @@ for(i in 1:length(homes_clustered)) {
       )
       # add the identified cluster type of each value
       # in the new column in the data
-    ] <- energy_cluster_df[cluster_type_indeces[j], 'type'][[1]]
+    ] <- energy_cluster_df[cluster_type_indeces[j], 'cluster_type'][[1]]
   }
 }
 
@@ -289,6 +300,25 @@ omni_daily_data <- omni_daily_data %>%
 
 
 ```
+
+```{r ts_grid_function, include = FALSE}
+#function to put plots in a grid
+ts.grid <- function(plots, title,
+                     y_val = NULL, ncol = 4, nrow = 4) {
+  ##omit NULL values (from homes or rooms without valid data)
+  plots <- plots[!sapply(plots, is.null)]
+  
+  do.call('grid.arrange', c(plots, top = title, left = y_val,
+                            ncol = ncol, nrow = nrow))
+  
+}
+
+# NOTE, if there are no homes with valid data in selection (plots <- NULL)
+# the function will return the error: 
+### Error in unit(rep(1, nrow), "null") : 'x' and 'units' must have length > 0
+
+```
+
 
 ```{r stationarity}
 # check stationarity before doing acf calcs and plots
@@ -310,15 +340,7 @@ map(
                                breaks = c("blue", "darkgreen", "red", "black"),
                                labels = c("AC", "Shoulder", "Heat", "Unclassified"),
                                guide = "legend")+
-                   # make color depend on energy cluster if available for home
-                   # color = if(
-                   #   omni_daily_data %>%
-                   #     filter(home == x_home) %>%
-                   #     pull(energy_cluster) %>%
-                   #     as.factor() %>%
-                   #     levels() %>%
-                   #   length() >1) {energy_cluster
-                   #   } else {'black'}))+
+
           geom_line()+
           ggtitle(paste(x_home, x_location))
         
@@ -327,22 +349,64 @@ map(
   }
 )
 
-# hm <- '002'
-# loc <- 'living'
-# metric <- 'pm25'
-# 
-# # for one home
-# ggplot(omni_daily_data %>% filter(home == hm & location == loc),
-#        aes(x = as.Date(date), y = metric))+
-#   geom_line()+
-#   ggtitle(paste(hm, loc))
-# 
+
+# make time series plot for all available sensors
+map(
+  homes_avail, function(x_home) {
+    map(
+      locations_indoor, function(x_location){
+        
+        ggplot(omni_daily_data %>% filter(home == x_home & location == x_location),
+               aes(x = as.Date(date), y = pm25,
+                   color=case_when(grepl('heat', energy_cluster)~ 'red',
+                                   energy_cluster == 'ac' ~ 'blue',
+                                   grepl('none|shoulder', energy_cluster)~ 'darkgreen',
+                                   energy_cluster == 'unclassified' ~ 'black')))+
+          scale_color_identity(name = "Cluster",
+                               breaks = c("blue", "darkgreen", "red", "black"),
+                               labels = c("AC", "Shoulder", "Heat", "Unclassified"),
+                               guide = "legend")+
+
+          geom_line()+
+          ggtitle(paste(x_home, x_location))
+        
+      }
+    )
+  }
+)
+
+
+hm <- '010'
+loc <- 'bedroom'
+metric <- 'temp'
+
+# for one home
+ggplot(omni_daily_data %>% filter(home == hm & location == loc),
+               aes(x = as.Date(date), y = UQ(as.name(metric)),
+                   color=case_when(grepl('heat', energy_cluster)~ 'red',
+                                   energy_cluster == 'ac' ~ 'blue',
+                                   grepl('none|shoulder', energy_cluster)~ 'darkgreen',
+                                   energy_cluster == 'unclassified' ~ 'black')))+
+          scale_color_identity(name = "Cluster",
+                               breaks = c("blue", "darkgreen", "red", "black"),
+                               labels = c("AC", "Shoulder", "Heat", "Unclassified"),
+                               guide = "legend")+
+          geom_line()+
+          ggtitle(paste(hm, loc))
+
+ggplot(omni_daily_data %>% filter(home == hm & location == loc),
+       aes(x = as.Date(date), y = UQ(as.name(metric))))+
+  geom_line()+
+  ggtitle(paste(hm, loc))
+
+
+
+# # plot differenced time series
 # diff_data <- omni_daily_data %>%
 #   filter(home == hm & location == loc) %>%
 #   mutate(diff = c(NA, diff(pull(., all_of(metric),1))))
 # 
 # 
-# # plot differenced time series
 # 
 # diff_data <- omni_daily_data %>%
 #   filter(home == hm & location == loc) %>%
@@ -859,8 +923,10 @@ met <- 'pm25'
   # convert values that were infinite to above the maximum tested value
 # and omit samples that have less than 21 available days
 # and omit samples with a missing pct greater than 1/9
+
+
 acf_lags_filter <- acf_lags %>%
-  mutate(lag_signif = if_else(is.infinite(lag_signif), 35, lag_signif)) %>%
+  # mutate(lag_signif = if_else(is.infinite(lag_signif), 35, lag_signif)) %>%
   filter(days_avail >=21 & missing_pct <= (1/9*100))
 
 
@@ -876,15 +942,37 @@ a <- acf_lags_filter %>%
 
 # boxplots by location
 ggplot(data = a , aes(x = location, y = lag_signif))+
-  geom_boxplot(outlier.shape = NULL)+
-  geom_jitter()+
-  facet_wrap(vars(energy_cluster))
+  geom_boxplot(outlier.shape = NA)+
+  geom_jitter(aes(
+    color = ifelse(is.infinite(lag_signif),
+                    'red',
+                    'black')
+    ), height = 0)+
+  facet_wrap(vars(energy_cluster))+
+  ggtitle(label = paste0(met, ', lags before acf is insignficant'))+
+  scale_y_continuous(oob= scales::squish_infinite)+
+            scale_color_identity(name = "Insignifiance Reached within Month",
+                               breaks = c("black", "red"),
+                               labels = c("Yes", "No"),
+                               guide = "legend")
 
 # boxplots by location, pooled clusters
 ggplot(data = a %>% filter(energy_cluster != 'all_dates') ,
        aes(x = location, y = lag_signif))+
-  geom_boxplot(outlier.shape = NULL)+
-  geom_jitter()
+  geom_boxplot(outlier.shape = NA)+
+  geom_jitter(aes(
+    color=case_when(grepl('heat', energy_cluster)~ 'red',
+                    energy_cluster == 'ac' ~ 'blue',
+                    grepl('none|shoulder', energy_cluster)~ 'darkgreen',
+                    energy_cluster == 'unclassified' ~ 'black')
+  ), height = 0)+
+  ggtitle(label = paste0(met, ', lags before acf is insignficant'))+
+  scale_y_continuous(oob= scales::squish_infinite)+
+  scale_color_identity(name = "Cluster",
+                       breaks = c("blue", "darkgreen", "red", "black"),
+                       labels = c("AC", "Shoulder", "Heat", "Unclassified"),
+                       guide = "legend")
+          
 
 
 ####### compare all metrics, pooled cluster periods
@@ -895,9 +983,20 @@ a <- acf_lags_filter %>%
 # boxplots by location, pooled clusters
 ggplot(data = a %>% filter(energy_cluster != 'all_dates') ,
        aes(x = location, y = lag_signif))+
-  geom_boxplot(outlier.shape = NULL)+
-  geom_jitter()+
-  facet_wrap(vars(metric))
+  geom_boxplot(outlier.shape = NA)+
+  geom_jitter(aes(
+    color=case_when(grepl('heat', energy_cluster)~ 'red',
+                    energy_cluster == 'ac' ~ 'blue',
+                    grepl('none|shoulder', energy_cluster)~ 'darkgreen',
+                    energy_cluster == 'unclassified' ~ 'black')
+  ), height = 0)+
+  facet_wrap(vars(metric))+
+  ggtitle(label = 'Lags before acf is insignficant')+
+  scale_y_continuous(oob= scales::squish_infinite)+
+  scale_color_identity(name = "Cluster",
+                       breaks = c("blue", "darkgreen", "red", "black"),
+                       labels = c("AC", "Shoulder", "Heat", "Unclassified"),
+                       guide = "legend")
 
 
 
