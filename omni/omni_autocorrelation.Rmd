@@ -561,12 +561,12 @@ lapply(homes_all, ggacf,
 ```{r ggacf_grid_function, include = FALSE}
 #function to put plots in a grid
 acf.grid <- function(plots, title,
-                     y_val = 'ACF', ncol = 5) {
+                     y_val = 'ACF', ncol = 4, nrow = 4) {
   ##omit NULL values (from homes or rooms without valid data)
   plots <- plots[!sapply(plots, is.null)]
   
   do.call('grid.arrange', c(plots, top = title, left = y_val,
-                            ncol = ncol))
+                            ncol = ncol, nrow = nrow))
   
 }
 
@@ -599,7 +599,7 @@ acf.grid <- function(plots, title,
             )[['plot']]
           }
           ) %>%
-            acf.grid(title = paste(x_location, x_metric, 'no clusters'), ncol = 4)
+            acf.grid(title = paste(x_location, x_metric, 'no clusters'))
         }
         )
       }
@@ -705,15 +705,17 @@ metric <- 'pm25'
         )[['plot']]
       }
       ) %>%
-  acf.grid(title = paste(loc, metric, 'all dates'), ncol = 4)
+  acf.grid(title = paste(loc, metric, 'all dates'))
 
-            date_ranges <- list(c('2020-11-01', '2020-12-31'),
+      
+
+            
+# multpile smaller date ranges
+
+                        date_ranges <- list(c('2020-11-01', '2020-12-31'),
                                 c('2021-01-01', '2021-02-28'),
                                 c('2021-03-01', '2021-04-30'))
-            
-# try applying to multpile date ranges
-
-            
+                        
                  lapply(date_ranges, function(x_date_range) {
                        
                    # date_range <- unlist(x_date_range)
@@ -730,8 +732,8 @@ metric <- 'pm25'
   acf.grid(title = paste(loc, metric,
                             month(x_date_range[1], label = TRUE, abbr = TRUE),
                          '-',
-                         month(x_date_range[2], label = TRUE, abbr = TRUE)),
-           ncol = 4)   
+                         month(x_date_range[2], label = TRUE, abbr = TRUE))
+           )   
                  }
                  )
 
@@ -770,7 +772,7 @@ metric <- 'pm25'
                   }
                }
       ) %>%
-          acf.grid(title = paste(x_location, x_metric, x_cluster), ncol = 4) 
+          acf.grid(title = paste(x_location, x_metric, x_cluster)) 
       }
       ) 
     }
@@ -866,10 +868,10 @@ a <- acf_lags_filter %>%
   filter(energy_cluster %in% c('ac', 'shoulder', 'heat', 'all_dates')) %>%
   filter(metric == met)
 
-# look at possible effects of sample size
-ggplot(data = a , aes(x = days_avail, y = lag_signif))+
-  geom_point(aes(color = location))+
-  facet_wrap(vars(energy_cluster))
+# # look at possible effects of sample size
+# ggplot(data = a , aes(x = days_avail, y = lag_signif))+
+#   geom_point(aes(color = location))+
+#   facet_wrap(vars(energy_cluster))
 
 
 # boxplots by location
