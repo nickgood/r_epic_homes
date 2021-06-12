@@ -377,7 +377,7 @@ map(
 
 
 
-```{r functions_autocorrelation, include= FALSE}
+```{r ggacf_function, include= FALSE}
 
 # # variables or testing
 # data <- omni_daily_data
@@ -470,18 +470,22 @@ ggacf <- function(data,  hm, loc, lag_max_plot, metric,
               size = xsmall)+ # annotate w/ n used to calculate acf for each lag
     theme_bw() +
     xlab("Lag") +
-    ggtitle(if_else(simple == TRUE, "", paste(hm, loc, metric, cluster))) +
-    annotate( 'text', x = Inf, y = Inf, hjust = 1, vjust = 1,
+    ggtitle(if_else(simple == TRUE,
+                    paste(hm, '*missing', signif(missing,3), '%'),
+                    paste(hm, loc, metric, cluster))) +
+    {if (simple != TRUE) {
+      annotate( 'text', x = Inf, y = Inf, hjust = 1, vjust = 1,
               label = paste("*missing", signif(missing,3), "% of daily values\n",
-                            "in home sampling period"), size = small)+
-    coord_cartesian(xlim=c(0, lag_max_plot), ylim = c(-1,1))+
-    # theme(axis.title = element_blank(),
-    #       axis.text = element_blank(),
-    #       axis.ticks = element_blank(),
-    #       panel.grid.major = element_blank(),
-    #       panel.grid.minor = element_blank(),
-    #       panel.border = element_blank(),
-    #       plot.title = element_text(hjust = 0.5))+
+                            "in home sampling period"), size = small)}}+
+    coord_cartesian(xlim=c(0, lag_max_plot), ylim = c(-0.25,1))+
+    {if(simple == TRUE) {
+      theme(axis.title = element_blank(),
+          axis.text.x = element_blank(),
+          axis.ticks = element_blank(),
+          panel.grid.minor.x = element_blank(),
+          panel.grid.major.x = element_blank(),
+          panel.border = element_blank(),
+          plot.title = element_text(hjust = 0.5))}}+
     if (is.null(ylab))
       ylab(ifelse(type=="partial", "PACF", "ACF"))
   else
@@ -504,10 +508,14 @@ ggacf <- function(data,  hm, loc, lag_max_plot, metric,
   return(list('lag_signif' = lag_signif, 'plot' = plot))
 }
 
+# # test for one home, loc, metric
+# lapply('002', ggacf,
+#        data = omni_daily_data, loc = 'living', lag_max_plot = 10,
+#        metric = 'pm25', simple= TRUE)
 ```
 
 
-```{r test_ggacf_data_resolution_affect, eval = FALSE}
+```{r test_acf_data_resolution_effect, eval = FALSE}
 # is the point at which data crosses conf_int
 # affected by resolution of data?
 
@@ -544,7 +552,7 @@ acf(omni_daily_data %>%
     na.action = na.pass, lag.max = 10)
 
 lapply(homes_all, ggacf,
-       data = omni_daily_data, loc = 'living', lag.max = 48, metric = 'pm25')
+       data = omni_daily_data, loc = 'living', lag_max_plot = 10, metric = 'pm25')
 
 
   
@@ -593,7 +601,26 @@ acf.grid <- function(plots, title,
 ```
 
 
-```{r ggacf_grid_plots_no_clusters}
+```{r ggacf_grid_plots_no_clusters, fig.width=8, fig.height=10.5}
+
+# plots for all homes, locations, and metrics (no clusters)
+
+# # not in grid
+#   plots <- lapply(metrics_all, function(x_metric) {
+#     
+#     lapply(locations_indoor, function(x_location) {
+#       
+#       lapply(homes_avail, function(x_home) {
+#         ggacf(hm = x_home,
+#               data = omni_daily_data,
+#               loc = x_location, lag_max_plot = 14, metric = x_metric
+#         )[['plot']]
+#       }
+#       ) 
+#     }
+#     ) 
+#   }
+#   )
 
 # plots for all homes, locations, and metrics (no clusters)
   plots <- lapply(metrics_all, function(x_metric) {
@@ -610,7 +637,20 @@ acf.grid <- function(plots, title,
     }
     ) 
   }
-  ) 
+  ) %>%
+  acf.grid(title = )
+
+loc <- 'living'
+metric <- 'pm25'
+
+      lapply(homes_avail, function(x_home) {
+        ggacf(hm = x_home,
+              data = omni_daily_data,
+              loc = loc, lag_max_plot = 30, metric = metric
+        )[['plot']]
+      }
+      ) %>%
+  acf.grid(title = paste(loc, metric, 'no clusters'))
 
 ```
 
