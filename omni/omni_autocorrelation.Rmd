@@ -570,6 +570,10 @@ acf.grid <- function(plots, title,
   
 }
 
+# NOTE, if there are no homes with valid data in selection (plots <- NULL)
+# the function will return the error: 
+### Error in unit(rep(1, nrow), "null") : 'x' and 'units' must have length > 0
+
 ```
 
 
@@ -581,6 +585,25 @@ acf.grid <- function(plots, title,
 ```{r ggacf_grid_plots_no_clusters, fig.width=8, fig.height=4.5}
 
 # plots for all homes, locations, and metrics (no clusters)
+
+    # all locs/metrics  
+      lapply(locations_indoor, function(x_location) {
+        
+        lapply(metrics_all, function(x_metric) {
+          
+          lapply(homes_avail, function(x_home) {
+            ggacf(hm = x_home,
+                  data = omni_daily_data,
+                  loc = x_location, lag_max_plot = 30, metric = x_metric,
+                  simple = TRUE
+            )[['plot']]
+          }
+          ) %>%
+            acf.grid(title = paste(x_location, x_metric, 'no clusters'), ncol = 4)
+        }
+        )
+      }
+      )
 
 # # not in grid
 #   plots <- lapply(metrics_all, function(x_metric) {
@@ -616,71 +639,54 @@ acf.grid <- function(plots, title,
 #   }
 #   )
 
-loc <- 'living'
-metric <- 'pm25'
-
-      lapply(homes_avail, function(x_home) {
-        ggacf(hm = x_home,
-              data = omni_daily_data,
-              loc = loc, lag_max_plot = 30, metric = metric,
-              simple = TRUE
-        )[['plot']]
-      }
-      ) %>%
-  acf.grid(title = paste(loc, metric, 'no clusters'), ncol = 4)
+# one location/metric at a time
+# loc <- 'living'
+# metric <- 'pm25'
+# 
+#       lapply(homes_avail, function(x_home) {
+#         ggacf(hm = x_home,
+#               data = omni_daily_data,
+#               loc = loc, lag_max_plot = 30, metric = metric,
+#               simple = TRUE
+#         )[['plot']]
+#       }
+#       ) %>%
+#   acf.grid(title = paste(loc, metric, 'no clusters'), ncol = 4)
+#       
+# metric <- 'voc'
+# 
+# 
+#       lapply(homes_avail, function(x_home) {
+#         ggacf(hm = x_home,
+#               data = omni_daily_data,
+#               loc = loc, lag_max_plot = 30, metric = metric,
+#               simple = TRUE
+#         )[['plot']]
+#       }
+#       ) %>%
+#   acf.grid(title = paste(loc, metric, 'no clusters'), ncol = 4)
+#       
+#       metric <- 'voc'
+# 
+#       
+# loc <- 'living'
+# metric <- 'pm25'
+#       lapply(homes_avail, function(x_home) {
+#         ggacf(hm = x_home,
+#               data = omni_daily_data,
+#               loc = loc, lag_max_plot = 30, metric = metric,
+#               simple = TRUE
+#         )[['plot']]
+#       }
+#       ) %>%
+#   acf.grid(title = paste(loc, metric, 'no clusters'), ncol = 4)
       
-metric <- 'voc'
-
-
-      lapply(homes_avail, function(x_home) {
-        ggacf(hm = x_home,
-              data = omni_daily_data,
-              loc = loc, lag_max_plot = 30, metric = metric,
-              simple = TRUE
-        )[['plot']]
-      }
-      ) %>%
-  acf.grid(title = paste(loc, metric, 'no clusters'), ncol = 4)
-      
-      metric <- 'voc'
-
-      
-loc <- 'living'
-metric <- 'pm25'
-      lapply(homes_avail, function(x_home) {
-        ggacf(hm = x_home,
-              data = omni_daily_data,
-              loc = loc, lag_max_plot = 30, metric = metric,
-              simple = TRUE
-        )[['plot']]
-      }
-      ) %>%
-  acf.grid(title = paste(loc, metric, 'no clusters'), ncol = 4)
-      
-      
-      
-      lapply(locations_indoor, function(x_location) {
-        
-        lapply(metrics_all, function(x_metric) {
-          
-          lapply(homes_avail, function(x_home) {
-            ggacf(hm = x_home,
-                  data = omni_daily_data,
-                  loc = x_location, lag_max_plot = 30, metric = x_metric,
-                  simple = TRUE
-            )[['plot']]
-          }
-          ) %>%
-            acf.grid(title = paste(x_location, x_metric, 'no clusters'), ncol = 4)
-        }
-        )
-      }
-      )
-
+    
 
 ```
 
-## for some homes, acf stops decreasing, likely due to non-stationarity of data
+## for some homes, acf stops decreasing (especially pm25), likely due to non-stationarity of data  
+## will shorter time periods avoid this?  
 
 ```{r test_ggacf_n_sample, fig.width=8, fig.height=4.5}
 # how does the total amount of days sampled affect the plot?
@@ -731,34 +737,54 @@ metric <- 'pm25'
 
 ```
 
-```{r ggacf_grid_plots_with_clusters}
+## shorter time periods due seem to avoid the slow decrease, see home 002 only has slight issue in one time period
+
+```{r ggacf_grid_plots_with_clusters, fig.width=8, fig.height=4.5}
 # plots for all homes, locations, and metrics (with clusters)
   lapply(metrics_all, function(x_metric) {
     
     lapply(locations_indoor, function(x_location) {
       
-      lapply(homes_avail, function(x_home) {
-        
-        lapply(omni_daily_data %>%
-                 filter(home == x_home) %>%
+      lapply(omni_daily_data %>%
                  pull(energy_cluster) %>%
                  as.factor() %>% levels(),
                function(x_cluster) {
                  
-        ggacf(hm = x_home,
+      lapply(homes_avail, function(x_home) {
+        
+        # if cluster exists for given house, return plot
+                if (x_cluster %in%
+                    (omni_daily_data %>%
+                    filter(home == x_home) %>%
+                    pull(energy_cluster) %>%
+                    as.factor() %>% levels())
+                ) { 
+                  ggacf(hm = x_home,
               data = omni_daily_data,
               loc = x_location, lag_max_plot = 14, metric = x_metric,
               cluster = x_cluster
         )[['plot']]
+                  } else{
+                    # if cluster does not exist for home, return NULL
+                    NULL
+                  }
                }
-      ) 
+      ) %>%
+          acf.grid(title = paste(x_location, x_metric, x_cluster), ncol = 4) 
       }
       ) 
     }
     ) 
   }
-  ) 
+  )
+
+
+
 ```
+
+## Calculate how many lags (days) it takes for pollutant/metric to
+## not be significantly autocorrelated
+
 
 ```{r lag_dataframes}
 
@@ -823,21 +849,6 @@ acf_lags <- acf_lags_cluster %>% bind_rows(acf_lags_no_cluster)
 ```
 
 
-
-```{r ggacf_partial, eval = FALSE}
-
-# plot results for one location and metric
-lapply(homes_all, function(x) {
-  ggacf(hm = x,
-        data = omni_daily_data,
-        loc = 'living', lag_max_plot = 14, metric = 'pm25', type = 'partial'
-  )[['plot']]
-}
-)
-```
-
-
-
 ```{r lag_plots}
 
 ######## one metric
@@ -889,3 +900,18 @@ ggplot(data = a %>% filter(energy_cluster != 'all_dates') ,
 
 
 ```
+
+
+
+```{r ggacf_partial, eval = FALSE}
+
+# plot results for one location and metric
+lapply(homes_all, function(x) {
+  ggacf(hm = x,
+        data = omni_daily_data,
+        loc = 'living', lag_max_plot = 14, metric = 'pm25', type = 'partial'
+  )[['plot']]
+}
+)
+```
+
