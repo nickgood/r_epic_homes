@@ -79,7 +79,7 @@ homes_all <- home.list(c(1:4, 7:16))
 # define indoor rooms
 locations_indoor <- c('living', 'bedroom', 'kitchen')
 
-# define homes that have data for all indoor rooms
+# define homes that have data for all indoor rooms (if needed)
 homes_avail <- homes_all[-2]
 
 # define metrics for acf testing
@@ -477,10 +477,10 @@ ggacf <- function(data,  hm, loc, lag_max_plot, metric,
       annotate( 'text', x = Inf, y = Inf, hjust = 1, vjust = 1,
               label = paste("*missing", signif(missing,3), "% of daily values\n",
                             "in home sampling period"), size = small)}}+
-    coord_cartesian(xlim=c(0, lag_max_plot), ylim = c(-0.25,1))+
+    coord_cartesian(xlim=c(0, lag_max_plot), ylim = c(-0.5,1))+
     {if(simple == TRUE) {
       theme(axis.title = element_blank(),
-          axis.text.x = element_blank(),
+          # axis.text.x = element_blank(),
           axis.ticks = element_blank(),
           panel.grid.minor.x = element_blank(),
           panel.grid.major.x = element_blank(),
@@ -558,42 +558,14 @@ lapply(homes_all, ggacf,
   
 ```
 
-
-
-
-```{r test_ggacf_n_sample}
-# how does the total amount of days sampled affect the plot?
-
-# plot results for one location and metric at each home
-
-# all dates
-lapply(homes_avail, function(x) {
-  ggacf(hm = x,
-        data = omni_daily_data,
-        loc = 'living', lag_max_plot = 14, metric = 'pm25',
-  )[['plot']]
-}
-)
-
-# one month
-lapply(homes_avail, function(x) {
-  ggacf(hm = x,
-        data = omni_daily_data %>%
-          filter(date> ymd('2020-11-15') & date <ymd('2020-12-15')),
-        loc = 'living', lag_max_plot = 14, metric = 'pm25',
-  )[['plot']]
-}
-)
-```
-
 ```{r ggacf_grid_function, include = FALSE}
 #function to put plots in a grid
 acf.grid <- function(plots, title,
-                     ncol = 5) {
+                     y_val = 'ACF', ncol = 5) {
   ##omit NULL values (from homes or rooms without valid data)
   plots <- plots[!sapply(plots, is.null)]
   
-  do.call('grid.arrange', c(plots, top = title,
+  do.call('grid.arrange', c(plots, top = title, left = y_val,
                             ncol = ncol))
   
 }
@@ -601,7 +573,12 @@ acf.grid <- function(plots, title,
 ```
 
 
-```{r ggacf_grid_plots_no_clusters, fig.width=8, fig.height=10.5}
+
+
+
+# Examples of autocorrelation plots  
+
+```{r ggacf_grid_plots_no_clusters, fig.width=8, fig.height=4.5}
 
 # plots for all homes, locations, and metrics (no clusters)
 
@@ -622,23 +599,22 @@ acf.grid <- function(plots, title,
 #   }
 #   )
 
-# plots for all homes, locations, and metrics (no clusters)
-  plots <- lapply(metrics_all, function(x_metric) {
-    
-    lapply(locations_indoor, function(x_location) {
-      
-      lapply(homes_avail, function(x_home) {
-        ggacf(hm = x_home,
-              data = omni_daily_data,
-              loc = x_location, lag_max_plot = 14, metric = x_metric
-        )[['plot']]
-      }
-      ) 
-    }
-    ) 
-  }
-  ) %>%
-  acf.grid(title = )
+# # no grid
+#   plots <- lapply(metrics_all, function(x_metric) {
+#     
+#     lapply(locations_indoor, function(x_location) {
+#       
+#       lapply(homes_avail, function(x_home) {
+#         ggacf(hm = x_home,
+#               data = omni_daily_data,
+#               loc = x_location, lag_max_plot = 14, metric = x_metric
+#         )[['plot']]
+#       }
+#       ) 
+#     }
+#     ) 
+#   }
+#   )
 
 loc <- 'living'
 metric <- 'pm25'
@@ -646,11 +622,112 @@ metric <- 'pm25'
       lapply(homes_avail, function(x_home) {
         ggacf(hm = x_home,
               data = omni_daily_data,
-              loc = loc, lag_max_plot = 30, metric = metric
+              loc = loc, lag_max_plot = 30, metric = metric,
+              simple = TRUE
         )[['plot']]
       }
       ) %>%
-  acf.grid(title = paste(loc, metric, 'no clusters'))
+  acf.grid(title = paste(loc, metric, 'no clusters'), ncol = 4)
+      
+metric <- 'voc'
+
+
+      lapply(homes_avail, function(x_home) {
+        ggacf(hm = x_home,
+              data = omni_daily_data,
+              loc = loc, lag_max_plot = 30, metric = metric,
+              simple = TRUE
+        )[['plot']]
+      }
+      ) %>%
+  acf.grid(title = paste(loc, metric, 'no clusters'), ncol = 4)
+      
+      metric <- 'voc'
+
+      
+loc <- 'living'
+metric <- 'pm25'
+      lapply(homes_avail, function(x_home) {
+        ggacf(hm = x_home,
+              data = omni_daily_data,
+              loc = loc, lag_max_plot = 30, metric = metric,
+              simple = TRUE
+        )[['plot']]
+      }
+      ) %>%
+  acf.grid(title = paste(loc, metric, 'no clusters'), ncol = 4)
+      
+      
+      
+      lapply(locations_indoor, function(x_location) {
+        
+        lapply(metrics_all, function(x_metric) {
+          
+          lapply(homes_avail, function(x_home) {
+            ggacf(hm = x_home,
+                  data = omni_daily_data,
+                  loc = x_location, lag_max_plot = 30, metric = x_metric,
+                  simple = TRUE
+            )[['plot']]
+          }
+          ) %>%
+            acf.grid(title = paste(x_location, x_metric, 'no clusters'), ncol = 4)
+        }
+        )
+      }
+      )
+
+
+```
+
+## for some homes, acf stops decreasing, likely due to non-stationarity of data
+
+```{r test_ggacf_n_sample, fig.width=8, fig.height=4.5}
+# how does the total amount of days sampled affect the plot?
+
+# plot results for one location and metric at each home
+
+# all dates
+loc <- 'living'
+metric <- 'pm25'
+
+      lapply(homes_avail, function(x_home) {
+        ggacf(hm = x_home,
+              data = omni_daily_data,
+              loc = loc, lag_max_plot = 30, metric = metric,
+              simple = TRUE
+        )[['plot']]
+      }
+      ) %>%
+  acf.grid(title = paste(loc, metric, 'all dates'), ncol = 4)
+
+            date_ranges <- list(c('2020-11-01', '2020-12-31'),
+                                c('2021-01-01', '2021-02-28'),
+                                c('2021-03-01', '2021-04-30'))
+            
+# try applying to multpile date ranges
+
+            
+                 lapply(date_ranges, function(x_date_range) {
+                       
+                   # date_range <- unlist(x_date_range)
+                   # another month
+            lapply(homes_all, function(x_home) {
+        ggacf(hm = x_home,
+              data = omni_daily_data %>%
+          filter(date>= ymd(x_date_range[1]) & date <=ymd(x_date_range[2])),
+              loc = loc, lag_max_plot = 30, metric = metric,
+              simple = TRUE
+        )[['plot']]
+      }
+      ) %>%
+  acf.grid(title = paste(loc, metric,
+                            month(x_date_range[1], label = TRUE, abbr = TRUE),
+                         '-',
+                         month(x_date_range[2], label = TRUE, abbr = TRUE)),
+           ncol = 4)   
+                 }
+                 )
 
 ```
 
