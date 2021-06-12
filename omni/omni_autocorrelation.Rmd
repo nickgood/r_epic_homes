@@ -25,7 +25,8 @@ library(ggplot2)
 library(readr)
 library(googlesheets4)
 library(lubridate)
-library(gridExtra) #for making ggplot autocorrelation plots
+library(gridExtra) #for making ggplot autocorrelation plot grids
+library(ggpubr) # for making time series plot grids (with common legends)
 
 ```
 
@@ -309,7 +310,7 @@ ts.grid <- function(plots, title,
   plots <- plots[!sapply(plots, is.null)]
   
   do.call('grid.arrange', c(plots, top = title, left = y_val,
-                            ncol = ncol, nrow = nrow))
+                            ncol = ncol, nrow = nrow))  
   
 }
 
@@ -319,86 +320,75 @@ ts.grid <- function(plots, title,
 
 ```
 
+# Will stationarity be an issue?
 
-```{r stationarity}
+```{r stationarity, fig.width=8, fig.height=4.5}
 # check stationarity before doing acf calcs and plots
 
-
 # make time series plot for all available sensors
 map(
-  homes_avail, function(x_home) {
+  metrics_all, function(x_metric){
+    
     map(
       locations_indoor, function(x_location){
         
-        ggplot(omni_daily_data %>% filter(home == x_home & location == x_location),
-               aes(x = as.Date(date), y = pm25,
-                   color=case_when(grepl('heat', energy_cluster)~ 'red',
-                                   energy_cluster == 'ac' ~ 'blue',
-                                   grepl('none|shoulder', energy_cluster)~ 'darkgreen',
-                                   energy_cluster == 'unclassified' ~ 'black')))+
-          scale_color_identity(name = "Cluster",
-                               breaks = c("blue", "darkgreen", "red", "black"),
-                               labels = c("AC", "Shoulder", "Heat", "Unclassified"),
-                               guide = "legend")+
-
-          geom_line()+
-          ggtitle(paste(x_home, x_location))
+        map(
+          homes_all, function(x_home) {
+            
+            ggplot(omni_daily_data %>% filter(home == x_home & location == x_location),
+                   aes(x = as.Date(date), y = UQ(as.name(metric)),
+                       color=case_when(grepl('heat', energy_cluster)~ 'red',
+                                       energy_cluster == 'ac' ~ 'blue',
+                                       grepl('none|shoulder', energy_cluster)~ 'darkgreen',
+                                       energy_cluster == 'unclassified' ~ 'black')))+
+              scale_color_identity(name = "Cluster",
+                                   breaks = c("blue", "darkgreen", "red", "black"),
+                                   labels = c("AC", "Shoulder", "Heat", "Unclassified"),
+                                   guide = "none")+
+              geom_line()+
+              ggtitle(paste(x_home))+
+              theme(axis.title = element_blank(),
+                    # axis.text.x = element_blank(),
+                    axis.ticks = element_blank(),
+                    panel.grid.minor.x = element_blank(),
+                    panel.grid.major.x = element_blank(),
+                    panel.border = element_blank(),
+                    plot.title = element_text(hjust = 0.5))
+            
+            
+          }
+        ) %>% ts.grid( title = paste(x_location, x_metric))
         
       }
     )
   }
 )
 
-
-# make time series plot for all available sensors
-map(
-  homes_avail, function(x_home) {
-    map(
-      locations_indoor, function(x_location){
-        
-        ggplot(omni_daily_data %>% filter(home == x_home & location == x_location),
-               aes(x = as.Date(date), y = pm25,
-                   color=case_when(grepl('heat', energy_cluster)~ 'red',
-                                   energy_cluster == 'ac' ~ 'blue',
-                                   grepl('none|shoulder', energy_cluster)~ 'darkgreen',
-                                   energy_cluster == 'unclassified' ~ 'black')))+
-          scale_color_identity(name = "Cluster",
-                               breaks = c("blue", "darkgreen", "red", "black"),
-                               labels = c("AC", "Shoulder", "Heat", "Unclassified"),
-                               guide = "legend")+
-
-          geom_line()+
-          ggtitle(paste(x_home, x_location))
-        
-      }
-    )
-  }
-)
-
-
-hm <- '010'
-loc <- 'bedroom'
-metric <- 'temp'
-
-# for one home
-ggplot(omni_daily_data %>% filter(home == hm & location == loc),
-               aes(x = as.Date(date), y = UQ(as.name(metric)),
-                   color=case_when(grepl('heat', energy_cluster)~ 'red',
-                                   energy_cluster == 'ac' ~ 'blue',
-                                   grepl('none|shoulder', energy_cluster)~ 'darkgreen',
-                                   energy_cluster == 'unclassified' ~ 'black')))+
-          scale_color_identity(name = "Cluster",
-                               breaks = c("blue", "darkgreen", "red", "black"),
-                               labels = c("AC", "Shoulder", "Heat", "Unclassified"),
-                               guide = "legend")+
-          geom_line()+
-          ggtitle(paste(hm, loc))
-
-ggplot(omni_daily_data %>% filter(home == hm & location == loc),
-       aes(x = as.Date(date), y = UQ(as.name(metric))))+
-  geom_line()+
-  ggtitle(paste(hm, loc))
-
+# # for one home
+#    
+# hm <- '010'
+# loc <- 'bedroom'
+# metric <- 'temp'
+# 
+# ggplot(omni_daily_data %>% filter(home == hm & location == loc),
+#                aes(x = as.Date(date), y = UQ(as.name(metric)),
+#                    color=case_when(grepl('heat', energy_cluster)~ 'red',
+#                                    energy_cluster == 'ac' ~ 'blue',
+#                                    grepl('none|shoulder', energy_cluster)~ 'darkgreen',
+#                                    energy_cluster == 'unclassified' ~ 'black')))+
+#           scale_color_identity(name = "Cluster",
+#                                breaks = c("blue", "darkgreen", "red", "black"),
+#                                labels = c("AC", "Shoulder", "Heat", "Unclassified"),
+#                                guide = "legend")+
+#           geom_line()+
+#           ggtitle(paste(hm, loc))+
+#   theme(axis.title = element_blank(),
+#           # axis.text.x = element_blank(),
+#           axis.ticks = element_blank(),
+#           # panel.grid.minor.x = element_blank(),
+#           # panel.grid.major.x = element_blank(),
+#           panel.border = element_blank(),
+#           plot.title = element_text(hjust = 0.5))
 
 
 # # plot differenced time series
@@ -439,7 +429,7 @@ ggplot(omni_daily_data %>% filter(home == hm & location == loc),
 
 ```
 
-
+# Autocorrelation plots  
 
 ```{r ggacf_function, include= FALSE}
 
@@ -643,8 +633,8 @@ acf.grid <- function(plots, title,
 
 
 
+## Plots of all homes without clusters
 
-# Examples of autocorrelation plots  
 
 ```{r ggacf_grid_plots_no_clusters, fig.width=8, fig.height=4.5}
 
@@ -749,8 +739,8 @@ acf.grid <- function(plots, title,
 
 ```
 
-## for some homes, acf stops decreasing (especially pm25), likely due to non-stationarity of data  
-## will shorter time periods avoid this?  
+### for some homes, acf stops decreasing (especially pm25), likely due to non-stationarity of data  
+### will shorter time periods avoid this?  
 
 ```{r test_ggacf_n_sample, fig.width=8, fig.height=4.5}
 # how does the total amount of days sampled affect the plot?
@@ -803,7 +793,7 @@ metric <- 'pm25'
 
 ```
 
-## shorter time periods due seem to avoid the slow decrease, see home 002 only has slight issue in one time period
+### shorter time periods due seem to avoid the slow decrease, see home 002 only has slight issue in one time period
 
 ```{r ggacf_grid_plots_with_clusters, fig.width=8, fig.height=4.5}
 # plots for all homes, locations, and metrics (with clusters)
