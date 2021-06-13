@@ -7,7 +7,7 @@ output: html_document
 
 ```{r global_options, include=FALSE}
 knitr::opts_chunk$set(
-  # fig.path = 'figures/',
+  fig.path = 'figures/',
   warning = FALSE,
   message = FALSE,
   echo = FALSE,
@@ -79,8 +79,8 @@ homes_all <- home.list(c(1:4, 7:16))
 # define indoor rooms
 locations_indoor <- c('living', 'bedroom', 'kitchen')
 
-# define homes that have data for all indoor rooms (if needed)
-homes_avail <- homes_all[-2]
+# # define homes that have data for all indoor rooms (if needed)
+# homes_avail <- homes_all[-2]
 
 # define metrics for acf testing
 metrics_all <- c('pm25', 'voc', 'co2', 'temp', 'humid')
@@ -155,7 +155,7 @@ count.missing <- function(data, hm, loc, metric,
 
 ```
 
-```{r create_dfs}
+```{r create_daily_df, eval = FALSE}
 
 # all homes/locations in one dataframe
 # with missing dates put in as NA values
@@ -190,7 +190,7 @@ omni_daily_data <- omni_data %>%
 
 ```
 
-```{r add_clusters}
+```{r add_clusters, eval = FALSE}
 
 # classify homes into "types" based on cluster pattern
 homes_tier3<-home.list(c(1,2,7,9,12)) # ac-shoulder-heat
@@ -301,6 +301,17 @@ omni_daily_data <- omni_daily_data %>%
 
 ```
 
+```{r daily_df_csv, eval = FALSE}
+write_csv(omni_daily_data, paste0('./csv_created/omni_daily_data_',
+                                  Sys.Date(), '.csv'))
+
+```
+
+```{r daily_data_import}
+omni_daily_data <- read_csv('./csv_created/omni_daily_data.csv')
+```
+
+
 ```{r ts_grid_function, include = FALSE}
 #function to put plots in a grid
 ts.grid <- function(plots, title,
@@ -335,7 +346,7 @@ map(
           homes_all, function(x_home) {
             
             ggplot(omni_daily_data %>% filter(home == x_home & location == x_location),
-                   aes(x = as.Date(date), y = UQ(as.name(metric)),
+                   aes(x = as.Date(date), y = UQ(as.name(x_metric)),
                        color=case_when(grepl('heat', energy_cluster)~ 'red',
                                        energy_cluster == 'ac' ~ 'blue',
                                        grepl('shoulder', energy_cluster)~ 'darkgreen',
@@ -432,7 +443,7 @@ map(
 
 ```{r ggacf_function, include= FALSE}
 
-# # variables or testing
+# # variables for testing
 # data <- omni_daily_data
 # hm <- '003'
 # loc <- 'living'
@@ -533,12 +544,12 @@ ggacf <- function(data,  hm, loc, lag_max_plot, metric,
     coord_cartesian(xlim=c(0, lag_max_plot), ylim = c(-0.5,1))+
     {if(simple == TRUE) {
       theme(axis.title = element_blank(),
-          # axis.text.x = element_blank(),
+          axis.text = element_text( size = xsmall),
           axis.ticks = element_blank(),
           panel.grid.minor.x = element_blank(),
           panel.grid.major.x = element_blank(),
           panel.border = element_blank(),
-          plot.title = element_text(hjust = 0.5))}}+
+          plot.title = element_text(hjust = 0.5, size = xsmall))}}+
     if (is.null(ylab))
       ylab(ifelse(type=="partial", "PACF", "ACF"))
   else
@@ -841,7 +852,7 @@ metric <- 'pm25'
 ## not be significantly autocorrelated
 
 
-```{r lag_dataframes}
+```{r lag_df_csv, eval = FALSE}
 
 # return data for all homes, locations, and metrics (no clusters)
 acf_lags_no_cluster <- 
@@ -901,8 +912,14 @@ acf_lags_cluster <-
 
 # bind results into one dataframe
 acf_lags <- acf_lags_cluster %>% bind_rows(acf_lags_no_cluster)
+
+write_csv(acf_lags, paste0('./csv_created/acf_lags_',Sys.Date(), '.csv'))
+
 ```
 
+```{r acf_lag_data_import}
+acf_lags <- read_csv('./csv_created/acf_lags.csv')
+```
 
 
 ```{r lag_plot_variables}
@@ -1044,6 +1061,12 @@ ggplot(data = a %>% filter(energy_cluster != 'all_dates') ,
   geom_text(data=n_labels, aes(x = location, y=label_position,
                                label=label_value),vjust=0)
 
+```
+
+
+
+```{r lag_table}
+gg
 ```
 
 
