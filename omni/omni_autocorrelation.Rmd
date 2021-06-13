@@ -989,6 +989,7 @@ inf_count <-a %>% filter(lag_signif %>%is.infinite()) %>% nrow()
 
 # make n labels
 n_labels <- a %>%
+filter(lag_signif %>%is.finite()) %>%
   group_by(location, energy_cluster) %>%
   summarise(
     label_position=median(lag_signif, na.rm= TRUE)+5,
@@ -1012,7 +1013,8 @@ ggplot(data = a , aes(x = location, y = lag_signif))+
                                breaks = c(16, 4),
                                labels = c("Yes", "No"),
                                guide = "legend")+
-  labs(tag = paste0('* how keep include >30 values\nbut omit from boxplot stats?'))+
+  labs(tag = paste0('* how keep include >30 values\nbut omit from boxplot stats?\n',
+                    'n does not include inf values'))+
   theme(plot.tag.position = c(.7, .3))+
   geom_text(data=n_labels, aes(x = location, y=label_position,
                                label=label_value),vjust=0)
@@ -1023,6 +1025,8 @@ ggplot(data = a , aes(x = location, y = lag_signif))+
 
 # make n labels
 n_labels <- a %>%
+  filter(energy_cluster %in% c('ac', 'shoulder', 'heat'))%>%
+  filter(lag_signif %>%is.finite()) %>%
   group_by(location) %>%
   summarise(
   label_position=median(lag_signif, na.rm= TRUE)+5,
@@ -1032,7 +1036,7 @@ n_labels <- a %>%
   mutate(label_value = paste0('n=',label_value))
 
 
-ggplot(data = a %>% filter(energy_cluster != 'all_dates') ,
+ggplot(data = a  ,
        aes(x = location, y = lag_signif))+
   geom_boxplot(outlier.shape = NA)+
   geom_text(data=n_labels, aes(x = location, y=label_position,
@@ -1057,17 +1061,18 @@ ggplot(data = a %>% filter(energy_cluster != 'all_dates') ,
                        breaks = c(16, 4),
                        labels = c("Yes", "No"),
                        guide = "legend")
-          
+#           
 
 
 ####### compare all metrics, pooled cluster periods
 a <- acf_lags_filter %>% 
-  filter(energy_cluster %in% c('ac', 'shoulder', 'heat', 'all_dates'))
+  filter(energy_cluster %in% c('ac', 'shoulder', 'heat'))
 
 inf_count <-a %>% filter(lag_signif %>%is.infinite()) %>% nrow()
 
 # make n labels
 n_labels <- a %>%
+  filter(lag_signif %>%is.finite()) %>%
   group_by(location, metric) %>%
   summarise(
     label_position=median(lag_signif, na.rm= TRUE)+5,
@@ -1077,7 +1082,7 @@ n_labels <- a %>%
   mutate(label_value = paste0('n=',label_value))
 
 # boxplots by location, pooled clusters
-ggplot(data = a %>% filter(energy_cluster != 'all_dates') ,
+ggplot(data = a ,
        aes(x = location, y = lag_signif))+
   geom_boxplot(outlier.shape = NA)+
   geom_jitter(aes(
