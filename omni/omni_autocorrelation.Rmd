@@ -8,7 +8,6 @@ output: html_document
 ```{r global_options, include=FALSE}
 knitr::opts_chunk$set(
   # fig.path = 'figures/',
-  eval = FALSE,
   warning = FALSE,
   message = FALSE,
   echo = FALSE,
@@ -645,7 +644,7 @@ acf.grid <- function(plots, title,
         
         lapply(metrics_all, function(x_metric) {
           
-          lapply(homes_avail, function(x_home) {
+          lapply(homes_all, function(x_home) {
             ggacf(hm = x_home,
                   data = omni_daily_data,
                   loc = x_location, lag_max_plot = 30, metric = x_metric,
@@ -664,7 +663,7 @@ acf.grid <- function(plots, title,
 #     
 #     lapply(locations_indoor, function(x_location) {
 #       
-#       lapply(homes_avail, function(x_home) {
+#       lapply(homes_all, function(x_home) {
 #         ggacf(hm = x_home,
 #               data = omni_daily_data,
 #               loc = x_location, lag_max_plot = 14, metric = x_metric
@@ -681,7 +680,7 @@ acf.grid <- function(plots, title,
 #     
 #     lapply(locations_indoor, function(x_location) {
 #       
-#       lapply(homes_avail, function(x_home) {
+#       lapply(homes_all, function(x_home) {
 #         ggacf(hm = x_home,
 #               data = omni_daily_data,
 #               loc = x_location, lag_max_plot = 14, metric = x_metric
@@ -697,7 +696,7 @@ acf.grid <- function(plots, title,
 # loc <- 'living'
 # metric <- 'pm25'
 # 
-#       lapply(homes_avail, function(x_home) {
+#       lapply(homes_all, function(x_home) {
 #         ggacf(hm = x_home,
 #               data = omni_daily_data,
 #               loc = loc, lag_max_plot = 30, metric = metric,
@@ -710,7 +709,7 @@ acf.grid <- function(plots, title,
 # metric <- 'voc'
 # 
 # 
-#       lapply(homes_avail, function(x_home) {
+#       lapply(homes_all, function(x_home) {
 #         ggacf(hm = x_home,
 #               data = omni_daily_data,
 #               loc = loc, lag_max_plot = 30, metric = metric,
@@ -725,7 +724,7 @@ acf.grid <- function(plots, title,
 #       
 # loc <- 'living'
 # metric <- 'pm25'
-#       lapply(homes_avail, function(x_home) {
+#       lapply(homes_all, function(x_home) {
 #         ggacf(hm = x_home,
 #               data = omni_daily_data,
 #               loc = loc, lag_max_plot = 30, metric = metric,
@@ -751,7 +750,7 @@ acf.grid <- function(plots, title,
 loc <- 'living'
 metric <- 'pm25'
 
-      lapply(homes_avail, function(x_home) {
+      lapply(homes_all, function(x_home) {
         ggacf(hm = x_home,
               data = omni_daily_data,
               loc = loc, lag_max_plot = 30, metric = metric,
@@ -806,7 +805,7 @@ metric <- 'pm25'
                  as.factor() %>% levels(),
                function(x_cluster) {
                  
-      lapply(homes_avail, function(x_home) {
+      lapply(homes_all, function(x_home) {
         
         # if cluster exists for given house, return plot
                 if (x_cluster %in%
