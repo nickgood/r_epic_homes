@@ -16,7 +16,7 @@ knitr::opts_chunk$set(
   cache = FALSE)
 ```
 
-```{r}
+```{r libraries}
 library(dplyr)
 library(purrr)
 library(tidyr)
@@ -222,50 +222,26 @@ energy_cluster_df<- tribble(~home, ~cluster_type,
                      '009', 'shoulder', '2020-09-24', '2020-10-31',
                      '009', 'heat', '2020-11-01', '2021-05-23',                     
                      '010', 'heat', '2020-12-02', '2021-05-23',
-                     '011', 'none', '2020-08-01', '2020-12-01',
+                     '011', 'shoulder', '2020-08-01', '2020-12-01',
                      '011', 'heat', '2020-12-02', '2021-05-23',
                      '012', 'ac', '2020-08-01', '2020-09-26',
                      '012', 'shoulder', '2020-09-27', '2020-11-07',
                      '012', 'heat', '2020-11-08', '2021-05-23',
-                     '013', 'none_1', '2020-08-01', '2020-11-07',
+                     '013', 'shoulder', '2020-08-01', '2020-11-07',
                      '013', 'heat', '2020-11-08', '2021-03-31',
-                     '013', 'none_2', '2021-04-01', '2021-05-23',
-                     '015', 'none_1', '2020-08-01', '2020-11-23',
+                     '013', 'shoulder_2', '2021-04-01', '2021-05-23',
+                     '015', 'shoulder', '2020-08-01', '2020-11-23',
                      '015', 'heat', '2020-11-24', '2021-03-28',
-                     '015', 'none_2', '2021-03-29', '2021-05-23',
+                     '015', 'shoulder_2', '2021-03-29', '2021-05-23',
 ) %>%
   mutate(across(start_date, ymd), across(end_date, ymd))
 
 
+############# using for loop
 
 # make an empty column to fill with cluster function
 omni_daily_data$energy_cluster <- NA
 
-
-# # using lapply
-# lapply('001', function(x_home) {
-#   
-#   lapply(
-#     # apply the function to all the energy clusters for a given home
-#     c(1:length(which(energy_clusters$home == hm))),
-#      function(cluster_type_index) {
-#       
-#       omni_daily_data$energy_cluster[
-#         which(omni_daily_data$home == x_home &
-#                 between(omni_daily_data$date,
-#                         energy_clusters[which(energy_clusters$home == x_home)[cluster_type_index],
-#                                         'start_date'][[1]],
-#                         energy_clusters[which(energy_clusters$home == x_home)[cluster_type_index],
-#                                         'end_date'][[1]])
-#         )
-#       ]<- energy_clusters[which(energy_clusters$home == x_home)[cluster_type_index], 'type'][[1]]
-#     }
-#   )
-# }
-# )
-
-
-# using for loop
 #specify all homes that have specified energy clusters
 homes_clustered <- levels(as.factor(energy_cluster_df$home))
 
@@ -296,7 +272,31 @@ for(i in 1:length(homes_clustered)) {
 omni_daily_data <- omni_daily_data %>%
   mutate(energy_cluster = if_else(is.na(energy_cluster), 'unclassified', energy_cluster))
 
-# other possible method?
+
+########### using lapply
+# lapply('001', function(x_home) {
+#   
+#   lapply(
+#     # apply the function to all the energy clusters for a given home
+#     c(1:length(which(energy_clusters$home == hm))),
+#      function(cluster_type_index) {
+#       
+#       omni_daily_data$energy_cluster[
+#         which(omni_daily_data$home == x_home &
+#                 between(omni_daily_data$date,
+#                         energy_clusters[which(energy_clusters$home == x_home)[cluster_type_index],
+#                                         'start_date'][[1]],
+#                         energy_clusters[which(energy_clusters$home == x_home)[cluster_type_index],
+#                                         'end_date'][[1]])
+#         )
+#       ]<- energy_clusters[which(energy_clusters$home == x_home)[cluster_type_index], 'type'][[1]]
+#     }
+#   )
+# }
+# )
+
+
+###########other possible method?
 # https://stackoverflow.com/questions/35636315/replace-values-in-a-dataframe-based-on-lookup-table
 
 
@@ -339,7 +339,7 @@ map(
                    aes(x = as.Date(date), y = UQ(as.name(metric)),
                        color=case_when(grepl('heat', energy_cluster)~ 'red',
                                        energy_cluster == 'ac' ~ 'blue',
-                                       grepl('none|shoulder', energy_cluster)~ 'darkgreen',
+                                       grepl('shoulder', energy_cluster)~ 'darkgreen',
                                        energy_cluster == 'unclassified' ~ 'black')))+
               scale_color_identity(name = "Cluster",
                                    breaks = c("blue", "darkgreen", "red", "black"),
@@ -850,7 +850,7 @@ acf_lags_no_cluster <-
     
     lapply(locations_indoor, function(x_location) {
       
-      lapply(homes_avail, function(x_home) {
+      lapply(homes_all, function(x_home) {
         ggacf(hm = x_home,
               data = omni_daily_data,
               loc = x_location, lag_max_plot = 14, metric = x_metric
@@ -873,7 +873,7 @@ acf_lags_cluster <-
     
     lapply(locations_indoor, function(x_location) {
       
-      lapply(homes_avail, function(x_home) {
+      lapply(homes_all, function(x_home) {
         
         lapply(omni_daily_data %>%
                  filter(home == x_home) %>%
@@ -917,11 +917,10 @@ met <- 'pm25'
 
 acf_lags_filter <- acf_lags %>%
   # mutate(lag_signif = if_else(is.infinite(lag_signif), 35, lag_signif)) %>%
-  filter(days_avail >=21 & missing_pct <= (1/9*100))
+  filter(days_avail >=25 & missing_pct <= (1/9*100))
 
 
 a <- acf_lags_filter %>% 
-  filter(energy_cluster %in% c('ac', 'shoulder', 'heat', 'all_dates')) %>%
   filter(metric == met)
 
 # # look at possible effects of sample size
@@ -929,6 +928,11 @@ a <- acf_lags_filter %>%
 #   geom_point(aes(color = location))+
 #   facet_wrap(vars(energy_cluster))
 
+
+inf_count <-a %>% filter(lag_signif %>%is.infinite()) %>% nrow()
+
+a <- a %>%
+  filter(lag_signif %>%is.finite())
 
 # boxplots by location
 ggplot(data = a , aes(x = location, y = lag_signif))+
@@ -941,19 +945,40 @@ ggplot(data = a , aes(x = location, y = lag_signif))+
   facet_wrap(vars(energy_cluster))+
   ggtitle(label = paste0(met, ', lags before acf is insignficant'))+
   scale_y_continuous(oob= scales::squish_infinite)+
-            scale_color_identity(name = "Insignifiance Reached within Month",
+            scale_color_identity(name = "Insignifiance reached within 30 days",
                                breaks = c("black", "red"),
                                labels = c("Yes", "No"),
-                               guide = "legend")
+                               guide = "legend")+
+  labs(tag = paste0('*need to add in ', inf_count, ' points\n',
+                    'that did not reach insignificance.'))+
+  theme(plot.tag.position = c(.7, .3))
+
+
+
 
 # boxplots by location, pooled clusters
+
+
+n_labels <- a %>%
+  group_by(location) %>%
+  summarise(
+  label_position=median(lag_signif, na.rm= TRUE)+5,
+  label_value=n()
+) %>%
+  ungroup() %>%
+  mutate(label_value = paste0('n=',label_value))
+
+
 ggplot(data = a %>% filter(energy_cluster != 'all_dates') ,
        aes(x = location, y = lag_signif))+
   geom_boxplot(outlier.shape = NA)+
+  geom_text(data=n_labels, aes(x = location, y=label_position,
+                               label=label_value),vjust=0)+
+
   geom_jitter(aes(
-    color=case_when(grepl('heat', energy_cluster)~ 'red',
+    color=case_when(energy_cluster == 'heat' ~ 'red',
                     energy_cluster == 'ac' ~ 'blue',
-                    grepl('none|shoulder', energy_cluster)~ 'darkgreen',
+                    energy_cluster == 'shoulder' ~ 'darkgreen',
                     energy_cluster == 'unclassified' ~ 'black')
   ), height = 0)+
   ggtitle(label = paste0(met, ', lags before acf is insignficant'))+
@@ -966,18 +991,26 @@ ggplot(data = a %>% filter(energy_cluster != 'all_dates') ,
 
 
 ####### compare all metrics, pooled cluster periods
-
 a <- acf_lags_filter %>% 
   filter(energy_cluster %in% c('ac', 'shoulder', 'heat', 'all_dates'))
+
+n_labels <- a %>%
+  group_by(location, metric) %>%
+  summarise(
+    label_position=median(lag_signif, na.rm= TRUE)+5,
+    label_value=n()
+  ) %>%
+  ungroup() %>%
+  mutate(label_value = paste0('n=',label_value))
 
 # boxplots by location, pooled clusters
 ggplot(data = a %>% filter(energy_cluster != 'all_dates') ,
        aes(x = location, y = lag_signif))+
   geom_boxplot(outlier.shape = NA)+
   geom_jitter(aes(
-    color=case_when(grepl('heat', energy_cluster)~ 'red',
+    color=case_when(energy_cluster == 'heat' ~ 'red',
                     energy_cluster == 'ac' ~ 'blue',
-                    grepl('none|shoulder', energy_cluster)~ 'darkgreen',
+                    energy_cluster == 'shoulder' ~ 'darkgreen',
                     energy_cluster == 'unclassified' ~ 'black')
   ), height = 0)+
   facet_wrap(vars(metric))+
@@ -986,9 +1019,9 @@ ggplot(data = a %>% filter(energy_cluster != 'all_dates') ,
   scale_color_identity(name = "Cluster",
                        breaks = c("blue", "darkgreen", "red", "black"),
                        labels = c("AC", "Shoulder", "Heat", "Unclassified"),
-                       guide = "legend")
-
-
+                       guide = "legend")+
+  geom_text(data=n_labels, aes(x = location, y=label_position,
+                               label=label_value),vjust=0)
 
 ```
 
