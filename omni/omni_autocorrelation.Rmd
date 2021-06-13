@@ -954,15 +954,15 @@ acf_lags_filter <- acf_lags %>%
 
 n_metrics_lags <- acf_lags %>% pull(metric) %>% as.factor() %>% levels() %>% length()
 
-a <- acf_lags %>% filter(days_avail < days_avail_min) %>% nrow()/n_metrics_lags
-b <- acf_lags %>% filter(missing_pct > missing_pct_min) %>% nrow()/n_metrics_lags
+a <- acf_lags %>% filter(days_avail < days_avail_min)
+b <- a %>% filter(missing_pct > missing_pct_min) 
 
 ```
 
-### omitted `r a` monitoring periods for each metric
+### omitted `r a %>% nrow()/n_metrics_lags` monitoring periods for each metric
 ### because less than `r days_avail_min` available days  
 
-### omitted `r b` monitoring periods for each metric
+### omitted `r b %>% nrow()/n_metrics_lags` additional monitoring periods for each metric
 ### because missing more than `r missing_pct_min`% of days within period
 
 ```{r lag_plots}
@@ -984,28 +984,38 @@ a <- acf_lags_filter %>%
 
 inf_count <-a %>% filter(lag_signif %>%is.infinite()) %>% nrow()
 
-a <- a %>%
-  filter(lag_signif %>%is.finite())
+# a <- a %>%
+#   filter(lag_signif %>%is.finite())
+
+# make n labels
+n_labels <- a %>%
+  group_by(location, energy_cluster) %>%
+  summarise(
+    label_position=median(lag_signif, na.rm= TRUE)+5,
+    label_value=n()
+  ) %>%
+  ungroup() %>%
+  mutate(label_value = paste0('n=',label_value))
 
 # boxplots by location
 ggplot(data = a , aes(x = location, y = lag_signif))+
   geom_boxplot(outlier.shape = NA)+
   geom_jitter(aes(
-    color = ifelse(is.infinite(lag_signif),
-                    'red',
-                    'black')
+    shape = ifelse(is.infinite(lag_signif),
+                    4,
+                    16)
     ), height = 0)+
   facet_wrap(vars(energy_cluster))+
   ggtitle(label = paste0(met, ', lags before acf is insignficant'))+
   scale_y_continuous(oob= scales::squish_infinite)+
-            scale_color_identity(name = "Insignifiance reached within 30 days",
-                               breaks = c("black", "red"),
+            scale_shape_identity(name = "Insignifiance reached within 30 days",
+                               breaks = c(16, 4),
                                labels = c("Yes", "No"),
                                guide = "legend")+
-  labs(tag = paste0('*need to add in ', inf_count, ' points\n',
-                    'that did not reach insignificance.'))+
-  theme(plot.tag.position = c(.7, .3))
-
+  labs(tag = paste0('* how keep include >30 values\nbut omit from boxplot stats?'))+
+  theme(plot.tag.position = c(.7, .3))+
+  geom_text(data=n_labels, aes(x = location, y=label_position,
+                               label=label_value),vjust=0)
 
 
 
@@ -1032,13 +1042,20 @@ ggplot(data = a %>% filter(energy_cluster != 'all_dates') ,
     color=case_when(energy_cluster == 'heat' ~ 'red',
                     energy_cluster == 'ac' ~ 'blue',
                     energy_cluster == 'shoulder' ~ 'darkgreen',
-                    energy_cluster == 'unclassified' ~ 'black')
+                    energy_cluster == 'unclassified' ~ 'black'),
+    shape = ifelse(is.infinite(lag_signif),
+                   4,
+                   16)
   ), height = 0)+
   ggtitle(label = paste0(met, ', lags before acf is insignficant'))+
   scale_y_continuous(oob= scales::squish_infinite)+
   scale_color_identity(name = "Cluster",
                        breaks = c("blue", "darkgreen", "red", "black"),
                        labels = c("AC", "Shoulder", "Heat", "Unclassified"),
+                       guide = "legend")+
+  scale_shape_identity(name = "Insignifiance reached within 30 days",
+                       breaks = c(16, 4),
+                       labels = c("Yes", "No"),
                        guide = "legend")
           
 
@@ -1046,6 +1063,8 @@ ggplot(data = a %>% filter(energy_cluster != 'all_dates') ,
 ####### compare all metrics, pooled cluster periods
 a <- acf_lags_filter %>% 
   filter(energy_cluster %in% c('ac', 'shoulder', 'heat', 'all_dates'))
+
+inf_count <-a %>% filter(lag_signif %>%is.infinite()) %>% nrow()
 
 # make n labels
 n_labels <- a %>%
@@ -1065,7 +1084,10 @@ ggplot(data = a %>% filter(energy_cluster != 'all_dates') ,
     color=case_when(energy_cluster == 'heat' ~ 'red',
                     energy_cluster == 'ac' ~ 'blue',
                     energy_cluster == 'shoulder' ~ 'darkgreen',
-                    energy_cluster == 'unclassified' ~ 'black')
+                    energy_cluster == 'unclassified' ~ 'black'),
+    shape = ifelse(is.infinite(lag_signif),
+                   4,
+                   16)
   ), height = 0)+
   facet_wrap(vars(metric))+
   ggtitle(label = 'Lags before acf is insignficant')+
@@ -1075,7 +1097,11 @@ ggplot(data = a %>% filter(energy_cluster != 'all_dates') ,
                        labels = c("AC", "Shoulder", "Heat", "Unclassified"),
                        guide = "legend")+
   geom_text(data=n_labels, aes(x = location, y=label_position,
-                               label=label_value),vjust=0)
+                               label=label_value),vjust=0)+
+  scale_shape_identity(name = "Insignifiance reached within 30 days",
+                       breaks = c(16, 4),
+                       labels = c("Yes", "No"),
+                       guide = "legend")
 
 ```
 
