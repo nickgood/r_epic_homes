@@ -441,6 +441,15 @@ map(
 
 # Autocorrelation plots  
 
+```{r ggacf_omission_criteria}
+# not omitted, but highligthed in ggacf plots, and possibly omitted later
+days_avail_min <- 25
+pairs_min <- 20
+missing_pct_min <- 1/9*100
+```
+
+
+
 ```{r ggacf_function, include= FALSE}
 
 # # variables for testing
@@ -455,7 +464,8 @@ map(
 ###Make acf function in ggplot
 ##from: https://stackoverflow.com/questions/28857241/r-combine-plots-that-use-parmfrow-internally
 
-ggacf <- function(data,  hm, loc, lag_max_plot, metric,
+ggacf <- function(data,  hm, loc, metric,
+                  lag_max_plot = 30,
                   cluster = NULL,
                        ci=0.95, type="correlation",
                        xlab="Lag", ylab=NULL,
@@ -521,17 +531,20 @@ ggacf <- function(data,  hm, loc, lag_max_plot, metric,
       ci_low = qnorm((1-ci)/2)/sqrt(n_lag)
       
     )
-  
+
   #plot
   plot <- ggplot(df_acf, aes(x=lag, y=acf)) +
     geom_hline(yintercept=0) +
-    geom_segment(aes(xend=lag, yend=0)) +
+    geom_segment(aes(xend=lag, yend=0,
+                     color = ifelse(n_lag < pairs_min,
+                    'red',
+                    'black'))) +
     geom_line(aes(x = lag, y = ci_high),
               linetype = 'dashed', color = ci.col)+
     geom_line(aes(x = lag, y = ci_low),
               linetype = 'dashed', color = ci.col)+
-    geom_text(aes(x = lag, y = acf+0.05, label = n_lag),
-              size = xsmall)+ # annotate w/ n used to calculate acf for each lag
+    # geom_text(aes(x = lag, y = acf+0.05, label = n_lag),
+    #           size = xsmall)+ # annotate w/ n used to calculate acf for each lag
     theme_bw() +
     xlab("Lag") +
     ggtitle(if_else(simple == TRUE,
@@ -542,6 +555,11 @@ ggacf <- function(data,  hm, loc, lag_max_plot, metric,
               label = paste("*missing", signif(missing,3), "% of daily values\n",
                             "in home sampling period"), size = small)}}+
     coord_cartesian(xlim=c(0, lag_max_plot), ylim = c(-0.5,1))+
+    
+    scale_color_identity(name = paste(">=", pairs_min, 'correlation pairs'),
+                               breaks = c("black", "red"),
+                               labels = c("yes", "no"),
+                               guide = "legend")+
     {if(simple == TRUE) {
       theme(axis.title = element_blank(),
           axis.text = element_text( size = xsmall),
@@ -549,7 +567,8 @@ ggacf <- function(data,  hm, loc, lag_max_plot, metric,
           panel.grid.minor.x = element_blank(),
           panel.grid.major.x = element_blank(),
           panel.border = element_blank(),
-          plot.title = element_text(hjust = 0.5, size = xsmall))}}+
+          plot.title = element_text(hjust = 0.5, size = xsmall),
+          legend.position = 'none')}}+
     if (is.null(ylab))
       ylab(ifelse(type=="partial", "PACF", "ACF"))
   else
@@ -572,10 +591,11 @@ ggacf <- function(data,  hm, loc, lag_max_plot, metric,
   return(list('lag_signif' = lag_signif, 'plot' = plot))
 }
 
-# # test for one home, loc, metric
-# lapply('002', ggacf,
-#        data = omni_daily_data, loc = 'living', lag_max_plot = 10,
-#        metric = 'pm25', simple= TRUE)
+# test for one home, loc, metric
+lapply('002', ggacf,
+       data = omni_daily_data %>% filter(date < ymd('2020-08-13')),
+       loc = 'living', lag_max_plot = 10,
+       metric = 'pm25', simple= TRUE)
 ```
 
 
@@ -827,8 +847,8 @@ metric <- 'pm25'
                 ) { 
                   ggacf(hm = x_home,
               data = omni_daily_data,
-              loc = x_location, lag_max_plot = 14, metric = x_metric,
-              cluster = x_cluster
+              loc = x_location, lag_max_plot = 30, metric = x_metric,
+              cluster = x_cluster, simple = TRUE
         )[['plot']]
                   } else{
                     # if cluster does not exist for home, return NULL
@@ -922,14 +942,10 @@ acf_lags <- read_csv('./csv_created/acf_lags.csv')
 ```
 
 
-```{r lag_plot_variables}
+```{r lag_plot_omissions}
 
 # and omit samples that have less than ___ available days
-# and omit samples with a missing pct greater than 1/9
-
-days_avail_min <- 25
-
-missing_pct_min <- 1/9*100
+# and omit samples with a missing pct greater than ____
 
 
 acf_lags_filter <- acf_lags %>%
@@ -1066,7 +1082,7 @@ ggplot(data = a %>% filter(energy_cluster != 'all_dates') ,
 
 
 ```{r lag_table}
-gg
+
 ```
 
 
