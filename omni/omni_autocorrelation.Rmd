@@ -905,19 +905,40 @@ acf_lags <- acf_lags_cluster %>% bind_rows(acf_lags_no_cluster)
 ```
 
 
+
+```{r lag_plot_variables}
+
+# and omit samples that have less than ___ available days
+# and omit samples with a missing pct greater than 1/9
+
+days_avail_min <- 25
+
+missing_pct_min <- 1/9*100
+
+
+acf_lags_filter <- acf_lags %>%
+  # mutate(lag_signif = if_else(is.infinite(lag_signif), 35, lag_signif)) %>%
+  filter(days_avail >=days_avail_min & missing_pct <= missing_pct_min)
+
+n_metrics_lags <- acf_lags %>% pull(metric) %>% as.factor() %>% levels() %>% length()
+
+a <- acf_lags %>% filter(days_avail < days_avail_min) %>% nrow()/n_metrics_lags
+b <- acf_lags %>% filter(missing_pct > missing_pct_min) %>% nrow()/n_metrics_lags
+
+```
+
+### omitted `r a` monitoring periods for each metric
+### because less than `r days_avail_min` available days  
+
+### omitted `r b` monitoring periods for each metric
+### because missing more than `r missing_pct_min`% of days within period
+
 ```{r lag_plots}
 
 ######## one metric
 met <- 'pm25'
 
-  # convert values that were infinite to above the maximum tested value
-# and omit samples that have less than 21 available days
-# and omit samples with a missing pct greater than 1/9
 
-
-acf_lags_filter <- acf_lags %>%
-  # mutate(lag_signif = if_else(is.infinite(lag_signif), 35, lag_signif)) %>%
-  filter(days_avail >=25 & missing_pct <= (1/9*100))
 
 
 a <- acf_lags_filter %>% 
@@ -958,7 +979,7 @@ ggplot(data = a , aes(x = location, y = lag_signif))+
 
 # boxplots by location, pooled clusters
 
-
+# make n labels
 n_labels <- a %>%
   group_by(location) %>%
   summarise(
@@ -994,6 +1015,7 @@ ggplot(data = a %>% filter(energy_cluster != 'all_dates') ,
 a <- acf_lags_filter %>% 
   filter(energy_cluster %in% c('ac', 'shoulder', 'heat', 'all_dates'))
 
+# make n labels
 n_labels <- a %>%
   group_by(location, metric) %>%
   summarise(
