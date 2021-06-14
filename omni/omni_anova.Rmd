@@ -165,6 +165,8 @@ omni_avg_data <- read_csv('./csv_created/omni_avg_data.csv')
 
 ```{r anova_assumptions_tests}
 
+
+# test for outliers for one metric in one home for each location
 outlier.test <- function(data = omni_avg_data, hm, met, log.trans = FALSE){
   
   # create df of one metric for indoor rooms
@@ -214,7 +216,7 @@ outliers_homes_log <- map(homes_all, function(x) outlier.test(hm = x, met = 'pm2
   bind_rows()
   
  
-
+# test for normality for each location in one home for one metric
 qqplot.homes <- function(data = omni_avg_data, hm, met, log.trans = FALSE){
   
   # create df of one metric for indoor rooms
@@ -253,8 +255,8 @@ map(homes_all, function(x) qqplot.homes(hm = x, met = 'co2',
 
 
 
-
-qqplot.homes <- function(data = omni_avg_data, hm, met, log.trans = FALSE){
+# test for equal variances across locations for one home, for one metric
+levene.test.home <- function(data = omni_avg_data, hm, met, log.trans = FALSE){
   
   # create df of one metric for indoor rooms
   data_metric <- data %>%
@@ -263,26 +265,32 @@ qqplot.homes <- function(data = omni_avg_data, hm, met, log.trans = FALSE){
     mutate(mean = if(log.trans == TRUE) {log(mean)} else mean)
 
 
-# Create a QQ plot of values by location
-  ## raw
-qqplot <- ggqqplot(data_metric, 'mean', facet.by = 'location',
-                   title = if(log.trans == TRUE) {
-                     'log-transformed'} else 'raw data')
+  levene_mean <- car::leveneTest(mean ~ as.factor(location),
+                                 data=data_metric, center="mean")
+  levene_median <- car::leveneTest(mean ~ as.factor(location),
+                                   data=data_metric, center="median")
 
+  tibble('home' = hm,
+         'p_val_mean' = levene_mean[['Pr(>F)']][[1]],
+         'p_val_median' = levene_median[['Pr(>F)']][[1]])
 
-
-
-
-
-    return(list(
-      # boxplot,
-      outliers_summary
-      # qqplot_log,
-      # shaptest_log,
-      # densityplots
-      ))
 }
 
+# test function
+levene.test.home(hm = '001', met = 'pm25', log.trans = TRUE)
+
+# test variances for all homes/locations/metrics
+map(homes_all, function(x) levene.test.home(hm = x, met = 'pm25',
+                                        log.trans = TRUE)) %>%
+  bind_rows
+
+map(homes_all, function(x) levene.test.home(hm = x, met = 'voc',
+                                        log.trans = TRUE)) %>%
+  bind_rows
+
+map(homes_all, function(x) levene.test.home(hm = x, met = 'co2',
+                                        log.trans = TRUE)) %>%
+  bind_rows
 
 
 ```
