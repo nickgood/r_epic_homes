@@ -1036,7 +1036,7 @@ n_labels <- a %>%
   mutate(label_value = paste0('n=',label_value))
 
 
-ggplot(data = a  ,
+ggplot(data = a  %>% filter(energy_cluster %in% c('ac', 'shoulder', 'heat')),
        aes(x = location, y = lag_signif))+
   geom_boxplot(outlier.shape = NA)+
   geom_text(data=n_labels, aes(x = location, y=label_position,
@@ -1045,23 +1045,23 @@ ggplot(data = a  ,
   geom_jitter(aes(
     color=case_when(energy_cluster == 'heat' ~ 'red',
                     energy_cluster == 'ac' ~ 'blue',
-                    energy_cluster == 'shoulder' ~ 'darkgreen',
-                    energy_cluster == 'unclassified' ~ 'black'),
-    shape = ifelse(is.infinite(lag_signif),
-                   4,
-                   16)
+                    energy_cluster == 'shoulder' ~ 'darkgreen'), 
+    # can only use the below lines if Inf values are present
+    # if(any(lag_signif== Inf)) {
+    #   shape = ifelse(is.infinite(lag_signif),
+    #                4, 16)}
   ), height = 0)+
   ggtitle(label = paste0(met, ', lags before acf is insignficant'))+
   scale_y_continuous(oob= scales::squish_infinite)+
   scale_color_identity(name = "Cluster",
-                       breaks = c("blue", "darkgreen", "red", "black"),
-                       labels = c("AC", "Shoulder", "Heat", "Unclassified"),
+                       breaks = c("blue", "darkgreen", "red"),
+                       labels = c("AC", "Shoulder", "Heat"),
                        guide = "legend")+
-  scale_shape_identity(name = "Insignifiance reached within 30 days",
-                       breaks = c(16, 4),
-                       labels = c("Yes", "No"),
-                       guide = "legend")
-#           
+scale_shape_identity(name = "Insignifiance reached within 30 days",
+                     breaks = c(16, 4),
+                     labels = c("Yes", "No"),
+                     guide = "legend")
+
 
 
 ####### compare all metrics, pooled cluster periods
@@ -1108,11 +1108,62 @@ ggplot(data = a ,
                        labels = c("Yes", "No"),
                        guide = "legend")
 
+
+
+####### compare all metrics, pooled rooms
+
+# make n labels
+n_labels <- a %>%
+  filter(lag_signif %>%is.finite()) %>%
+  group_by(energy_cluster, metric) %>%
+  summarise(
+    label_position=median(lag_signif, na.rm= TRUE)+5,
+    label_value=n()
+  ) %>%
+  ungroup() %>%
+  mutate(label_value = paste0('n=',label_value))
+
+# boxplots by cluster, pooled rooms
+ggplot(data = a ,
+       aes(x = energy_cluster, y = lag_signif))+
+  geom_boxplot(outlier.shape = NA)+
+  geom_jitter(aes(
+    color=case_when(location == 'bedroom' ~ 'purple',
+                    location == 'living' ~ 'orange',
+                    location == 'kitchen' ~ 'brown'),
+    shape = ifelse(is.infinite(lag_signif),
+                   4,
+                   16)
+  ), height = 0)+
+  facet_wrap(vars(metric))+
+  ggtitle(label = 'Lags before acf is insignficant')+
+  scale_y_continuous(oob= scales::squish_infinite)+
+  scale_color_identity(name = "Cluster",
+                       breaks = c("purple", "orange", "brown"),
+                       labels = c("bedroom", "living", "kitchen"),
+                       guide = "legend")+
+  geom_text(data=n_labels, aes(x = energy_cluster, y=label_position,
+                               label=label_value),vjust=0)+
+  scale_shape_identity(name = "Insignifiance reached within 30 days",
+                       breaks = c(16, 4),
+                       labels = c("Yes", "No"),
+                       guide = "legend")
+
 ```
 
 
 
 ```{r lag_table}
+# don't include Inf values in calculations
+
+lag_summary <- acf_lags_filter %>%
+  filter(!is.infinite(lag_signif)) %>%
+  group_by(metric, energy_cluster) %>%
+  summarise(median = median(lag_signif),
+            q3 = quantile(lag_signif, probs= 3/4),
+                 n_home_room = sum(days_avail)) %>%
+  ungroup()
+
 
 ```
 
