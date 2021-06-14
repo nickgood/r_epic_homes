@@ -1151,20 +1151,40 @@ ggplot(data = a ,
 
 ```
 
+## seems to be not much difference in significant lag by room,
+## but may be difference between clusters
+## however, this could be due to heating periods beings longer, and less stationary
 
-
-```{r lag_table}
+```{r lag_table_csv, eval = FALSE}
 # don't include Inf values in calculations
+acf_lags_finite <- acf_lags_filter %>%
+    filter(!is.infinite(lag_signif))
 
-lag_summary <- acf_lags_filter %>%
-  filter(!is.infinite(lag_signif)) %>%
+
+lag_summary_cluster <- acf_lags_finite %>%
+    filter(energy_cluster %in% c('heat', 'ac', 'shoulder'))%>%
   group_by(metric, energy_cluster) %>%
   summarise(median = median(lag_signif),
             q3 = quantile(lag_signif, probs= 3/4),
-                 n_home_room = sum(days_avail)) %>%
+                        mean = mean(lag_signif),
+            sd = sd(lag_signif), 
+                 n = sum(days_avail)) %>%
   ungroup()
 
+lag_summary_total <- acf_lags_finite %>%
+  filter(energy_cluster %in% c('heat', 'ac', 'shoulder'))%>%
+  group_by(metric) %>%
+  summarise(median = median(lag_signif),
+            q3 = quantile(lag_signif, probs= 3/4),
+                                    mean = mean(lag_signif),
+            sd = sd(lag_signif), 
+                 n = sum(days_avail)) %>%
+  ungroup() %>%
+  mutate(energy_cluster = 'total')
 
+lag_summary <- bind_rows(lag_summary_total, lag_summary_cluster)
+
+write_csv(lag_summary, paste0('./csv_created/lag_summary_', Sys.Date(), '.csv'))
 ```
 
 
