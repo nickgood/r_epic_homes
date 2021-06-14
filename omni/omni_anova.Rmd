@@ -221,13 +221,15 @@ qqplot.homes <- function(data = omni_avg_data, hm, met, log.trans = FALSE){
   data_metric <- data %>%
   filter(home == hm & location %in% locations_indoor & metric == met) %>%
     filter(!is.na(mean)) %>%
-    mutate(mean = if(log.trans == TRUE) {log(mean)} else mean) %>%
+    mutate(mean = if(log.trans == TRUE) {log(mean)} else mean)
 
 
 # Create a QQ plot of values by location
 ggqqplot(data_metric, 'mean', facet.by = 'location',
-                   title = if(log.trans == TRUE) {
+                   title = paste('Home', hm, met,
+                                 if(log.trans == TRUE) {
                      'log-transformed'} else 'raw data')
+)
 
 
 
@@ -237,13 +239,28 @@ ggqqplot(data_metric, 'mean', facet.by = 'location',
 a <- qqplot.homes( hm = '001', met = 'pm25', log.trans = TRUE)
 
 
+# make qqplots for all homes/locations/metrics
+map(homes_all, function(x) qqplot.homes(hm = x, met = 'pm25',
+                                        log.trans = TRUE))
+
+map(homes_all, function(x) qqplot.homes(hm = x, met = 'voc',
+                                        log.trans = TRUE))
+
+map(homes_all, function(x) qqplot.homes(hm = x, met = 'co2',
+                                        log.trans = TRUE))
+
+
+
+
+
+
 qqplot.homes <- function(data = omni_avg_data, hm, met, log.trans = FALSE){
   
   # create df of one metric for indoor rooms
   data_metric <- data %>%
   filter(home == hm & location %in% locations_indoor & metric == met) %>%
     filter(!is.na(mean)) %>%
-    mutate(mean = if(log.trans == TRUE) {log(mean)} else mean) %>%
+    mutate(mean = if(log.trans == TRUE) {log(mean)} else mean)
 
 
 # Create a QQ plot of values by location
@@ -253,28 +270,7 @@ qqplot <- ggqqplot(data_metric, 'mean', facet.by = 'location',
                      'log-transformed'} else 'raw data')
 
 
-# # Compute Shapiro-Wilk test of normality
-# shaptest_log <- data_metric %>%
-#   group_by(location) %>%
-#   shapiro_test(log)
-# 
-# densityplots <- lapply(locations_indoor, function(x) {
-#   density(data_metric %>% filter(location == x) %>% pull(log)) %>% plot()
-# }
-# ) %>% unlist()
 
-# inverse hyperbolic sine (ihs)-transformed cols ---------------------------
-
-# # function to add ihs columns to dataframe
-# ihs.cols <- function(data) {
-#   #select the identifying columns
-#   data %>%
-#   # select(home, room, date, location) %>%
-#   cbind(
-#     ##bind them to the ihs data columns
-#     data %>%
-#     transmute_if(is.numeric,list( ihs = asinh)))
-# }
 
 
 
