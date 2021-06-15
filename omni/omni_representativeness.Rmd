@@ -32,15 +32,16 @@ library(runner) # for moving window functions
 
 ```
 
-```{r import_omni_15min_data}
+```{r import_omni_15min_data, eval = FALSE}
 rtdata<- read_csv('./../../purgiel_r_epic_homes/omni/OMNIdata_clean.csv')
 
 ```
 
-
 ```{r import_omni_daily_data}
+omni_daily_data<- read_csv('./csv_created/omni_daily_data.csv')
 
 ```
+
 
 
 ```{r functions_misc}
@@ -82,10 +83,20 @@ ggdensity(data %>%
 
 # calculate kld for continuous probability distributions --------------------------
 a <- '2020-12-01'
-ceiling_date(as.POSIXct(a, format="%Y-%m-%d",
-                              na = "NA", tz = 'UTC')+1)
-ceiling_date(ymd(a)+1)
+b <- '2020-12-31'
 
+
+    c_old <- seq.POSIXt(from = floor_date(
+    as.POSIXct( a,
+                tz = 'UTC'), unit = 'day'),
+    # round up to next day for the end date
+                    to = ceiling_date(
+                      as.POSIXct( b,
+                                  tz = 'UTC')+1,
+                      unit = 'day')-1, # then omit the start of the next day
+                    by = 60*15)
+    
+    c_new <- seq.Date(from = floor_date(ymd(a)))
 
 # function to calculate scaled entropy for a house
 # during multiple different time periods
@@ -94,6 +105,7 @@ scaled.entropy.table.shape <- function(home_num, metric,
 # date range of entire monitoring period (if not month)
 # in the form: list(c('YYYY-MM-DD', 'YYYY-MM-DD'),
 # c('YYYY-MM-DD', 'YYYY-MM-DD'))
+# data in start and end day included
  date_ranges_entire = NULL,
 tested_sample_sequence, # sequence of tested short sampling period lengths (in days)
 sample_days_min = 1, # amount of days in shortest theoretical sample
@@ -121,7 +133,7 @@ scaled.entropy.month <- function(monitor_period) {
        
        second(as.POSIXct(monitor_period[2])) != 0 |
        minute(as.POSIXct(monitor_period[2])) != 0 |
-       hour(as.POSIXct(monitor_period[2])) != 0) warning('Times specifed in date range endpoints are not acknowledged.')
+       hour(as.POSIXct(monitor_period[2])) != 0) stop('Times cannot be specifed in date range endpoints.')
 
     
  # make column of specified metric for one home, one room
@@ -130,8 +142,8 @@ all_data <- data %>%
   dplyr::select(c(date, all_of(metric)))%>%
   # choose long-term monitoring date range
   filter(
-    date >= floor_date(ymd(monitor_period[1]), unit = 'day'),
-    date < ceiling_date(ymd(monitor_period[2]), unit = 'day')
+    date >= ymd(monitor_period[1]) &
+    date <= ymd(monitor_period[2])
   )
 
  
