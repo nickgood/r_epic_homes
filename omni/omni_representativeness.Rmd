@@ -16,6 +16,32 @@ knitr::opts_chunk$set(fig.path = 'figures/',
   cache = FALSE)
 ```
 
+```{r libraries, include=FALSE}
+library(dplyr)
+library(purrr)
+library(tidyr)
+library(openair)
+library(ggplot2)
+library(readr)
+library(googlesheets4)
+library(lubridate)
+library(gridExtra)
+library(runner) # for moving window functions
+# library(entropy) # for KLD function
+# library(fitdistrplus) # for fitting distribution to data NOTE, MASS::select CONFLICTS WITH dplyr::select
+
+```
+
+```{r import_omni_15min_data}
+rtdata<- read_csv('./../../purgiel_r_epic_homes/omni/OMNIdata_clean.csv')
+
+```
+
+
+```{r import_omni_daily_data}
+
+```
+
 
 ```{r functions_misc}
 
@@ -55,7 +81,6 @@ ggdensity(data %>%
 ```{r functions_shape}
 
 # calculate kld for continuous probability distributions --------------------------
-
 
 
 # function to calculate scaled entropy for a house
@@ -199,7 +224,7 @@ if(longterm_data_avail < 0.75) stop(paste('missing ',
 
 entire <- all_data 
 
-entire_fit <- fitdist(pull(entire, metric), "lnorm", method = 'mle') %>%
+entire_fit <- fitdistrplus::fitdist(pull(entire, metric), "lnorm", method = 'mle') %>%
            suppressWarnings()
 
 # make function of continuous distribution from the parameters
@@ -256,7 +281,7 @@ kld.avg <- function(days) { # days = number of days in short samping period
            
            # fit a lognormal distribution to sample and extract
            # logmean and logsd values
-         sample_fit <- fitdist(pull(sample, metric), "lnorm", method = 'mle') %>%
+         sample_fit <- fitdistrplus::fitdist(pull(sample, metric), "lnorm", method = 'mle') %>%
            suppressWarnings()
          
          a <- c(sample_fit$estimate['meanlog'], sample_fit$estimate['sdlog'])
@@ -412,7 +437,9 @@ entropy_data_month  # scaled_entropy for all specified months
 
 }
 
-
+# # test function
+# scaled.entropy.table.shape('008', 'pm25', months_entire = c('Dec', 'Nov'),
+#                            tested_sample_sequence = c(4,5,6), sample_days_min = 3)
 
 # data making functions for shape distributions-----------------------------
 
@@ -425,15 +452,14 @@ make.data.shape <- function(hm, metric, month,
   
   tryCatch(scaled.entropy.table.shape(hm, metric,
                                 months_entire = month,
-                                tested_sample_sequence = tested_sample_sequence,
-                                n_bins = n_bins),
+                                tested_sample_sequence = tested_sample_sequence),
          error = function(e) NULL)
   
 }
 
 rep.data.shape <- function (hm, metric, mnths,
-                      tested_sample_sequence = c(1:28),
-                                n_bins = 50) {
+                      tested_sample_sequence = c(1:28)
+                      ) {
   
   a <- lapply(
   # loop through for homes
@@ -444,8 +470,8 @@ rep.data.shape <- function (hm, metric, mnths,
                       make.data.shape,
                       hm = hm2,
                       metric = metric,
-                      tested_sample_sequence = tested_sample_sequence,
-                                n_bins = n_bins)
+                      tested_sample_sequence = tested_sample_sequence
+                      )
                  })
   # remove one level of lists
   b <- flatten(a)
@@ -820,7 +846,7 @@ a <- do.call(cbind, a) %>%
 a <- sapply(colnames(a), function(x) {
   a %>%
   pull(x) %>%
-    KL.plugin(entire_discrete, unit = 'log2')
+    entropy::KL.plugin(entire_discrete, unit = 'log2')
 })
   
 a
@@ -1218,7 +1244,7 @@ n_samp_avail <- n_samples/n_samples_possible
 a <- sapply(colnames(a), function(x) {
   a %>%
   pull(x) %>%
-    KL.plugin(pull(entire, mean), unit = 'log2')
+    entropy::KL.plugin(pull(entire, mean), unit = 'log2')
 })
   
 # average all the resulting KLDs to find average KLD and standard error (se)
@@ -1316,8 +1342,12 @@ entropy_data_month  # scaled_entropy for all specified months
 
 }
 
+# test function
+scaled.entropy.table('008', 'pm25', c('Dec', 'Nov'),
+                     tested_sample_sequence = c(4,5,6), sample_days_min = 3)
+####################
 
-
+# functions to make data -----------------------------
 
 # make dataframes and name in form: "home_009_pm25"
 # so they can be saved separately and then joined
@@ -1419,13 +1449,13 @@ decemb <- c('2020-12-01', '2020-12-31')
 all_homes <- home.list(1:16)
 
 # vector of month numbers to make data for
-month_seq <- c(7:12, 1:2)
+month_seq <- c(1:2)
 
-# vector of sample lengths to make data for (months)
-samp_seq <- seq(1:28)
+# vector of sample lengths (in days) to make data for (when months are specified)
+samp_seq <- seq(3:6)
 
-# vector of sample lengths to make data for (ranges)
-sequence <- c(1:28)
+# vector of sample lengths to make data for (when ranges are specified)
+sequence <- c(3:6)
 
 # list of seasons to use as long-monitroing period (ranges)
 season_list <- list(fall)
@@ -1458,80 +1488,13 @@ Assumptions
 
 
 
-## Distribution Shape: Assume Normal Distribution of Logged Values
-
-### Test effects of number of bins on analysis
-
-```{r bin_testing, message=FALSE}
-
-# testing differences between using different bin numbers
-# both run time and coefficient results
-
-# start <- Sys.time()
-# rep.data.shape('003', met, 12,
-#                tested_sample_sequence = samp_seq,
-#                n_bins = 15)
-# end <- Sys.time()
-# 
-# time <- end-start
-# 
-# dat15 <- home_003_pm25_ihs
-# 
-# dat15 <- dat15 %>%
-#   mutate(n_bins = 15)
-
-# dat_test <- rbind(dat5, dat10, dat15, dat25, dat35, dat50)
-# write_csv(dat_test, 'n_bins_test.csv')
-
-# read in resulting data
-a <- read_csv('n_bins_test.csv')
-
-# plot results
-# show how bin amounts change calculated coefficient
-ggplot(a, aes(x = n_bins, y = coeff))+
-  geom_point()+
-  facet_wrap(vars(sample_length))
-
-# ggplot(a, aes(x = sample_length, y = coeff))+
-#   geom_point()+
-#   facet_wrap(vars(n_bins))
-
-
-# for each sample_length,
-# normalize coefficient based on largest coeff values (when 50 bins were used)
-
-# find coefficient when n_bins = 50
-b <- a %>%
-  filter(n_bins == 50) %>%
-  mutate(coeff_50 = coeff) %>%
-  dplyr::select(-c(coeff, n_bins))
-
-# scale the original coefficient
-c <- a %>%
-  left_join(b) %>%
-  mutate(coeff_scaled = coeff/coeff_50)
-
-# plot normalized values
-ggplot(c, aes(x = n_bins, y = coeff_scaled))+
-  geom_point()+
-  facet_wrap(vars(sample_length))+
-  expand_limits(y = 0)
-
-
-
-
-
-
-
-
-
-```
+## Distribution Shape: Assume Log-normal distribution
 
 
 ```{r shape_data_maker, eval= FALSE}
 
 
-met <- 'pm25_ihs'
+met <- 'pm25'
 
 
 # pm25_ihs--------------------------------------
@@ -1588,8 +1551,7 @@ rep.data.shape('015', met, month_seq,
 rep.data.shape('016', met, month_seq, 
                tested_sample_sequence = samp_seq)
 
-rep.data.shape('003', met, lkjdshflkjsdfh, 
-               tested_sample_sequence = samp_seq)
+
 
 
 # make a list of all file names
@@ -2296,11 +2258,11 @@ home_data_list <- lapply(all_files,
 home_data <- do.call(rbind, home_data_list)
 
 write_csv(home_data, file =
-            paste0('./representativeness_data/rep_data_', met, '_', Sys.Date(), '.csv'))
+            paste0('./csv_created/representativeness_data/rep_data_', met, '_', Sys.Date(), '.csv'))
 
 
 # read in csv file
-entropy_pm25 <- read_csv(file = './representativeness_data/rep_data_pm25.csv')
+entropy_pm25 <- read_csv(file = './csv_created/representativeness_data/rep_data_pm25.csv')
 
 
 
@@ -2548,7 +2510,7 @@ home_data_list <- lapply(all_files,
                                              ))
 
 #combine into one dataframe
-home_data <- do.call(rbind, home_data_list)
+home_data <- bind_rows(home_data_list)
 
 write_csv(home_data, file =
             paste0('./representativeness_data/rep_data_', met, '_', Sys.Date(), '.csv'))
