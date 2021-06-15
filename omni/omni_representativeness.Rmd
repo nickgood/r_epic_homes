@@ -86,7 +86,6 @@ ggdensity(data %>%
 # function to calculate scaled entropy for a house
 # during multiple different time periods
 scaled.entropy.table.shape <- function(home_num, metric,
-months_entire = NULL, # months in entire monitoring period
 
 # date range of entire monitoring period (if not month)
 # in the form: list(c('YYYY-MM-DD', 'YYYY-MM-DD'),
@@ -101,18 +100,8 @@ data = rtdata) {
   # function to find scaled_entropy for samples in a given monitor month
   
 scaled.entropy.month <- function(month_monitor) {
-# if date range is specified, month monitor will be a date range
-  # if month is specified, month_monitor will be a month
-  
-  # check to month and date range are not BOTH specified
-  # for entire monitoring period
-   if((!is.null(date_ranges_entire) &
-       !is.null(months_entire))) stop(paste0('Specify either month ',
-      'or date range of entire\n monitoring period. ',
-      'Do not specify both.'))
-  
-# if date range is specified for entire monitoring period
-  if(is.null(months_entire)){ 
+
+
 
     # must unlist the listed range that is used in lapply funnction
     month_monitor <- unlist(month_monitor)
@@ -146,29 +135,8 @@ all_data <- data %>%
   mutate(hour = hour(date), day = weekdays(date), month = month(date),
          # make column for day (so they can be grouped later)
          day_date = floor_date(date, unit = 'day'))
-  }
 
- # but if month is specified for entire monitoring period
-  if(!is.null(months_entire)){ 
-    
-        #define terms for later use
-    monitor_period <- month_monitor
-    
-    
- # make column of specified metric for one home, one room
-all_data <- data %>%
-  filter(home == home_num, room == room_type) %>%
-  dplyr::select(c(date, all_of(metric)))%>%
-  # make a month column
-         mutate(entire_period = month(date, label = TRUE)) %>%
-    filter(entire_period == month_monitor) %>% # filter by specified month
-  # make coluns for hour of day, day of week, and month of year
-  mutate(hour = hour(date), day = weekdays(date), month = month(date),
-         # make column for day (so they can be grouped later)
-         day_date = floor_date(date, unit = 'day'))
-  } 
-  
-  
+ 
   
 # make a vector of days in all_data
 date_col <- all_data$date %>%
@@ -176,8 +144,6 @@ date_col <- all_data$date %>%
 
 
 # make column of all dates within range
-
-if(is.null(months_entire)) {# if using date range...
 
     all_dates <- seq.POSIXt(from = floor_date(
     as.POSIXct( month_monitor[1],
@@ -189,25 +155,7 @@ if(is.null(months_entire)) {# if using date range...
                       unit = 'day')-1, # then omit the start of the next day
                     by = 60*15)
   
-} else { # or if using month
- 
-  # assume only July 2020 - June 2021 were sampled
-  if(match(month_monitor, month.abb) %in% 7:12) year_sample <- '2020'
-  if(match(month_monitor, month.abb) %in% 1:6) year_sample <- '2021'
 
-     all_dates <- seq.POSIXt(from = floor_date(
-    as.POSIXct( paste0(year_sample, '-',
-                       match(month_monitor, month.abb),
-                      '-15'),
-                tz = 'UTC'), unit = 'month'),
-                    to = ceiling_date(
-    as.POSIXct( paste0(year_sample, '-',
-                       match(month_monitor, month.abb),
-                      '-15'),
-                tz = 'UTC'), unit = 'month')-dminutes(15),
-                    by = 60*15)
-
-}
 
 
 
@@ -224,7 +172,8 @@ if(longterm_data_avail < 0.75) stop(paste('missing ',
 
 entire <- all_data 
 
-entire_fit <- fitdistrplus::fitdist(pull(entire, metric), "lnorm", method = 'mle') %>%
+entire_fit <- fitdistrplus::fitdist(pull(entire, metric),
+                                    "lnorm", method = 'mle') %>%
            suppressWarnings()
 
 # make function of continuous distribution from the parameters
@@ -416,17 +365,10 @@ a # scaled_entropy for one month
 
 
 
-# find scaled_entropy for all short smpling lengths in all apecified months
-# or time periods
-
-if(is.null(months_entire)) {# if using date range...
+# find scaled_entropy for all short smpling lengths in all apecified time ranges
 
 a <- lapply(date_ranges_entire, scaled.entropy.month)
 
-}else{# if using months...
-  a <- lapply(months_entire, scaled.entropy.month)
-
-}
 
 # bind all into a dataframe
 entropy_data_month <- do.call(rbind, a) %>%
@@ -438,7 +380,9 @@ entropy_data_month  # scaled_entropy for all specified months
 }
 
 # # test function
-# scaled.entropy.table.shape('008', 'pm25', months_entire = c('Dec', 'Nov'),
+# scaled.entropy.table.shape('008', 'pm25',
+#                            date_ranges_entire = list(c('2020-12-01', '2020-12-31'),
+#                                                      c('2020-11-01', '2020-11-30')),
 #                            tested_sample_sequence = c(4,5,6), sample_days_min = 3)
 
 # data making functions for shape distributions-----------------------------
@@ -498,6 +442,30 @@ make.data.range.shape <- function(hm, metric, range,
 
 
 ```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ```{r functions_shape_pdf}
 
@@ -3353,5 +3321,372 @@ ggplot(aes(x = sample_length, fill = thresh), data = a)+
 
 ```
 
+---
+
+# Old functions
+```{r old_function_shape}
+# # calculate kld for continuous probability distributions --------------------------
+# 
+# 
+# # function to calculate scaled entropy for a house
+# # during multiple different time periods
+# scaled.entropy.table.shape <- function(home_num, metric,
+# months_entire = NULL, # months in entire monitoring period
+# 
+# # date range of entire monitoring period (if not month)
+# # in the form: list(c('YYYY-MM-DD', 'YYYY-MM-DD'),
+# # c('YYYY-MM-DD', 'YYYY-MM-DD'))
+#  date_ranges_entire = NULL,
+# tested_sample_sequence, # sequence of tested short sampling period lengths (in days)
+# sample_days_min = 1, # amount of days in shortest theoretical sample
+# room_type = 'living',
+# data = rtdata) {
+#   
+# 
+#   # function to find scaled_entropy for samples in a given monitor month
+#   
+# scaled.entropy.month <- function(month_monitor) {
+# # if date range is specified, month monitor will be a date range
+#   # if month is specified, month_monitor will be a month
+#   
+#   # check to month and date range are not BOTH specified
+#   # for entire monitoring period
+#    if((!is.null(date_ranges_entire) &
+#        !is.null(months_entire))) stop(paste0('Specify either month ',
+#       'or date range of entire\n monitoring period. ',
+#       'Do not specify both.'))
+#   
+# # if date range is specified for entire monitoring period
+#   if(is.null(months_entire)){ 
+# 
+#     # must unlist the listed range that is used in lapply funnction
+#     month_monitor <- unlist(month_monitor)
+#     
+#         #define terms for later use
+#     monitor_period <- paste(as.Date(month_monitor[1]), '-',
+#                              as.Date(month_monitor[2]))
+# 
+#     # warn that times will be rounded to full day for entire monitoring period
+#     if(second(as.POSIXct(month_monitor[1])) != 0 |
+#        minute(as.POSIXct(month_monitor[1])) != 0 |
+#        hour(as.POSIXct(month_monitor[1])) != 0|
+#        
+#        second(as.POSIXct(month_monitor[2])) != 0 |
+#        minute(as.POSIXct(month_monitor[2])) != 0 |
+#        hour(as.POSIXct(month_monitor[2])) != 0) warning('Times specifed in date range endpoints are not acknowledged.')
+# 
+#     
+#  # make column of specified metric for one home, one room
+# all_data <- data %>%
+#   filter(home == home_num, room == room_type) %>%
+#   dplyr::select(c(date, all_of(metric)))%>%
+#   # choose long-term monitoring date range
+#   filter(
+#     date >= floor_date(as.POSIXct(month_monitor[1], format="%Y-%m-%d",
+#                               na = "NA", tz = 'UTC'), unit = 'day'),
+#     date < ceiling_date(as.POSIXct(month_monitor[2], format="%Y-%m-%d",
+#                               na = "NA", tz = 'UTC')+1, unit = 'day')
+#   ) %>%
+#   # make columns for hour of day, day of week, and month of year
+#   mutate(hour = hour(date), day = weekdays(date), month = month(date),
+#          # make column for day (so they can be grouped later)
+#          day_date = floor_date(date, unit = 'day'))
+#   }
+# 
+#  # but if month is specified for entire monitoring period
+#   if(!is.null(months_entire)){ 
+#     
+#         #define terms for later use
+#     monitor_period <- month_monitor
+#     
+#     
+#  # make column of specified metric for one home, one room
+# all_data <- data %>%
+#   filter(home == home_num, room == room_type) %>%
+#   dplyr::select(c(date, all_of(metric)))%>%
+#   # make a month column
+#          mutate(entire_period = month(date, label = TRUE)) %>%
+#     filter(entire_period == month_monitor) %>% # filter by specified month
+#   # make coluns for hour of day, day of week, and month of year
+#   mutate(hour = hour(date), day = weekdays(date), month = month(date),
+#          # make column for day (so they can be grouped later)
+#          day_date = floor_date(date, unit = 'day'))
+#   } 
+#   
+#   
+#   
+# # make a vector of days in all_data
+# date_col <- all_data$date %>%
+#   unique() 
+# 
+# 
+# # make column of all dates within range
+# 
+# if(is.null(months_entire)) {# if using date range...
+# 
+#     all_dates <- seq.POSIXt(from = floor_date(
+#     as.POSIXct( month_monitor[1],
+#                 tz = 'UTC'), unit = 'day'),
+#     # round up to next day for the end date
+#                     to = ceiling_date(
+#                       as.POSIXct( month_monitor[2],
+#                                   tz = 'UTC')+1,
+#                       unit = 'day')-1, # then omit the start of the next day
+#                     by = 60*15)
+#   
+# } else { # or if using month
+#  
+#   # assume only July 2020 - June 2021 were sampled
+#   if(match(month_monitor, month.abb) %in% 7:12) year_sample <- '2020'
+#   if(match(month_monitor, month.abb) %in% 1:6) year_sample <- '2021'
+# 
+#      all_dates <- seq.POSIXt(from = floor_date(
+#     as.POSIXct( paste0(year_sample, '-',
+#                        match(month_monitor, month.abb),
+#                       '-15'),
+#                 tz = 'UTC'), unit = 'month'),
+#                     to = ceiling_date(
+#     as.POSIXct( paste0(year_sample, '-',
+#                        match(month_monitor, month.abb),
+#                       '-15'),
+#                 tz = 'UTC'), unit = 'month')-dminutes(15),
+#                     by = 60*15)
+# 
+# }
+# 
+# 
+# 
+# # count missing data points in the entire data set
+# 
+# longterm_data_avail <- length(date_col)/length(all_dates)
+#          
+# if(longterm_data_avail < 0.75) stop(paste('missing ',
+#                                           ((1-longterm_data_avail)*100),
+#                                           '% of 15-min data in long monitoring period'))
+# 
+# 
+# # make a fitted distribution for data assuming log-normal distribution
+# 
+# entire <- all_data 
+# 
+# entire_fit <- fitdistrplus::fitdist(pull(entire, metric), "lnorm", method = 'mle') %>%
+#            suppressWarnings()
+# 
+# # make function of continuous distribution from the parameters
+# # calculated in the fitted curve
+# # note that meanlog and sdlog in dlnorm correspond to the mean and sd,
+# # so you do not have to take log of them yourself
+# log_fit_entire <- function(x) dlnorm(x, meanlog = entire_fit$estimate['meanlog'],
+#                                      sdlog = entire_fit$estimate['sdlog'])
+# 
+# 
+# 
+# 
+# # function to take a running window of all short sampling periods possible
+# # within the longer montirong period,
+# # find the hour-of-day averages for each short sampling period,
+# # and return a dataframe with the results for each sampling period
+# # in its own column 
+# 
+# # NOTES:
+# ## will stop if there are less than 24 hour-of-day averages in a given
+#          # short sampling period
+# 
+# kld.avg <- function(days) { # days = number of days in short samping period
+#   
+#   # for testing
+#   # y<- all_dates[(3*24*4):((3+days)*24*4)]
+# 
+#    a <- 
+#     runner(all_dates,
+#        k = days*24*4, # number of 15 min-periods in short sampling period
+#        # only evaluate windows at end of day timestamp
+#        at = seq(days*24*4, length(all_dates), 24*4),
+#        f = function(y) { # y = vector of specified days (length = k) of day_col per iteration
+#          
+#          sample <- all_data %>%
+# 
+# # filter out only the amount of days specified by k
+#            # from the all_dates col
+#            filter(date %in% y)
+#          
+#          
+# 
+# 
+#          # omit sampling period if missing more than
+#          # 25 % of sampling period
+#          if(nrow(sample) < 0.75 * 4 * 24 * days) { 
+#            
+#            a <- rep(NA, 2) %>% as.integer()
+# 
+# 
+#          
+#            # if not missing 25% of sampling period...
+#          } else { 
+#            
+#            # fit a lognormal distribution to sample and extract
+#            # logmean and logsd values
+#          sample_fit <- fitdistrplus::fitdist(pull(sample, metric), "lnorm", method = 'mle') %>%
+#            suppressWarnings()
+#          
+#          a <- c(sample_fit$estimate['meanlog'], sample_fit$estimate['sdlog'])
+# 
+#          }
+#          
+#          # return values for all running windows
+#          a <- as.data.frame(a)
+#        }
+#   )
+#  
+# # bind all elements of list into a dataframe
+# a <- do.call(cbind, a) %>%
+#   data.frame()
+# 
+# 
+# 
+# n_samples_possible <- ncol(a)
+# # omit columns that have NA values (didn't have enough data)
+# # use if statement to avoid changing
+# # structure of single column to vector
+# if(ncol(a)>1) a <- a[ , colSums(is.na(a)) == 0]
+# 
+# # count number of sampling periods created (columns)
+# n_samples <- ncol(a)
+# 
+# # calculate proportion of samples that had sufficient data
+# # for given short sampling frame length
+# n_samp_avail <- n_samples/n_samples_possible
+# 
+# 
+# 
+# 
+# 
+# # apply KLD between the each short sample period and
+# # the entire monitroing period individually
+# 
+# a <- lapply(colnames(a), function(x) {
+#   
+#     a <- a %>% pull(x)
+#     
+#     log_fit_sample <- function(x) dlnorm(x, meanlog = a[1],
+#                                          sdlog = a[2])              
+#     
+#     # find kld from two continuous functions
+#     # bounded from 0 to Inf
+#     kld_fit <- function(x) log_fit_sample(x)*log((log_fit_sample(x))/(log_fit_entire(x)))
+#     
+#     # find kld value
+#     return(integrate(kld_fit, lower = 0, upper = Inf)$value)
+#     
+#   }) 
+#   
+# 
+#   
+# # average all the resulting KLDs to find average KLD
+# # for specified short sampling period length
+# # and calculate the standard error
+# 
+# 
+# list('kld_avg' = mean(unlist(a)),
+#           'kld_se' = sd(unlist(a))/length(unlist(a)),
+# 
+#      'n_samp_avail' = n_samp_avail)
+# 
+# }
+# 
+# 
+# # test kld.avg function
+#   # test <- kld.avg(16)
+# 
+# 
+#             # calculate "max KLD":
+# # average kld for short sampling periods of length of short sampling period
+# # of minimum length, "sample_days_min"
+# a <- kld.avg(sample_days_min)
+# 
+# kld_avg_max <- a[['kld_avg']]
+# 
+# kld_se_max <- a[['kld_se']]
+# 
+# # apply function to find scaled_entropy dataframe for
+# # sampling period of length "sample_days" to range of 1:28 days
+# entropy_data_list <- lapply(tested_sample_sequence,
+#                         function (
+#                           days2 # length of short sampling period
+#                                   ) {
+# 
+#                                                     
+# # calculate average KLD for all short sampling period of length "days2"
+# a <- kld.avg(days2)
+# 
+# 
+# 
+# # calculate the confidence interval for ratio of two means
+# # https://i.stack.imgur.com/vO8Ip.png
+# b <- ((a[['kld_avg']])/kld_avg_max)*
+#   sqrt(
+#     ((a[['kld_se']])^2)/((a[['kld_avg']])^2)+ (kld_se_max^2)/(kld_avg_max^2))
+# 
+# 
+# 
+# a <- tibble(
+#   'coeff' = a[['kld_avg']]/kld_avg_max, # mean scaled entropy value
+#   # values for confidence intervals
+#   'high_val' = a[['kld_avg']]/kld_avg_max+1.96*b,
+#     'low_val' = a[['kld_avg']]/kld_avg_max-1.96*b,
+#      'home' = home_num,
+#   'metric' = metric,
+#      'sample_length' = days2,
+#   'monitor_period' = monitor_period,
+#   'n_samp_avail' = a[['n_samp_avail']] # amount of samples with sufficient data
+#   )
+# 
+# 
+# a
+# 
+#                         }
+# )
+# 
+# 
+# # bind all into a dataframe
+# a <- do.call(rbind, entropy_data_list)
+# 
+# a # scaled_entropy for one month
+# 
+# }
+# 
+# # test function for one month
+# # test <- scaled.entropy.month(month_monitor = 'Dec')
+# 
+# 
+# 
+# 
+# # find scaled_entropy for all short smpling lengths in all apecified months
+# # or time periods
+# 
+# if(is.null(months_entire)) {# if using date range...
+# 
+# a <- lapply(date_ranges_entire, scaled.entropy.month)
+# 
+# }else{# if using months...
+#   a <- lapply(months_entire, scaled.entropy.month)
+# 
+# }
+# 
+# # bind all into a dataframe
+# entropy_data_month <- do.call(rbind, a) %>%
+#   mutate(method = 'shape')
+# 
+# 
+# entropy_data_month  # scaled_entropy for all specified months
+# 
+# }
+# 
+# # # test function
+# # scaled.entropy.table.shape('008', 'pm25', months_entire = c('Dec', 'Nov'),
+# #                            tested_sample_sequence = c(4,5,6), sample_days_min = 3)
+# 
+# 
+```
 
 
