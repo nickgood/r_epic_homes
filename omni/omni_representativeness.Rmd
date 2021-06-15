@@ -81,6 +81,10 @@ ggdensity(data %>%
 ```{r functions_shape}
 
 # calculate kld for continuous probability distributions --------------------------
+a <- '2020-12-01'
+ceiling_date(as.POSIXct(a, format="%Y-%m-%d",
+                              na = "NA", tz = 'UTC')+1)
+ceiling_date(ymd(a)+1)
 
 
 # function to calculate scaled entropy for a house
@@ -126,15 +130,9 @@ all_data <- data %>%
   dplyr::select(c(date, all_of(metric)))%>%
   # choose long-term monitoring date range
   filter(
-    date >= floor_date(as.POSIXct(monitor_period[1], format="%Y-%m-%d",
-                              na = "NA", tz = 'UTC'), unit = 'day'),
-    date < ceiling_date(as.POSIXct(monitor_period[2], format="%Y-%m-%d",
-                              na = "NA", tz = 'UTC')+1, unit = 'day')
-  ) %>%
-  # make columns for hour of day, day of week, and month of year
-  mutate(hour = hour(date), day = weekdays(date), month = month(date),
-         # make column for day (so they can be grouped later)
-         day_date = floor_date(date, unit = 'day'))
+    date >= floor_date(ymd(monitor_period[1]), unit = 'day'),
+    date < ceiling_date(ymd(monitor_period[2]), unit = 'day')
+  )
 
  
   
