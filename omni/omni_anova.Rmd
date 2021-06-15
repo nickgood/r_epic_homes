@@ -217,7 +217,7 @@ outliers_homes_log <- map(homes_all, function(x) outlier.test(hm = x, met = 'pm2
   
  
 # test for normality for each location in one home for one metric
-qqplot.homes <- function(data = omni_avg_data, hm, met, log.trans = FALSE){
+qqplotter <- function(data = omni_avg_data, hm, met, log.trans = FALSE){
   
   # create df of one metric for indoor rooms
   data_metric <- data %>%
@@ -238,17 +238,17 @@ ggqqplot(data_metric, 'mean', facet.by = 'location',
 }
 
   # test function
-a <- qqplot.homes( hm = '001', met = 'pm25', log.trans = TRUE)
+a <- qqplotter( hm = '001', met = 'pm25', log.trans = TRUE)
 
 
 # make qqplots for all homes/locations/metrics
-map(homes_all, function(x) qqplot.homes(hm = x, met = 'pm25',
+map(homes_all, function(x) qqplotter(hm = x, met = 'pm25',
                                         log.trans = TRUE))
 
-map(homes_all, function(x) qqplot.homes(hm = x, met = 'voc',
+map(homes_all, function(x) qqplotter(hm = x, met = 'voc',
                                         log.trans = TRUE))
 
-map(homes_all, function(x) qqplot.homes(hm = x, met = 'co2',
+map(homes_all, function(x) qqplotter(hm = x, met = 'co2',
                                         log.trans = TRUE))
 
 
@@ -256,7 +256,7 @@ map(homes_all, function(x) qqplot.homes(hm = x, met = 'co2',
 
 
 # test for equal variances across locations for one home, for one metric
-levene.test.home <- function(data = omni_avg_data, hm, met, log.trans = FALSE){
+levene.tester <- function(data = omni_avg_data, hm, met, log.trans = FALSE){
   
   # create df of one metric for indoor rooms
   data_metric <- data %>%
@@ -277,21 +277,83 @@ levene.test.home <- function(data = omni_avg_data, hm, met, log.trans = FALSE){
 }
 
 # test function
-levene.test.home(hm = '001', met = 'pm25', log.trans = TRUE)
+levene.tester(hm = '001', met = 'pm25', log.trans = TRUE)
 
 # test variances for all homes/locations/metrics
-map(homes_all, function(x) levene.test.home(hm = x, met = 'pm25',
+map(homes_all, function(x) levene.tester(hm = x, met = 'pm25',
                                         log.trans = TRUE)) %>%
   bind_rows
 
-map(homes_all, function(x) levene.test.home(hm = x, met = 'voc',
+map(homes_all, function(x) levene.tester(hm = x, met = 'voc',
                                         log.trans = TRUE)) %>%
   bind_rows
 
-map(homes_all, function(x) levene.test.home(hm = x, met = 'co2',
+map(homes_all, function(x) levene.tester(hm = x, met = 'co2',
                                         log.trans = TRUE)) %>%
   bind_rows
 
+
+
+
+```
+
+```{r sum_squares}
+
+sum.square<- function(data = omni_avg_data, hm, met,
+                              log.trans = FALSE) {
+  
+  # create df of one metric for indoor rooms
+  data_metric <- data %>%
+  filter(home == hm & location %in% locations_indoor & metric == met) %>%
+    filter(!is.na(mean))%>%
+        mutate(mean = if(log.trans == TRUE) {log(mean)} else mean)
+
+  # grand mean of all data
+  grand_mean <- data_metric %>%
+    pull(mean) %>%
+    mean()
+  
+  grand_n <- data_metric %>%
+    pull(mean) %>%
+    length()
+  
+  # sum of squares between each location mean and grand mean
+  ss_between <- data_metric %>%
+    group_by(location) %>%
+    summarise_at(vars(mean), list(ss.between = function(x) {
+      n()*(mean(x)-grand_mean)^2})) %>%
+    ungroup()
+  
+    # sum of squares between each data point at a location
+  # and that location's mean
+  ss_within <- data_metric %>%
+    group_by(location) %>%
+    summarise_at(vars(mean), list(ss.within = function(x) {sum((x-mean(x))^2)})) %>%
+    ungroup()
+  
+  # join into one df
+  full_join(ss_between, ss_within, by = 'location') %>%
+    mutate(home = hm, metric = met)
+  }
+
+# test function
+a <- sum.square(hm = '001', met = 'pm25', log.trans = TRUE)
+
+# test variances for all homes/locations/metrics
+ss_df <- map(metrics_all, function(x_metric) {
+  
+  map(homes_all, function(x_home) {
+    sum.square(hm = x_home, met = x_metric,
+               log.trans = TRUE)
+  }
+  )
+}
+) %>%
+  bind_rows()
+
+# find when between_group
+ss_greater <- ss_df %>%
+  filter(ss.between>ss.within)
 
 ```
 
