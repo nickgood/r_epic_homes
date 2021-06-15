@@ -103,7 +103,7 @@ humid_days <- 7
 
 ```
 
-```{r avg_df_function}
+```{r avg_df_function, eval = FALSE}
 
 
 avg.data <- function(data = omni_data, metric, days){
@@ -202,8 +202,8 @@ outlier.test <- function(data = omni_avg_data, hm, met, log.trans = FALSE){
 }
 
 
-# test function
-a <- outlier.test( hm = '001', met = 'pm25', log.trans = TRUE)
+# # test function
+# a <- outlier.test( hm = '001', met = 'pm25', log.trans = TRUE)
 
 # make outlier df for all homes/locations
 outliers_homes <- map(homes_all, function(x) outlier.test(hm = x, met = 'pm25',
@@ -237,8 +237,8 @@ ggqqplot(data_metric, 'mean', facet.by = 'location',
 
 }
 
-  # test function
-a <- qqplotter( hm = '001', met = 'pm25', log.trans = TRUE)
+#   # test function
+# a <- qqplotter( hm = '001', met = 'pm25', log.trans = TRUE)
 
 
 # make qqplots for all homes/locations/metrics
@@ -276,8 +276,8 @@ levene.tester <- function(data = omni_avg_data, hm, met, log.trans = FALSE){
 
 }
 
-# test function
-levene.tester(hm = '001', met = 'pm25', log.trans = TRUE)
+# # test function
+# levene.tester(hm = '001', met = 'pm25', log.trans = TRUE)
 
 # test variances for all homes/locations/metrics
 map(homes_all, function(x) levene.tester(hm = x, met = 'pm25',
@@ -297,7 +297,7 @@ map(homes_all, function(x) levene.tester(hm = x, met = 'co2',
 
 ```
 
-```{r sum_squares}
+```{r sum_squares, eval = FALSE}
 
 sum.square<- function(data = omni_avg_data, hm, met,
                               log.trans = FALSE) {
