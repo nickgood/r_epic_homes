@@ -82,7 +82,7 @@ ggplot(home_001_f, aes(x = hod, y = pct) ) +
 
 ## Fraction On  
 
-```{r daily_frac_func, include = FALSE, eval = FALSE}
+```{r function_daily_fraction, include = FALSE, eval = FALSE}
 
 # function to test daily usage per device by home
 
@@ -120,7 +120,7 @@ coord_cartesian(ylim = c(0,100))+
 
 ```
 
-```{r daily_frac_overview, eval = FALSE}
+```{r plot_daily_frac_overview, eval = FALSE}
 
 # apply above function to all homes
 lapply(levels(as.factor(data$job_id)), daily.fraction)
@@ -129,7 +129,7 @@ lapply(levels(as.factor(data$job_id)), daily.fraction)
 
 ## Consumption  
 
-```{r daily_consum_functions, include = FALSE, eval = FALSE}
+```{r functions_daily_consum, include = FALSE, eval = FALSE}
 
 # function to test daily usage per device by home
 
@@ -163,7 +163,7 @@ geom_segment(aes(xend = dateday, y = 0, yend = consumption)) +
 
 ```
 
-```{r daily_consum_overview, eval = FALSE}
+```{r plot_daily_consum_overview, eval = FALSE}
 # homes 3 and 16 do not have data available
 
 # apply above function to all homes
@@ -171,10 +171,10 @@ lapply(levels(as.factor(data$job_id)), daily.consumption)
 ```
 
 
-# Cluster days based on heating and ac behaviours  
+# Cluster days based on heating and ac behaviours using PAM 
 
 
-```{r cluster_functions, include = FALSE, eval = FALSE}
+```{r functions_pam_cluster, include = FALSE, eval = FALSE}
 
 
 
@@ -336,7 +336,7 @@ cluster.plots <- function(
 ```
 
 
-```{r cluster_maker, eval = FALSE}
+```{r pam_cluster_df_maker, eval = FALSE}
 
 hm <- '001'
 # 2 feasible ac units...
@@ -428,7 +428,7 @@ hm <- '017'
 
 ## By Per-Device Fraction On
 
-```{r cluster_plot_frac, eval = FALSE, fig.width=10, fig.height=3}
+```{r plot_pam_cluster_fraction, eval = FALSE, fig.width=10, fig.height=3}
 
 # make plots for all homes
 hm <- '001'
@@ -503,7 +503,7 @@ cluster.plots(hm, get(paste0('cluster_df_', hm)),2, 'pct')
 ```
 
 ## By Per-Device Consumption
-```{r cluster_plot_consum, eval = FALSE, fig.width=10, fig.height=3}
+```{r plot_pam_cluster_consum, eval = FALSE, fig.width=10, fig.height=3}
 
 # make plots for all homes
 hm <- '001'
@@ -577,7 +577,7 @@ cluster.plots(hm, get(paste0('cluster_df_', hm)),2, 'consumption')
 ```
 
 ## By Summed Heat/AC consumption
-```{r cluster_maker_summed, eval = FALSE}
+```{r pam_cluster_df_maker_consum_summed, eval = FALSE}
 
 hm <- '001'
 # 2 feasible ac units...
@@ -667,7 +667,7 @@ hm <- '017'
 
 ```
 
-```{r cluster_plot_consum_summed, eval = FALSE, fig.width=10, fig.height=3}
+```{r plot_pam_cluster_consum_summed, eval = FALSE, fig.width=10, fig.height=3}
 
 # make plots for all homes
 hm <- '001'
@@ -742,7 +742,7 @@ cluster.plots(hm, get(paste0('cluster_df_', hm)),2, 'consumption')
 
 
 # Compare Clustering Methods  
-```{r cluster_compare_function, eval = FALSE}
+```{r function_cluster_compare, eval = FALSE}
 
 
 cluster.methods <- function(home_id, devices,
@@ -881,7 +881,7 @@ return(list( boxplot, cluster_point_plot, cluster_time_plot))
 
 ```
 
-```{r cluster_compare_plots, eval = FALSE, fig.width=10, fig.height=5}
+```{r plots_cluster_compare, eval = FALSE, fig.width=10, fig.height=5}
 
 # define variables
 # just compare methods for daily fraction of time-on (pct)
@@ -975,9 +975,9 @@ hm <- '017'
 
 ```
 
-# Use Only Manual Clustering  
+# Manual Clustering  
 
-```{r cluster_manual_function, eval = TRUE}
+```{r functions_manual_cluster, eval = TRUE}
 
 
 cluster.manual <- function(home_id, devices,
@@ -1191,7 +1191,7 @@ if(return_data == FALSE){
 
 ```
 
-```{r cluster_manual_define_variables, eval = TRUE}
+```{r define_variables_manual_cluster, eval = TRUE}
 # define variables
 
 homes_ac <- c('001', '002', '006', '007', '008', '009', '012', '014')
@@ -1207,7 +1207,8 @@ heating threshold set at `r heat_percentile_thresh` percentile for daily % time 
 
 ac threshold set at `r ac_usage_thresh`% for daily % time on
 
-```{r cluster_manual_plots, eval = TRUE, fig.width=8, fig.height=1}
+## Tier 3 Homes
+```{r plot_manual_cluster_tier3, eval = TRUE, fig.width=8, fig.height=1}
 
 
 
@@ -1222,28 +1223,8 @@ hm <- '002'
 cluster.manual(hm, c('furnace','ac 2'))
 
 
-hm <- '003'
-# # home 3 not available?
-# cluster_df <- cluster.maker(hm, c('heat 6','ac'))
-
-
-hm <- '004'
-# no AC
-cluster.manual.heat(hm, c('furnace'))
-
-
-hm <- '006'
-#
-cluster.manual(hm, c('heat 1','ac'))
-
 hm <- '007'
 # 
-cluster.manual(hm, c('heat 2','ac'))
-
-
-hm <- '008'
-# many heats that could be feasible...
-# heat 1 and 2 on approx same fraction, but 2 consumes more energy
 cluster.manual(hm, c('heat 2','ac'))
 
 
@@ -1251,6 +1232,24 @@ hm <- '009'
 # many heats that could be feasible...
 # consider summing consumption from heat 2 and 3 with furnace to cluster
 cluster.manual(hm, c('furnace','ac'))
+
+
+
+hm <- '012'
+#
+cluster.manual(hm, c('furnace','ac'))
+
+
+
+```
+
+## Tier 2 Homes
+```{r plot_manual_cluster_tier2, eval = TRUE, fig.width=8, fig.height=1}
+
+hm <- '004'
+# no AC
+cluster.manual.heat(hm, c('furnace'))
+
 
 
 hm <- '010'
@@ -1263,15 +1262,36 @@ hm <- '011'
 cluster.manual.heat(hm, c('heat 6'))
 
 
-hm <- '012'
-#
-cluster.manual(hm, c('furnace','ac'))
-
 
 hm <- '013'
 # only 4 days of ac detected, so not used to cluster
 # no heats consume much, but heat 2 is on most often/constently
 cluster.manual.heat(hm, c('heat 2'))
+
+
+
+hm <- '015'
+# no ac, multiple feasible heats
+cluster.manual.heat(hm, c('furnace'))
+
+
+```
+
+## Tier 1 Homes
+```{r plot_manual_cluster_tier1, eval = TRUE, fig.width=8, fig.height=1}
+
+
+hm <- '006'
+#
+cluster.manual(hm, c('heat 1','ac'))
+
+
+
+hm <- '008'
+# many heats that could be feasible...
+# heat 1 and 2 on approx same fraction, but 2 consumes more energy
+cluster.manual(hm, c('heat 2','ac'))
+
 
 
 hm <- '014'
@@ -1280,22 +1300,6 @@ hm <- '014'
 cluster.manual(hm, c('heat 1','ac'))
 
 
-hm <- '015'
-# no ac, multiple feasible heats
-cluster.manual.heat(hm, c('furnace'))
-
-
-hm <- '016'
-# # not available
-# cluster_df <- cluster.maker(hm, c('heat 6','ac'))
-
-
-hm <- '017'
-# # not available
-# cluster_df <- cluster.maker(hm, c('heat 6','ac'))
-
-
-
-
 
 ```
+
