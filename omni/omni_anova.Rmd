@@ -322,25 +322,35 @@ sum.square<- function(data = omni_avg_data, hm, met,
     group_by(location) %>%
     summarise_at(vars(mean), list(ss.between = function(x) {
       n()*(mean(x)-grand_mean)^2})) %>%
-    ungroup()
+    ungroup() %>%
+    # sum the between-location variances
+    pull(ss.between) %>%
+    sum()
   
-    # sum of squares between each data point at a location
-  # and that location's mean
-  ss_within <- data_metric %>%
+
+   a <- data_metric %>%
     group_by(location) %>%
+         # sum of squares between each data point at a location
+  # and that location's mean
     summarise_at(vars(mean), list(ss.within = function(x) {sum((x-mean(x))^2)})) %>%
-    ungroup()
+    ungroup() %>%
+    t() %>% # transpose
+     as.data.frame()
+   
+   colnames(a) <- a[1,]
+   
+   a[-1,] %>%
+     rename_all(function(x) paste0('within_',x))%>%
+    mutate(between = ss_between, home = hm, metric = met)
   
-  # join into one df
-  full_join(ss_between, ss_within, by = 'location') %>%
-    mutate(home = hm, metric = met)
+
   }
 
 # test function
 a <- sum.square(hm = '001', met = 'pm25', log.trans = TRUE)
 
 # test variances for all homes/locations/metrics
-ss_df <- map(metrics_all, function(x_metric) {
+ss_df2 <- map(metrics_all, function(x_metric) {
   
   map(homes_all, function(x_home) {
     sum.square(hm = x_home, met = x_metric,
@@ -350,6 +360,7 @@ ss_df <- map(metrics_all, function(x_metric) {
 }
 ) %>%
   bind_rows()
+
 
 # find when between_group
 ss_greater <- ss_df %>%
