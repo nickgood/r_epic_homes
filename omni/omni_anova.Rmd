@@ -32,7 +32,7 @@ library(rstatix)
 ```
 
 
-```{r data_import}
+```{r data_import, eval = FALSE}
 
 export_date <- '2021-06-07'
 
@@ -163,9 +163,30 @@ omni_avg_data <- read_csv('./csv_created/omni_avg_data.csv')
 
 ```
 
-```{r anova_assumptions_tests}
+```{r function_grid_plotting}
+
+#function to put plots in a grid
+plot.grid <- function(plots, title,
+                     y_val = NULL, ncol = 4, nrow = 4) {
+  ##omit NULL values (from homes or rooms without valid data)
+  plots <- plots[!sapply(plots, is.null)]
+  
+  do.call('grid.arrange', c(plots, top = title, left = y_val,
+                            ncol = ncol, nrow = nrow))  
+  
+}
+```
 
 
+# ANOVA Assumptions  
+
+* note that pm25 and voc have been log-transformed on most of the analysis
+* CO2 was as well, bt did not result in normality
+
+
+## Outliers  
+
+```{r function_assumption_outliers}
 # test for outliers for one metric in one home for each location
 outlier.test <- function(data = omni_avg_data, hm, met, log.trans = FALSE){
   
@@ -204,6 +225,11 @@ outlier.test <- function(data = omni_avg_data, hm, met, log.trans = FALSE){
 
 # # test function
 # a <- outlier.test( hm = '001', met = 'pm25', log.trans = TRUE)
+```
+
+
+```{r assumption_outliers}
+
 
 # make outlier df for all homes/locations
 outliers_homes <- map(homes_all, function(x) outlier.test(hm = x, met = 'pm25',
@@ -215,7 +241,13 @@ outliers_homes_log <- map(homes_all, function(x) outlier.test(hm = x, met = 'pm2
                                                           log.trans = TRUE)) %>%
   bind_rows()
   
- 
+```
+
+
+## Normality  
+
+```{r function_assumption_normality}
+
 # test for normality for each location in one home for one metric
 qqplotter <- function(data = omni_avg_data, hm, met, log.trans = FALSE){
   
@@ -241,18 +273,28 @@ ggqqplot(data_metric, 'mean', facet.by = 'location',
 # a <- qqplotter( hm = '001', met = 'pm25', log.trans = TRUE)
 
 
+```
+
+```{r plot_assumption_normality, fig.width=10.5, fig.height=8}
 # make qqplots for all homes/locations/metrics
 map(homes_all, function(x) qqplotter(hm = x, met = 'pm25',
-                                        log.trans = TRUE))
+                                        log.trans = TRUE)) %>%
+  plot.grid(title = '')
 
 map(homes_all, function(x) qqplotter(hm = x, met = 'voc',
-                                        log.trans = TRUE))
+                                        log.trans = TRUE)) %>%
+  plot.grid(title = '')
 
 map(homes_all, function(x) qqplotter(hm = x, met = 'co2',
-                                        log.trans = TRUE))
+                                        log.trans = TRUE)) %>%
+  plot.grid(title = '')
 
 
+```
 
+## Homogeneous Variances  
+
+```{r function_assumptions_variance}
 
 
 # test for equal variances across locations for one home, for one metric
@@ -279,6 +321,12 @@ levene.tester <- function(data = omni_avg_data, hm, met, log.trans = FALSE){
 # # test function
 # levene.tester(hm = '001', met = 'pm25', log.trans = TRUE)
 
+
+```
+
+
+```{r df_assumption_variances}
+
 # test variances for all homes/locations/metrics
 map(homes_all, function(x) levene.tester(hm = x, met = 'pm25',
                                         log.trans = TRUE)) %>%
@@ -293,11 +341,12 @@ map(homes_all, function(x) levene.tester(hm = x, met = 'co2',
   bind_rows
 
 
-
-
 ```
 
-```{r sum_squares, eval = FALSE}
+
+# Sum of Squares  
+
+```{r function_sum_squares, eval = FALSE}
 
 sum.square<- function(data = omni_avg_data, hm, met,
                               log.trans = FALSE) {
@@ -347,8 +396,14 @@ sum.square<- function(data = omni_avg_data, hm, met,
 
   }
 
-# test function
-a <- sum.square(hm = '001', met = 'pm25', log.trans = TRUE)
+# # test function
+# a <- sum.square(hm = '001', met = 'pm25', log.trans = TRUE)
+
+
+
+```
+
+```{r df_sum_squares, eval = FALSE}
 
 # test variances for all homes/locations/metrics
 ss_df <- map(metrics_all, function(x_metric) {
