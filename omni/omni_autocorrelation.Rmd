@@ -332,7 +332,7 @@ ts.grid <- function(plots, title,
 
 # Will stationarity be an issue?
 
-```{r stationarity, fig.width=8, fig.height=4.5}
+```{r stationarity, fig.width=8, fig.height=4.5, eval = FALSE}
 # check stationarity before doing acf calcs and plots
 
 # make time series plot for all available sensors
@@ -562,12 +562,12 @@ ggacf <- function(data,  hm, loc, metric,
                                guide = "legend")+
     {if(simple == TRUE) {
       theme(axis.title = element_blank(),
-          axis.text = element_text( size = xsmall),
+          axis.text = element_text( size = small),
           axis.ticks = element_blank(),
           panel.grid.minor.x = element_blank(),
           panel.grid.major.x = element_blank(),
           panel.border = element_blank(),
-          plot.title = element_text(hjust = 0.5, size = xsmall),
+          plot.title = element_text(hjust = 0.5, size = small),
           legend.position = 'none')}}+
     if (is.null(ylab))
       ylab(ifelse(type=="partial", "PACF", "ACF"))
