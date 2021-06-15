@@ -237,14 +237,16 @@ kld.avg <- function(days) { # days = number of days in short samping period
 
          }
          
-         # return values for all running windows
+         # return values for one running window
          a <- as.data.frame(a)
+         colnames(a) <- y[1] # give name to column just to suppress "new name" message
+
+         a
        }
   )
  
 # bind all elements of list into a dataframe
-a <- do.call(cbind, a) %>%
-  data.frame()
+a <- bind_cols(a)
 
 
 
@@ -353,7 +355,7 @@ a
 
 
 # bind all into a dataframe
-a <- do.call(rbind, entropy_data_list)
+a <- bind_rows(entropy_data_list)
 
 a # scaled_entropy for one month
 
@@ -371,7 +373,7 @@ a <- lapply(date_ranges_entire, scaled.entropy.month)
 
 
 # bind all into a dataframe
-entropy_data_month <- do.call(rbind, a) %>%
+entropy_data_month <- bind_rows(a) %>%
   mutate(method = 'shape')
 
 
@@ -379,11 +381,16 @@ entropy_data_month  # scaled_entropy for all specified months
 
 }
 
-# # test function
-# scaled.entropy.table.shape('008', 'pm25',
-#                            date_ranges_entire = list(c('2020-12-01', '2020-12-31'),
-#                                                      c('2020-11-01', '2020-11-30')),
-#                            tested_sample_sequence = c(4,5,6), sample_days_min = 3)
+# test function
+a <- scaled.entropy.table.shape('008', 'pm25',
+                           date_ranges_entire = list(c('2020-12-01', '2020-12-31'),
+                                                     c('2020-11-01', '2020-11-30')),
+                           tested_sample_sequence = c(4,5,6), sample_days_min = 3)
+
+
+all.equal(a, a_old)
+
+
 
 # data making functions for shape distributions-----------------------------
 
