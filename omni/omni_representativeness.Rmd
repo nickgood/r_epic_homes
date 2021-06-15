@@ -99,25 +99,25 @@ data = rtdata) {
 
   # function to find scaled_entropy for samples in a given monitor month
   
-scaled.entropy.month <- function(month_monitor) {
+scaled.entropy.month <- function(monitor_period) {
 
 
 
     # must unlist the listed range that is used in lapply funnction
-    month_monitor <- unlist(month_monitor)
+    monitor_period <- unlist(monitor_period)
     
         #define terms for later use
-    monitor_period <- paste(as.Date(month_monitor[1]), '-',
-                             as.Date(month_monitor[2]))
+    period_label <- paste(as.Date(monitor_period[1]), '-',
+                             as.Date(monitor_period[2]))
 
     # warn that times will be rounded to full day for entire monitoring period
-    if(second(as.POSIXct(month_monitor[1])) != 0 |
-       minute(as.POSIXct(month_monitor[1])) != 0 |
-       hour(as.POSIXct(month_monitor[1])) != 0|
+    if(second(as.POSIXct(monitor_period[1])) != 0 |
+       minute(as.POSIXct(monitor_period[1])) != 0 |
+       hour(as.POSIXct(monitor_period[1])) != 0|
        
-       second(as.POSIXct(month_monitor[2])) != 0 |
-       minute(as.POSIXct(month_monitor[2])) != 0 |
-       hour(as.POSIXct(month_monitor[2])) != 0) warning('Times specifed in date range endpoints are not acknowledged.')
+       second(as.POSIXct(monitor_period[2])) != 0 |
+       minute(as.POSIXct(monitor_period[2])) != 0 |
+       hour(as.POSIXct(monitor_period[2])) != 0) warning('Times specifed in date range endpoints are not acknowledged.')
 
     
  # make column of specified metric for one home, one room
@@ -126,9 +126,9 @@ all_data <- data %>%
   dplyr::select(c(date, all_of(metric)))%>%
   # choose long-term monitoring date range
   filter(
-    date >= floor_date(as.POSIXct(month_monitor[1], format="%Y-%m-%d",
+    date >= floor_date(as.POSIXct(monitor_period[1], format="%Y-%m-%d",
                               na = "NA", tz = 'UTC'), unit = 'day'),
-    date < ceiling_date(as.POSIXct(month_monitor[2], format="%Y-%m-%d",
+    date < ceiling_date(as.POSIXct(monitor_period[2], format="%Y-%m-%d",
                               na = "NA", tz = 'UTC')+1, unit = 'day')
   ) %>%
   # make columns for hour of day, day of week, and month of year
@@ -146,11 +146,11 @@ date_col <- all_data$date %>%
 # make column of all dates within range
 
     all_dates <- seq.POSIXt(from = floor_date(
-    as.POSIXct( month_monitor[1],
+    as.POSIXct( monitor_period[1],
                 tz = 'UTC'), unit = 'day'),
     # round up to next day for the end date
                     to = ceiling_date(
-                      as.POSIXct( month_monitor[2],
+                      as.POSIXct( monitor_period[2],
                                   tz = 'UTC')+1,
                       unit = 'day')-1, # then omit the start of the next day
                     by = 60*15)
@@ -343,7 +343,7 @@ a <- tibble(
      'home' = home_num,
   'metric' = metric,
      'sample_length' = days2,
-  'monitor_period' = monitor_period,
+  'monitor_period' = period_label,
   'n_samp_avail' = a[['n_samp_avail']] # amount of samples with sufficient data
   )
 
@@ -362,7 +362,7 @@ a # scaled_entropy for one month
 }
 
 # test function for one month
-# test <- scaled.entropy.month(month_monitor = 'Dec')
+# test <- scaled.entropy.month(monitor_period = 'Dec')
 
 
 
