@@ -32,10 +32,6 @@ library(runner) # for moving window functions
 
 ```
 
-```{r import_omni_15min_data, eval = FALSE}
-rtdata<- read_csv('./../../purgiel_r_epic_homes/omni/OMNIdata_clean.csv')
-
-```
 
 ```{r import_omni_daily_data}
 omni_daily_data<- read_csv('./csv_created/omni_daily_data.csv')
@@ -86,17 +82,6 @@ a <- '2020-12-01'
 b <- '2020-12-31'
 
 
-    c_old <- seq.POSIXt(from = floor_date(
-    as.POSIXct( a,
-                tz = 'UTC'), unit = 'day'),
-    # round up to next day for the end date
-                    to = ceiling_date(
-                      as.POSIXct( b,
-                                  tz = 'UTC')+1,
-                      unit = 'day')-1, # then omit the start of the next day
-                    by = 60*15)
-    
-    c_new <- seq.Date(from = floor_date(ymd(a)))
 
 # function to calculate scaled entropy for a house
 # during multiple different time periods
@@ -110,7 +95,7 @@ scaled.entropy.table.shape <- function(home_num, metric,
 tested_sample_sequence, # sequence of tested short sampling period lengths (in days)
 sample_days_min = 1, # amount of days in shortest theoretical sample
 room_type = 'living',
-data = rtdata) {
+data = omni_daily_data) {
   
 
   # function to find scaled_entropy for samples in a given monitor month
@@ -127,13 +112,15 @@ scaled.entropy.month <- function(monitor_period) {
                              as.Date(monitor_period[2]))
 
     # warn that times will be rounded to full day for entire monitoring period
-    if(second(as.POSIXct(monitor_period[1])) != 0 |
-       minute(as.POSIXct(monitor_period[1])) != 0 |
-       hour(as.POSIXct(monitor_period[1])) != 0|
+    if(0 %in% c(
+      second(as.POSIXct(monitor_period[1])),
+       minute(as.POSIXct(monitor_period[1])),
+       hour(as.POSIXct(monitor_period[1])),
        
-       second(as.POSIXct(monitor_period[2])) != 0 |
-       minute(as.POSIXct(monitor_period[2])) != 0 |
-       hour(as.POSIXct(monitor_period[2])) != 0) stop('Times cannot be specifed in date range endpoints.')
+       second(as.POSIXct(monitor_period[2])),
+       minute(as.POSIXct(monitor_period[2])),
+       hour(as.POSIXct(monitor_period[2])))
+      ) stop('Times cannot be specifed in date range endpoints.')
 
     
  # make column of specified metric for one home, one room
@@ -142,15 +129,14 @@ all_data <- data %>%
   dplyr::select(c(date, all_of(metric)))%>%
   # choose long-term monitoring date range
   filter(
-    date >= ymd(monitor_period[1]) &
-    date <= ymd(monitor_period[2])
+    dateday >= ymd(monitor_period[1]) &
+    dateday <= ymd(monitor_period[2])
   )
 
  
   
 # make a vector of days in all_data
-date_col <- all_data$date %>%
-  unique() 
+date_col <- all_data$dateday
 
 
 # make column of all dates within range
