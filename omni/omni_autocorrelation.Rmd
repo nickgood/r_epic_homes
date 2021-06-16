@@ -160,7 +160,7 @@ count.missing <- function(data, hm, loc, metric,
 # all homes/locations in one dataframe
 # with missing dates put in as NA values
 ## daily
-omni_daily_data <- omni_data %>%
+omni_daily_data_complete <- omni_data %>%
   mutate(date = floor_date(datetime, unit = 'days')) %>%
   group_by(home, location, date) %>%
   summarize_if(is.numeric, list(~mean(., na.rm = TRUE))) %>%
@@ -197,7 +197,7 @@ homes_tier3<-home.list(c(1,2,7,9,12)) # ac-shoulder-heat
 homes_tier2<-home.list(c(4,10,11,13,15)) # shoulder-heat (sometimes second shoulder)
 homes_tier1<-home.list(c(6,8,14))
 
-omni_daily_data<- omni_daily_data %>%
+omni_daily_data_complete<- omni_daily_data_complete %>%
   mutate(home_type = case_when(
     home %in% homes_tier3 ~ 'tier3',
     home %in% homes_tier2 ~ 'tier2',
@@ -239,7 +239,7 @@ energy_cluster_df<- tribble(~home, ~cluster_type,
 ############# using for loop
 
 # make an empty column to fill with cluster function
-omni_daily_data$energy_cluster <- NA
+omni_daily_data_complete$energy_cluster <- NA
 
 #specify all homes that have specified energy clusters
 homes_clustered <- levels(as.factor(energy_cluster_df$home))
@@ -253,9 +253,9 @@ for(i in 1:length(homes_clustered)) {
     # for each cluster type in each home in the energycluster dataframe
       # indentify the values in the data that are match the home
       # and are within the dates specified by the cluster
-    omni_daily_data$energy_cluster[
-      which(omni_daily_data$home == homes_clustered[i] &
-              between(omni_daily_data$date,
+    omni_daily_data_complete$energy_cluster[
+      which(omni_daily_data_complete$home == homes_clustered[i] &
+              between(omni_daily_data_complete$date,
                       energy_cluster_df[cluster_type_indeces[j],
                                       'start_date'][[1]],
                       energy_cluster_df[cluster_type_indeces[j],
@@ -268,7 +268,7 @@ for(i in 1:length(homes_clustered)) {
 }
 
 # convert any NA clusters to "unclassified"
-omni_daily_data <- omni_daily_data %>%
+omni_daily_data_complete <- omni_daily_data_complete %>%
   mutate(energy_cluster = if_else(is.na(energy_cluster), 'unclassified', energy_cluster))
 
 
@@ -280,9 +280,9 @@ omni_daily_data <- omni_daily_data %>%
 #     c(1:length(which(energy_clusters$home == hm))),
 #      function(cluster_type_index) {
 #       
-#       omni_daily_data$energy_cluster[
-#         which(omni_daily_data$home == x_home &
-#                 between(omni_daily_data$date,
+#       omni_daily_data_complete$energy_cluster[
+#         which(omni_daily_data_complete$home == x_home &
+#                 between(omni_daily_data_complete$date,
 #                         energy_clusters[which(energy_clusters$home == x_home)[cluster_type_index],
 #                                         'start_date'][[1]],
 #                         energy_clusters[which(energy_clusters$home == x_home)[cluster_type_index],
@@ -302,13 +302,14 @@ omni_daily_data <- omni_daily_data %>%
 ```
 
 ```{r daily_df_csv, eval = FALSE}
-write_csv(omni_daily_data, paste0('./csv_created/omni_daily_data_',
+# make a df with rows of NA for days within each home with no data
+write_csv(omni_daily_data_complete, paste0('./csv_created/omni_daily_data_complete_',
                                   Sys.Date(), '.csv'))
 
 ```
 
 ```{r daily_data_import}
-omni_daily_data <- read_csv('./csv_created/omni_daily_data.csv')
+omni_daily_data_complete <- read_csv('./csv_created/omni_daily_data_complete.csv')
 ```
 
 
@@ -345,7 +346,7 @@ map(
         map(
           homes_all, function(x_home) {
             
-            ggplot(omni_daily_data %>% filter(home == x_home & location == x_location),
+            ggplot(omni_daily_data_complete %>% filter(home == x_home & location == x_location),
                    aes(x = as.Date(date), y = UQ(as.name(x_metric)),
                        color=case_when(grepl('heat', energy_cluster)~ 'red',
                                        energy_cluster == 'ac' ~ 'blue',
@@ -380,7 +381,7 @@ map(
 # loc <- 'bedroom'
 # metric <- 'temp'
 # 
-# ggplot(omni_daily_data %>% filter(home == hm & location == loc),
+# ggplot(omni_daily_data_complete %>% filter(home == hm & location == loc),
 #                aes(x = as.Date(date), y = UQ(as.name(metric)),
 #                    color=case_when(grepl('heat', energy_cluster)~ 'red',
 #                                    energy_cluster == 'ac' ~ 'blue',
@@ -402,13 +403,13 @@ map(
 
 
 # # plot differenced time series
-# diff_data <- omni_daily_data %>%
+# diff_data <- omni_daily_data_complete %>%
 #   filter(home == hm & location == loc) %>%
 #   mutate(diff = c(NA, diff(pull(., all_of(metric),1))))
 # 
 # 
 # 
-# diff_data <- omni_daily_data %>%
+# diff_data <- omni_daily_data_complete %>%
 #   filter(home == hm & location == loc) %>%
 #   # make column of metric differenced with itself by one day
 #   mutate(diff = c(NA, diff(pull(., all_of(metric),1))))
@@ -453,7 +454,7 @@ missing_pct_min <- 1/9*100
 ```{r ggacf_function, include= FALSE}
 
 # # variables for testing
-# data <- omni_daily_data
+# data <- omni_daily_data_complete
 # hm <- '003'
 # loc <- 'living'
 # metric <- 'pm25'
@@ -593,7 +594,7 @@ ggacf <- function(data,  hm, loc, metric,
 
 # test for one home, loc, metric
 lapply('002', ggacf,
-       data = omni_daily_data %>% filter(date < ymd('2020-08-13')),
+       data = omni_daily_data_complete %>% filter(date < ymd('2020-08-13')),
        loc = 'living', lag_max_plot = 10,
        metric = 'pm25', simple= TRUE)
 ```
@@ -604,13 +605,13 @@ lapply('002', ggacf,
 # affected by resolution of data?
 
 # daily
-acf(omni_daily_data %>%
+acf(omni_daily_data_complete %>%
       filter(home == '002' & location == 'living') %>%
       select(pm25),
     na.action = na.pass, lag.max = 10)
 
 map(homes_all, function (x){
-  acf(omni_daily_data %>% filter(home == x & location == 'living') %>%select(pm25),
+  acf(omni_daily_data_complete %>% filter(home == x & location == 'living') %>%select(pm25),
       na.action = na.pass,
       lag.max = 48)
 })
@@ -630,13 +631,13 @@ map(homes_all, function (x){
 ```{r test_ggacf_to_acf_func, eval = FALSE}
 # does my function compare to the default acf, just with different conf_int?
 
-acf(omni_daily_data %>%
+acf(omni_daily_data_complete %>%
       filter(home == '002' & location == 'living') %>%
       select(pm25),
     na.action = na.pass, lag.max = 10)
 
 lapply(homes_all, ggacf,
-       data = omni_daily_data, loc = 'living', lag_max_plot = 10, metric = 'pm25')
+       data = omni_daily_data_complete, loc = 'living', lag_max_plot = 10, metric = 'pm25')
 
 
   
@@ -677,7 +678,7 @@ acf.grid <- function(plots, title,
           
           lapply(homes_all, function(x_home) {
             ggacf(hm = x_home,
-                  data = omni_daily_data,
+                  data = omni_daily_data_complete,
                   loc = x_location, lag_max_plot = 30, metric = x_metric,
                   simple = TRUE
             )[['plot']]
@@ -696,7 +697,7 @@ acf.grid <- function(plots, title,
 #       
 #       lapply(homes_all, function(x_home) {
 #         ggacf(hm = x_home,
-#               data = omni_daily_data,
+#               data = omni_daily_data_complete,
 #               loc = x_location, lag_max_plot = 14, metric = x_metric
 #         )[['plot']]
 #       }
@@ -713,7 +714,7 @@ acf.grid <- function(plots, title,
 #       
 #       lapply(homes_all, function(x_home) {
 #         ggacf(hm = x_home,
-#               data = omni_daily_data,
+#               data = omni_daily_data_complete,
 #               loc = x_location, lag_max_plot = 14, metric = x_metric
 #         )[['plot']]
 #       }
@@ -729,7 +730,7 @@ acf.grid <- function(plots, title,
 # 
 #       lapply(homes_all, function(x_home) {
 #         ggacf(hm = x_home,
-#               data = omni_daily_data,
+#               data = omni_daily_data_complete,
 #               loc = loc, lag_max_plot = 30, metric = metric,
 #               simple = TRUE
 #         )[['plot']]
@@ -742,7 +743,7 @@ acf.grid <- function(plots, title,
 # 
 #       lapply(homes_all, function(x_home) {
 #         ggacf(hm = x_home,
-#               data = omni_daily_data,
+#               data = omni_daily_data_complete,
 #               loc = loc, lag_max_plot = 30, metric = metric,
 #               simple = TRUE
 #         )[['plot']]
@@ -757,7 +758,7 @@ acf.grid <- function(plots, title,
 # metric <- 'pm25'
 #       lapply(homes_all, function(x_home) {
 #         ggacf(hm = x_home,
-#               data = omni_daily_data,
+#               data = omni_daily_data_complete,
 #               loc = loc, lag_max_plot = 30, metric = metric,
 #               simple = TRUE
 #         )[['plot']]
@@ -783,7 +784,7 @@ metric <- 'pm25'
 
       lapply(homes_all, function(x_home) {
         ggacf(hm = x_home,
-              data = omni_daily_data,
+              data = omni_daily_data_complete,
               loc = loc, lag_max_plot = 30, metric = metric,
               simple = TRUE
         )[['plot']]
@@ -806,7 +807,7 @@ metric <- 'pm25'
                    # another month
             lapply(homes_all, function(x_home) {
         ggacf(hm = x_home,
-              data = omni_daily_data %>%
+              data = omni_daily_data_complete %>%
           filter(date>= ymd(x_date_range[1]) & date <=ymd(x_date_range[2])),
               loc = loc, lag_max_plot = 30, metric = metric,
               simple = TRUE
@@ -831,7 +832,7 @@ metric <- 'pm25'
     
     lapply(locations_indoor, function(x_location) {
       
-      lapply(omni_daily_data %>%
+      lapply(omni_daily_data_complete %>%
                  pull(energy_cluster) %>%
                  as.factor() %>% levels(),
                function(x_cluster) {
@@ -840,13 +841,13 @@ metric <- 'pm25'
         
         # if cluster exists for given house, return plot
                 if (x_cluster %in%
-                    (omni_daily_data %>%
+                    (omni_daily_data_complete %>%
                     filter(home == x_home) %>%
                     pull(energy_cluster) %>%
                     as.factor() %>% levels())
                 ) { 
                   ggacf(hm = x_home,
-              data = omni_daily_data,
+              data = omni_daily_data_complete,
               loc = x_location, lag_max_plot = 30, metric = x_metric,
               cluster = x_cluster, simple = TRUE
         )[['plot']]
@@ -882,7 +883,7 @@ acf_lags_no_cluster <-
       
       lapply(homes_all, function(x_home) {
         ggacf(hm = x_home,
-              data = omni_daily_data,
+              data = omni_daily_data_complete,
               loc = x_location, lag_max_plot = 14, metric = x_metric
         )[['lag_signif']]
       }
@@ -905,14 +906,14 @@ acf_lags_cluster <-
       
       lapply(homes_all, function(x_home) {
         
-        lapply(omni_daily_data %>%
+        lapply(omni_daily_data_complete %>%
                  filter(home == x_home) %>%
                  pull(energy_cluster) %>%
                  as.factor() %>% levels(),
                function(x_cluster) {
                  
         ggacf(hm = x_home,
-              data = omni_daily_data,
+              data = omni_daily_data_complete,
               loc = x_location, lag_max_plot = 14, metric = x_metric,
               cluster = x_cluster
         )[['lag_signif']]
@@ -1194,7 +1195,7 @@ write_csv(lag_summary, paste0('./csv_created/lag_summary_', Sys.Date(), '.csv'))
 # plot results for one location and metric
 lapply(homes_all, function(x) {
   ggacf(hm = x,
-        data = omni_daily_data,
+        data = omni_daily_data_complete,
         loc = 'living', lag_max_plot = 14, metric = 'pm25', type = 'partial'
   )[['plot']]
 }
