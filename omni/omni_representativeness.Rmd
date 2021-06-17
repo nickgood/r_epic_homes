@@ -94,9 +94,9 @@ date_ranges_entire <- list(c('2020-12-01','2020-12-31'),
                            c('2020-11-01', '2020-11-30'))
 tested_sample_sequence <- sequence
 sample_days_min <- 3
-home_num <- '007'
+home_num <- '010'
 location_type <- 'living'
-data <- omni_hourly_data
+data <- omni_data
 monitor_period <- date_ranges_entire[1]
 metric <- 'pm25'
 days <- 4
@@ -115,6 +115,50 @@ days <- NULL
 days2 <- NULL
 
 
+
+# a_orig <- a
+
+a <- lapply(colnames(a), function(x) {
+  
+    a <- a_orig %>% pull(colnames(a_orig[1]))
+    
+    log_fit_sample <- function(x) {
+      
+      fit_value <- dlnorm(x, meanlog = a[1], sdlog = a[2])
+      
+      # make sure R does not convert to 0 if result is very small number
+      ifelse( abs(fit_value) > .Machine$double.xmin,
+              fit_value,
+              .Machine$double.xmin)
+    }           
+    
+    # find kld from two continuous functions
+    # bounded from 0 to Inf
+    kld_fit <- function(x) {
+      
+      fit_ratio_value <- (log_fit_sample(x))/(log_fit_entire(x))
+      
+      # make sure R does not convert to 0 if result is very small number
+      fit_ratio_value <- ifelse( abs(fit_ratio_value) > .Machine$double.xmin,
+                                 fit_ratio_value,
+                                 .Machine$double.xmin)
+      
+      log_fit_sample(x)*log(fit_ratio_value)
+    }
+    
+    # find kld value
+    return(integrate(kld_fit, lower = 0, upper = Inf,
+                     stop.on.error = FALSE)$value) # fails because of low values?
+    
+  }) 
+
+integrate(kld_fit, lower = 0.0000000001, upper = Inf,
+                     stop.on.error = FALSE)$value
+integrate(kld_fit, lower = .Machine$double.xmin, upper = Inf)$value
+pm_vals <- seq(0.)
+ggplot(kld_fit())
+
+all_data
 # entropy function minutely data ----------------------------
 
 # function to calculate scaled entropy for a house
@@ -162,7 +206,7 @@ scaled.entropy.month <- function(monitor_period) {
     
  # make column of specified metric for one home, one room
 all_data <- data %>%
-  filter(home == home_num, location == location_type) %>%
+  filter(home == home_num & location == location_type) %>%
   dplyr::select(c(datetime, all_of(metric)))%>%
   # choose long-term monitoring date range
   filter(
