@@ -81,6 +81,19 @@ ggdensity(data %>%
 a <- '2020-12-01'
 b <- '2020-12-31'
 
+# define variables for testing
+date_ranges_entire <- list(c('2020-12-01','2020-12-31'),
+                           c('2020-11-01', '2020-11-30'))
+tested_sample_sequence <- sequence
+sample_days_min <- 3
+home_num <- '009'
+location_type <- 'living'
+data <- omni_daily_data
+monitor_period <- date_ranges_entire[1]
+metric <- 'pm25'
+
+days <- 4
+
 
 
 # function to calculate scaled entropy for a house
@@ -94,7 +107,7 @@ scaled.entropy.table.shape <- function(home_num, metric,
  date_ranges_entire = NULL,
 tested_sample_sequence, # sequence of tested short sampling period lengths (in days)
 sample_days_min = 1, # amount of days in shortest theoretical sample
-room_type = 'living',
+location_type = 'living',
 data = omni_daily_data) {
   
 
@@ -112,21 +125,22 @@ scaled.entropy.month <- function(monitor_period) {
                              as.Date(monitor_period[2]))
 
     # warn that times will be rounded to full day for entire monitoring period
-    if(0 %in% c(
+    if(any(
+      c(
       second(as.POSIXct(monitor_period[1])),
        minute(as.POSIXct(monitor_period[1])),
        hour(as.POSIXct(monitor_period[1])),
        
        second(as.POSIXct(monitor_period[2])),
        minute(as.POSIXct(monitor_period[2])),
-       hour(as.POSIXct(monitor_period[2])))
-      ) stop('Times cannot be specifed in date range endpoints.')
+       hour(as.POSIXct(monitor_period[2]))) > 0
+      )) stop('Times cannot be specifed in date range endpoints.')
 
     
  # make column of specified metric for one home, one room
 all_data <- data %>%
-  filter(home == home_num, room == room_type) %>%
-  dplyr::select(c(date, all_of(metric)))%>%
+  filter(home == home_num, location == location_type) %>%
+  dplyr::select(c(dateday, all_of(metric)))%>%
   # choose long-term monitoring date range
   filter(
     dateday >= ymd(monitor_period[1]) &
@@ -135,21 +149,15 @@ all_data <- data %>%
 
  
   
-# make a vector of days in all_data
+# make a vector of dates when value was recorded
 date_col <- all_data$dateday
 
 
 # make column of all dates within range
 
-    all_dates <- seq.POSIXt(from = floor_date(
-    as.POSIXct( monitor_period[1],
-                tz = 'UTC'), unit = 'day'),
-    # round up to next day for the end date
-                    to = ceiling_date(
-                      as.POSIXct( monitor_period[2],
-                                  tz = 'UTC')+1,
-                      unit = 'day')-1, # then omit the start of the next day
-                    by = 60*15)
+    all_dates <- seq.POSIXt(from = as.POSIXct( monitor_period[1], tz = 'UTC'),
+                    to =  as.POSIXct( monitor_period[2], tz = 'UTC'), 
+                by = 'day')
   
 
 
@@ -160,8 +168,8 @@ date_col <- all_data$dateday
 longterm_data_avail <- length(date_col)/length(all_dates)
          
 if(longterm_data_avail < 0.75) stop(paste('missing ',
-                                          ((1-longterm_data_avail)*100),
-                                          '% of 15-min data in long monitoring period'))
+                                          signif((1-longterm_data_avail)*100, 2),
+                                          '% of daily data in long monitoring period'))
 
 
 # make a fitted distribution for data assuming log-normal distribution
@@ -176,17 +184,23 @@ entire_fit <- fitdistrplus::fitdist(pull(entire, metric),
 # calculated in the fitted curve
 # note that meanlog and sdlog in dlnorm correspond to the mean and sd,
 # so you do not have to take log of them yourself
-log_fit_entire <- function(x) dlnorm(x, meanlog = entire_fit$estimate['meanlog'],
-                                     sdlog = entire_fit$estimate['sdlog'])
 
 
+log_fit_entire <- function(x) {
+  
+  fit_value <- dlnorm(x, meanlog = entire_fit$estimate['meanlog'],
+                      sdlog = entire_fit$estimate['sdlog'])
+  
+  # make sure R does not convert to 0 if result is very small number
+  ifelse( abs(fit_value) > .Machine$double.xmin,
+          fit_value,
+          .Machine$double.xmin)
+}
 
 
 # function to take a running window of all short sampling periods possible
 # within the longer montirong period,
-# find the hour-of-day averages for each short sampling period,
-# and return a dataframe with the results for each sampling period
-# in its own column 
+
 
 # NOTES:
 ## will stop if there are less than 24 hour-of-day averages in a given
@@ -199,23 +213,23 @@ kld.avg <- function(days) { # days = number of days in short samping period
 
    a <- 
     runner(all_dates,
-       k = days*24*4, # number of 15 min-periods in short sampling period
-       # only evaluate windows at end of day timestamp
-       at = seq(days*24*4, length(all_dates), 24*4),
-       f = function(y) { # y = vector of specified days (length = k) of day_col per iteration
+       k = days, # number of days in short sampling period
+       # only evaluate windows that are full
+       # (ignore partial windows at start)
+       at = seq(days, length(all_dates), 1),
+       f = function(y) { # y = window, vector (length = k) of specified days per iteration
          
          sample <- all_data %>%
 
-# filter out only the amount of days specified by k
-           # from the all_dates col
-           filter(date %in% y)
+# filter out only the days specified by the days in window y
+           filter(dateday %in% y)
          
          
 
 
          # omit sampling period if missing more than
          # 25 % of sampling period
-         if(nrow(sample) < 0.75 * 4 * 24 * days) { 
+         if(nrow(sample) < 0.75 * days) { 
            
            a <- rep(NA, 2) %>% as.integer()
 
@@ -226,8 +240,9 @@ kld.avg <- function(days) { # days = number of days in short samping period
            
            # fit a lognormal distribution to sample and extract
            # logmean and logsd values
-         sample_fit <- fitdistrplus::fitdist(pull(sample, metric), "lnorm", method = 'mle') %>%
-           suppressWarnings()
+         sample_fit <- fitdistrplus::fitdist(pull(sample, metric),
+                                             "lnorm", method = 'mle') %>%
+           suppressWarnings() # warnings not a problem in this case
          
          a <- c(sample_fit$estimate['meanlog'], sample_fit$estimate['sdlog'])
 
@@ -270,12 +285,29 @@ a <- lapply(colnames(a), function(x) {
   
     a <- a %>% pull(x)
     
-    log_fit_sample <- function(x) dlnorm(x, meanlog = a[1],
-                                         sdlog = a[2])              
+    log_fit_sample <- function(x) {
+      
+      fit_value <- dlnorm(x, meanlog = a[1], sdlog = a[2])
+      
+      # make sure R does not convert to 0 if result is very small number
+      ifelse( abs(fit_value) > .Machine$double.xmin,
+              fit_value,
+              .Machine$double.xmin)
+    }           
     
     # find kld from two continuous functions
     # bounded from 0 to Inf
-    kld_fit <- function(x) log_fit_sample(x)*log((log_fit_sample(x))/(log_fit_entire(x)))
+    kld_fit <- function(x) {
+      
+      fit_ratio_value <- (log_fit_sample(x))/(log_fit_entire(x))
+      
+      # make sure R does not convert to 0 if result is very small number
+      fit_ratio_value <- ifelse( abs(fit_ratio_value) > .Machine$double.xmin,
+                                 fit_ratio_value,
+                                 .Machine$double.xmin)
+      
+      log_fit_sample(x)*log(fit_ratio_value)
+    }
     
     # find kld value
     return(integrate(kld_fit, lower = 0, upper = Inf)$value)
