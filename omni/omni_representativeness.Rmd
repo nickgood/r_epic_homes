@@ -474,113 +474,6 @@ end <- Sys.time()
 run2 <- end- start
 
 
-# data making functions for shape distributions-----------------------------
-
-
-
-# # make dataframes and name in form: "home_009_pm25"
-# # so they can be saved separately and then joined
-# make.data.shape <- function(hm, metric, month,
-#                       tested_sample_sequence) {
-#   
-#   tryCatch(scaled.entropy.table.shape(hm, metric,
-#                                 months_entire = month,
-#                                 tested_sample_sequence = tested_sample_sequence),
-#          error = function(e) NULL)
-#   
-# }
-
-
-
-# make dataframes and name in form: "home_009_pm25"
-# so they can be saved separately and then joined
-# for date ranges
-make.data.range.shape <- function(hm, metric, ranges,
-                      tested_sample_sequence) {
-  tryCatch(scaled.entropy.table.shape(hm, metric,
-                                date_ranges_entire = ranges,
-                                tested_sample_sequence = tested_sample_sequence),
-         error = function(e) NULL)
-
-}
-
-a <- lapply(home.list(1:11), make.data.range.shape,
-       metric = 'pm25', ranges = dates, tested_sample_sequence = c(4,5,6))
-
-  b <- scaled.entropy.table.shape(home_num = '003',
-                           metric = 'pm25',
-                        date_ranges_entire = dates,
-                            tested_sample_sequence = c(4,5,6))
-
-a <- make.data.range.shape('009', 'pm25', dates, c(4,5,6))
-
-make.data.range.shape <- function(hm, metric, ranges,
-                      tested_sample_sequence) {
-  
-  a <- lapply(ranges, function(x_range) {
-         
-     tryCatch(scaled.entropy.table.shape(home_num = hm,
-                                         metric = metric,
-                                date_ranges_entire = x_range,
-                                tested_sample_sequence = tested_sample_sequence),
-         error = function(e) NULL)
-  }
-  ) %>%
-    bind_rows()
-  
-  # make a variable name for this data
-  assign(paste('home', hm, metric, sep = '_'),
-         a,
-         envir = .GlobalEnv)
-
-}
-
-dates <- list(c('2020-12-01','2020-12-31'))
-
-  a2 <- lapply(dates, scaled.entropy.table.shape,
-              home_num = '008',
-              data = omni_data,
-                                         metric = 'pm25',
-                                tested_sample_sequence = c(4,5,6),
-                                         sample_days_min = 1,
-                                         location_type = 'living'
-  )
-
-
-
-
-make.data.range.shape('008', 'pm25', dates,
-                      sequence)
-
-#apply this data-making function to all homes
-rep.data.shape <- function (hms, metric, ranges,
-                      tested_sample_sequence = c(1:28)
-                      ) {
-  
-  a <- lapply(
-  # loop through for homes
-  hms,
-               # loop through for date ranges
-               function(hm) {
-                 lapply(ranges,
-                      make.data.range.shape,
-                      hm = hm,
-                      metric = metric,
-                      tested_sample_sequence = tested_sample_sequence
-                      )
-                 })
-  # remove one level of lists
-  b <- flatten(a)
-# combine all lists into a dataframe
-c <- do.call(rbind, b)
-
-assign(paste('home', hm, metric, sep = '_'),
-         c,
-         envir = .GlobalEnv)
-
-}
-
-
 ```
 
 
@@ -1585,172 +1478,38 @@ pdf_days <- c(3,7,10,14,21)
 ## Distribution Shape: Assume Log-normal distribution
 
 
-```{r shape_data_maker, eval= FALSE}
-
-
-met <- 'pm25'
-
-
-# pm25_ihs--------------------------------------
-
-# testing time
-
-# start <- Sys.time()
-# rep.data.shape('003', met, 12,
-#                tested_sample_sequence = samp_seq,
-#                n_bins = 15)
-# end <- Sys.time()
-# 
-# time <- end-start
-# 
-# dat15 <- home_003_pm25_ihs
-# 
-# dat15 <- dat15 %>%
-#   mutate(n_bins = 15)
-
-# dat_test <- rbind(dat5, dat10, dat15, dat25, dat35, dat50)
-
-
-rep.data.shape('001', met, month_seq,
-               tested_sample_sequence = samp_seq)
-
-rep.data.shape('002', met, month_seq,
-               tested_sample_sequence = samp_seq)
-rep.data.shape('003', met, month_seq, 
-               tested_sample_sequence = samp_seq)
-rep.data.shape('004', met, month_seq, 
-               tested_sample_sequence = samp_seq)
-rep.data.shape('005', met, month_seq, 
-               tested_sample_sequence = samp_seq)
-rep.data.shape('006', met, month_seq, 
-               tested_sample_sequence = samp_seq)
-rep.data.shape('007', met, month_seq, 
-               tested_sample_sequence = samp_seq)
-rep.data.shape('008', met, month_seq, 
-               tested_sample_sequence = samp_seq)
-rep.data.shape('009', met, month_seq, 
-               tested_sample_sequence = samp_seq)
-rep.data.shape('010', met, month_seq, 
-               tested_sample_sequence = samp_seq)
-rep.data.shape('011', met, month_seq, 
-               tested_sample_sequence = samp_seq)
-rep.data.shape('012', met, month_seq, 
-               tested_sample_sequence = samp_seq)
-rep.data.shape('013', met, month_seq, 
-               tested_sample_sequence = samp_seq)
-rep.data.shape('014', met, month_seq, 
-               tested_sample_sequence = samp_seq)
-rep.data.shape('015', met, month_seq, 
-               tested_sample_sequence = samp_seq)
-rep.data.shape('016', met, month_seq, 
-               tested_sample_sequence = samp_seq)
-
-
-
-
-# make a list of all file names
-all_files <- lapply(
-  # loop through for homes
-  all_homes,
-  file.name,
-  metric = met) %>%
-unlist()
-
-# make a list of all dataframes
-home_data_list <- lapply(all_files,
-                        function(x) tryCatch(get(x),
-                                             error = function(e){
-                                               NULL
-                                               }
-                                             ))
-
-#combine into one dataframe
-home_data <- do.call(rbind, home_data_list)
-
-write_csv(home_data, file =
-            paste0('./representativeness_data/rep_data_shape_', met, '_', Sys.Date(), '.csv'))
-
-
-# read in csv file
-entropy_pm25_shape <- read_csv(file = './representativeness_data/rep_data_shape_pm25_ihs.csv')
-
-
-
-
-
-
-
-# for one home:
-a <- entropy_pm25_shape %>%
-  filter(home == '003')
-
-# plot results
-ggplot(aes(x = sample_length, y = coeff, color = monitor_period), data = a)+
-  geom_line()+
-  geom_point(size = 1)+
-  xlab('Sample Length, days')+
-  ylab('Scaled Relative Entropy')+
-  geom_hline(yintercept=0.1, linetype="dashed", 
-                color = "black", size=0.5)+
-  coord_cartesian(ylim = c(0,0.5))
-
-
-
-
-
-```
 
 ```{r shape_data_maker_range, eval = FALSE}
 
+
+
+
+met <- 'pm25'
+cluster <- 'heat'
+
+# test function for multiple homes
+a <- lapply(home.list(6:8), function(x) {
+            
+  a <- tryCatch(scaled.entropy.table.shape(x, metric = met,
+                                date_ranges_entire = list(c('2020-12-01','2020-12-31')),
+                                tested_sample_sequence = c(4,5,6)),
+         error = function(e) NULL)
+  
+# # give a variable name to the created data
+# assign(paste('home', x, met, sep = '_'),
+#          a,
+#          envir = .GlobalEnv)
+  a
+  }
+         ) %>%
+  bind_rows()
 
 # Notes on run time:
 # if doing 2 seasons
 # takes about 1.4 minutes per sample_length per home (assume 2 if full season)
 
 
-# pm25_ihs--------------------------------------
 
-
-met <- 'pm25_ihs'
-
-home1 <- make.data.range.shape('001', met, season_list, sequence)
-home2 <- make.data.range.shape('002', met, season_list, sequence)
-
-start <- Sys.time()
-home3 <- make.data.range.shape('003', met, season_list, sequence)
-end <- Sys.time()
-time <- end-start
-
-home4 <- make.data.range.shape('004', met, season_list, sequence)
-home5 <- make.data.range.shape('005', met, season_list, sequence)
-home6 <- make.data.range.shape('006', met, season_list, sequence)
-home7 <- make.data.range.shape('007', met, season_list, sequence)
-home8 <- make.data.range.shape('008', met, season_list, sequence)
-home9 <- make.data.range.shape('009', met, season_list, sequence)
-home10 <- make.data.range.shape('010', met, season_list, sequence)
-home11 <- make.data.range.shape('011', met, season_list, sequence)
-home12 <- make.data.range.shape('012', met, season_list, sequence)
-home13 <- make.data.range.shape('013', met, season_list, sequence)
-home14 <- make.data.range.shape('014', met, season_list, sequence)
-home15 <- make.data.range.shape('015', met, season_list, sequence)
-home16 <- make.data.range.shape('016', met, season_list, sequence)
-
-
-# make a list of all dataframes
-home_data_list <- lapply(c(1:16),
-                        function(x) tryCatch(get(paste0('home', x)),
-                                             error = function(e){
-                                               NULL
-                                               }
-                                             ))
-
-
-#combine into one dataframe
-home_data <- do.call(rbind, home_data_list)
-
-
-# to combine new data with old data
-# home_data <- do.call(home_data, entropy_season_pm25)
 
 
 # make csv of all season data
@@ -1760,7 +1519,7 @@ write_csv(home_data, file =
 
 
 # read in csv file
-entropy_shape_season_pm25 <- read_csv(file = './representativeness_data/rep_data_shape_season_pm25_ihs.csv')
+entropy_shape_season_pm25 <- read_csv(file = './representativeness_data/rep_data_shape_season_pm25.csv')
 
 
 # # for binding new rows to old rows
