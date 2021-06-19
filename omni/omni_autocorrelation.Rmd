@@ -32,11 +32,9 @@ library(ggpubr) # for making time series plot grids (with common legends)
 
 ```{r data_import}
 
-export_date <- '2021-06-07'
-
 ##Import CSV with Real Time Data
-omni_data<- read_csv(paste0('../output/omni_clean/',
-                         'omni_all_locations_', export_date, '.csv'))
+omni_data<- read_csv(paste0('./csv_created/',
+                         'omni_all_locations.csv'))
 
 
 ```
@@ -193,9 +191,19 @@ omni_daily_data_complete <- omni_data %>%
 ```{r add_clusters, eval = FALSE}
 
 # classify homes into "types" based on cluster pattern
-homes_tier3<-home.list(c(1,2,7,9,12)) # ac-shoulder-heat
-homes_tier2<-home.list(c(4,10,11,13,15)) # shoulder-heat (sometimes second shoulder)
-homes_tier1<-home.list(c(6,8,14))
+# and add home types to data
+
+home_type_df <- read_csv('../sense/csv_created_sense/home_type_df.csv')
+
+homes_tier3<-home_type_df %>% filter(home_type == 'tier3') %>%
+  pull(home) # ac-shoulder-heat
+
+homes_tier2<-home_type_df %>% filter(home_type == 'tier2') %>%
+  pull(home) # shoulder-heat (sometimes second shoulder)
+
+homes_tier1<-home_type_df %>% filter(home_type == 'tier1') %>%
+  pull(home)
+
 
 omni_daily_data_complete<- omni_daily_data_complete %>%
   mutate(home_type = case_when(
@@ -204,37 +212,11 @@ omni_daily_data_complete<- omni_daily_data_complete %>%
     home %in% homes_tier1 ~ 'tier1',
     TRUE ~ 'unclassified'))
 
-energy_cluster_df<- tribble(~home, ~cluster_type,
-                            ~start_date, ~end_date,
-                     '001', 'ac', '2020-08-01', '2020-10-01',
-                     '001', 'shoulder', '2020-10-02', '2020-12-02',
-                     '001', 'heat', '2020-12-03', '2021-05-23',
-                     '002', 'ac', '2020-08-01', '2020-08-27',
-                     '002', 'shoulder', '2020-08-28', '2020-10-07',
-                     '002', 'heat', '2020-10-08', '2021-05-23',
-                     '004', 'shoulder', '2020-08-10', '2020-10-12',
-                     '004', 'heat', '2020-10-13', '2021-05-23',
-                     '007', 'ac', '2020-08-01', '2020-09-04',
-                     '007', 'shoulder', '2020-09-05', '2020-10-12',
-                     '007', 'heat', '2020-10-13', '2021-05-23',
-                     '009', 'ac', '2020-08-01', '2020-09-23',
-                     '009', 'shoulder', '2020-09-24', '2020-10-31',
-                     '009', 'heat', '2020-11-01', '2021-05-23',                     
-                     '010', 'heat', '2020-12-02', '2021-05-23',
-                     '011', 'shoulder', '2020-08-01', '2020-12-01',
-                     '011', 'heat', '2020-12-02', '2021-05-23',
-                     '012', 'ac', '2020-08-01', '2020-09-26',
-                     '012', 'shoulder', '2020-09-27', '2020-11-07',
-                     '012', 'heat', '2020-11-08', '2021-05-23',
-                     '013', 'shoulder', '2020-08-01', '2020-11-07',
-                     '013', 'heat', '2020-11-08', '2021-03-31',
-                     '013', 'shoulder_2', '2021-04-01', '2021-05-23',
-                     '015', 'shoulder', '2020-08-01', '2020-11-23',
-                     '015', 'heat', '2020-11-24', '2021-03-28',
-                     '015', 'shoulder_2', '2021-03-29', '2021-05-23',
-) %>%
-  mutate(across(start_date, ymd), across(end_date, ymd))
 
+
+# add date range clusters to data
+
+energy_cluster_df <- read_csv('../sense/csv_created_sense/energy_cluster_df.csv')
 
 ############# using for loop
 
