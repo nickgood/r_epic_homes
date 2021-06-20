@@ -138,7 +138,7 @@ days2 <- NULL
 # during multiple different time periods
 scaled.entropy.table.shape <- function(home_num, metric,
 
-# date range of entire monitoring period (if not month)
+# date range of entire monitoring period
 # in the form: list(
 #                    c('YYYY-MM-DD', 'YYYY-MM-DD'),
 #                    c('YYYY-MM-DD', 'YYYY-MM-DD')
@@ -472,6 +472,8 @@ test<- scaled.entropy.table.shape('007', 'pm25',
 
 end <- Sys.time()
 run2 <- end- start
+
+
 
 
 ```
@@ -1481,18 +1483,38 @@ pdf_days <- c(3,7,10,14,21)
 
 ```{r shape_data_maker_range, eval = FALSE}
 
-
-
+energy_cluster_df <- read_csv('../sense/csv_created_sense/energy_cluster_df.csv')
 
 met <- 'pm25'
-cluster <- 'heat'
+clust <- 'heat'
 
-# test function for multiple homes
-a <- lapply(home.list(6:8), function(x) {
+
+# make functions to look up starting and ending date of
+# energy cluster period based on home
+ pick.start <- function(x_home, x_cluster) {
+   energy_cluster_df %>%
+   filter(home == x_home & cluster_type == x_cluster) %>%
+   pull(start_date) %>% as.character()
+ }
+ 
+  pick.end <- function(x_home, x_cluster) {
+   energy_cluster_df %>%
+   filter(home == x_home & cluster_type == x_cluster) %>%
+   pull(end_date) %>% as.character()
+  }
+  
+ #  # test functions
+ # pick.start('009', 'heat')
+ #  pick.end('009', 'heat')
+
+   # test function for multiple homes
+a <- lapply(home.list(6:8), function(x_home) {
             
-  a <- tryCatch(scaled.entropy.table.shape(x, metric = met,
-                                date_ranges_entire = list(c('2020-12-01','2020-12-31')),
-                                tested_sample_sequence = c(4,5,6)),
+  a <- tryCatch(scaled.entropy.table.shape(x_home, metric = met,
+                                date_ranges_entire = list(c(pick.start(x_home, clust),
+                                                            pick.end(x_home, clust))),
+                                tested_sample_sequence = c(4,5,6)) %>%
+                  mutate(energy_cluster = clust),
          error = function(e) NULL)
   
 # # give a variable name to the created data
@@ -1503,6 +1525,11 @@ a <- lapply(home.list(6:8), function(x) {
   }
          ) %>%
   bind_rows()
+  
+  
+
+
+
 
 # Notes on run time:
 # if doing 2 seasons
