@@ -151,6 +151,7 @@ tested_sample_sequence, # sequence of tested short sampling period lengths (in d
 location_type, # sensor location (living, bedroom, or kitchen)
 all_time = FALSE, # if TRUE, compare each short sampling period to entire monitoring year of home
 sample_days_min, # amount of days in shortest theoretical sample
+
 data = omni_data) {
 
 if(metric %in% c('pm25', 'voc')) {
@@ -1547,6 +1548,7 @@ lag_summary_df <- read_csv('./csv_created/lag_summary.csv')
   # pick.start('004', 'heat')
   # pick.end('004', 'heat')
 
+
   all_time_choice <- TRUE
   clust <- 'heat'
   
@@ -1605,7 +1607,7 @@ a <- lapply('004', function(x_home) {
                                   sample_days_min = sample_min,
                                   all_time = all_time_choice) %>%
     mutate(energy_cluster = clust)
-  
+
   a
 }
 ) %>%
