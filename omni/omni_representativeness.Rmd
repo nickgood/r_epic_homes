@@ -28,7 +28,7 @@ library(lubridate)
 library(gridExtra)
 library(runner) # for moving window functions
 library(ggpubr) # for tesing log-normality
-library(cubature) # for integrating kld function
+# library(cubature) # for alternative method of integrating kld function
 # library(entropy) # for KLD function
 # library(fitdistrplus) # for fitting distribution to data NOTE, MASS::select CONFLICTS WITH dplyr::select
 
@@ -246,7 +246,7 @@ date_col_season <- data_season$datetime
 season_data_avail <- length(date_col_season)/length(all_dates_season)
 
 # stop if missing 25% of data in season
-if(season_data_avail < 0.75) stop(paste('missing ',
+if(season_data_avail < 0.75) stop(paste(location_type,home_num, ' missing ',
                                           signif((1-season_data_avail)*100, 2),
                                           '% of daily data in season,',
                                           period_label))
@@ -254,7 +254,7 @@ if(season_data_avail < 0.75) stop(paste('missing ',
 if(all_time == TRUE) {
 
   # stop if missing 25% of data in year
-if(year_data_avail < 0.75) stop(paste('missing ',
+if(year_data_avail < 0.75) stop(paste(location_type,home_num, ' missing ',
                                           signif((1-year_data_avail)*100, 2),
                                           '% of daily data in entire monitor period'))
   
@@ -3622,13 +3622,18 @@ scaled.entropy.table.shape <- function(home_num, metric,
       # ggplot()+
       #   geom_boxplot(aes(y = test_samples[[sample_number]] %>% log()))
 
-      # look at samples vs fitted log distribution
+      # look at samples vs fitted log distribution and dist for entire period
       ggplot()+
-        geom_line(aes(x = x_vals, y = log_fit_sample(sample_number, x_vals)))+
+        geom_line(aes(x = x_vals, y = log_fit_sample(sample_number, x_vals)),
+                  color = 'black')+
+        geom_line(aes(x = x_vals, y = log_fit_entire( x_vals)),
+                  color = 'red')+
       geom_histogram(aes(x = test_samples[[sample_number]],
                          y = ..density..),
-                     binwidth = 0.5, alpha = 0.6)+
+                     binwidth = 0.5, alpha = 0.6, color = 'grey')+
         coord_cartesian(xlim = c(0, 12))
+      
+      
 
       # apply shapiro test to logged values and
       # see if samples are considered normal      
@@ -3644,9 +3649,11 @@ scaled.entropy.table.shape <- function(home_num, metric,
         geom_line(aes(x = x_vals, y = kld_fit(sample_number, x_vals)))
       
       # check that the sample can be integrated
-      integrate(kld_fit, lower = 0, upper = Inf, samp_num = sample_number,
-                rel.tol = 1e-15)$value
+      integrate(kld_fit, lower = 0, upper = Inf, samp_num = sample_number)$value
       
+      # # different integration method, works near zero, but much slower
+      # cubintegrate(kld_fit, lower = 0, upper = Inf, method = "pcubature", 
+      #              samp_num = sample_number)
 
       
       
