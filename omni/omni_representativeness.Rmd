@@ -1528,6 +1528,10 @@ energy_cluster_df <- read_csv('../sense/csv_created_sense/energy_cluster_df.csv'
    pull(end_date) %>% as.character()
   }
   
+  pick.sample.min <- function(x_home) {
+    
+  }
+  
  #  # test functions
  # pick.start('009', 'heat')
  #  pick.end('009', 'heat')
