@@ -97,6 +97,18 @@ ggdensity(data %>%
           xlab = metric)
 }
 
+# give a row of NA values with identifers to help with identifying
+# causes of errors in function
+na.result <- function(sample_length, season, sample_available) {
+  tibble(
+  'coeff' = NA,
+  'high_val' = NA,
+  'low_val' = NA,
+  'sample_length' = sample_length,
+  'monitor_season' = period_label,
+  'n_samp_avail' = sample_available # amount of samples with sufficient data
+)
+}
 ```
 
 ```{r functions_shape}
@@ -161,6 +173,7 @@ if(metric %in% c('pm25', 'voc')) {
     pull(all_of(metric))%>%
     min()
 }
+
 
   # function to find scaled_entropy for samples in a given monitor season
 
