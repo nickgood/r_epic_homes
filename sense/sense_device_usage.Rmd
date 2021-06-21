@@ -1361,4 +1361,5 @@ write_csv(home_type_df, './csv_created_sense/home_type_df.csv')
 
 
 
+
 ```
