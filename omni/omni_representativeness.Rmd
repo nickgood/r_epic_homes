@@ -477,6 +477,8 @@ run2 <- end- start
 
 
 
+
+
 # entropy function test --------------------
 # function to calculate scaled entropy for a house
 # during multiple different time periods
@@ -549,11 +551,11 @@ date_col_year <- data_year$datetime
 
 # make column of all dates (increments of 5 min) within year
 
-    all_dates_year <- seq.POSIXt(from = as.POSIXct( monitor_season[1], tz = 'UTC'),
+    all_dates_year <- seq.POSIXt(
+      from = as.POSIXct( data_year%>%pull(datetime) %>% min(), tz = 'UTC'),
 
-                    to =  floor_date(as.POSIXct( monitor_season[2],
-                                                 tz = 'UTC')+24*60*60-1,
-                                     unit = '5 min'),
+                    to =  as.POSIXct( data_year%>%pull(datetime) %>% max(),
+                                                 tz = 'UTC'),
                 by = '5 min')
     
     #calculate missingness of data in year
@@ -576,7 +578,6 @@ date_col_season <- data_season$datetime
 
 
 # make column of all dates (increments of 5 min) within season
-
     all_dates_season <- seq.POSIXt(from = as.POSIXct( monitor_season[1], tz = 'UTC'),
                     to =  floor_date(as.POSIXct( monitor_season[2],
                                                  tz = 'UTC')+24*60*60-1,
@@ -587,30 +588,26 @@ date_col_season <- data_season$datetime
 # calculate missingness of data points in the season
 season_data_avail <- length(date_col_season)/length(all_dates_season)
 
-
+# stop if missing 25% of data in season
 if(season_data_avail < 0.75) stop(paste('missing ',
                                           signif((1-season_data_avail)*100, 2),
                                           '% of daily data in season,',
                                           period_label))
 
-
-
 if(all_time == TRUE) {
 
-
-
+  # stop if missing 25% of data in year
 if(year_data_avail < 0.75) stop(paste('missing ',
                                           signif((1-year_data_avail)*100, 2),
                                           '% of daily data in entire monitor period'))
   
-    # make a fitted distribution for data assuming log-normal distribution
-
     entire <- data_year
     
 } else { 
   entire <- data_season
 }
 
+    # make a fitted distribution for data assuming log-normal distribution
 entire_fit <- fitdistrplus::fitdist(pull(entire, metric),
                                     "lnorm", method = 'mle') %>%
            suppressWarnings()
@@ -843,7 +840,7 @@ entropy_data_season  # scaled_entropy for all specified date ranges
 # test function--------------------------
 start <- Sys.time()
 
-test<- scaled.entropy.table.shape('008', 'pm25',
+test<- scaled.entropy.table.shape('001', 'pm25',
                            date_ranges_entire = list(c('2020-12-01', '2020-12-31'),
                                                      c('2020-11-01', '2020-11-30')),
                            tested_sample_sequence = c(4,5,6),
