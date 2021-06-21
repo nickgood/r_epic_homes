@@ -35,18 +35,18 @@ library(ggpubr) # for tesing log-normality
 
 
 ```{r import_omni_daily_data}
-omni_daily_data<- read_csv('./csv_created/omni_daily_data.csv')
+# omni_daily_data<- read_csv('./csv_created/omni_daily_data.csv')
 
 ```
 
 ```{r import_omni_hourly_data}
-omni_hourly_data<- read_csv('./csv_created/omni_hourly_data.csv')
-
-zero_test <- omni_hourly_data %>%
-  group_by(home, location) %>%
-  summarize(pm25_zeros = sum(pm25 == 0), pm25_n = n()) %>%
-  mutate(pm25_zero_pct = pm25_zeros/pm25_n*100)
-  ungroup()
+# omni_hourly_data<- read_csv('./csv_created/omni_hourly_data.csv')
+# 
+# zero_test <- omni_hourly_data %>%
+#   group_by(home, location) %>%
+#   summarize(pm25_zeros = sum(pm25 == 0), pm25_n = n()) %>%
+#   mutate(pm25_zero_pct = pm25_zeros/pm25_n*100)
+#   ungroup()
 ```
 
 ```{r import_omni_minute_data}
@@ -108,7 +108,7 @@ date_ranges_entire <- list(c('2020-12-01','2020-12-31'),
                            c('2020-11-01', '2020-11-30'))
 tested_sample_sequence <- sequence
 sample_days_min <- 3
-home_num <- '010'
+home_num <- '004'
 location_type <- 'living'
 data <- omni_data
 monitor_period <- date_ranges_entire[1]
@@ -146,9 +146,9 @@ scaled.entropy.table.shape <- function(home_num, metric,
 # data in start and end day included
  date_ranges_entire,
 tested_sample_sequence, # sequence of tested short sampling period lengths (in days)
+location_type, # sensor location (living, bedroom, or kitchen)
 all_time = FALSE, # if TRUE, compare each short sampling period to entire monitoring year of home
-sample_days_min = 1, # amount of days in shortest theoretical sample
-location_type = 'living',
+sample_days_min, # amount of days in shortest theoretical sample
 data = omni_data) {
 
 if(metric %in% c('pm25', 'voc')) {
@@ -455,8 +455,6 @@ a <- tibble(
   # values for confidence intervals
   'high_val' = a[['kld_avg']]/kld_avg_max+1.96*b,
     'low_val' = a[['kld_avg']]/kld_avg_max-1.96*b,
-     'home' = home_num,
-  'metric' = metric,
      'sample_length' = days2,
   'monitor_season' = period_label,
   'n_samp_avail' = a[['n_samp_avail']] # amount of samples with sufficient data
@@ -484,6 +482,9 @@ a <- lapply(date_ranges_entire, scaled.entropy.season)
 # bind all into a dataframe
 entropy_data_season <- bind_rows(a) %>%
   mutate(method = 'shape',
+              home = home_num,
+  metric = metric,
+  location = location_type,
          period_compare = if_else(all_time == TRUE, 'year', 'season'))
 
 
@@ -495,10 +496,12 @@ entropy_data_season  # scaled_entropy for all specified date ranges
 # test function--------------------------
 start <- Sys.time()
 
-test<- scaled.entropy.table.shape('001', 'pm25',
-                           date_ranges_entire = list(c('2020-12-01', '2020-12-31'),
+test<- scaled.entropy.table.shape('009', 'pm25',
+                           date_ranges_entire = list(
+                             #c('2020-12-01', '2020-12-31'),
                                                      c('2020-11-01', '2020-11-30')),
                            tested_sample_sequence = c(4,5,6),
+                           location_type = 'living',
                            all_time = TRUE)
 
 end <- Sys.time()
@@ -1540,9 +1543,6 @@ lag_summary_df <- read_csv('./csv_created/lag_summary.csv')
   }
   
 
-
-  
-
   all_time_choice <- TRUE
   clust <- 'heat'
   
@@ -1550,44 +1550,61 @@ met <- 'pm25'
 
 
 
-
-   # test function for multiple homes
-a <- lapply(homes_all, function(x_home) {
-            
+# test function for multiple homes
+a <- lapply(home.list(2:4), function(x_home) {
+  
+  start_date <- pick.start(x_home, clust)
+  end_date <- pick.end(x_home, clust)
+  sample_min <- pick.sample.min(met)
+  sample_max <- if_else(as.numeric(as.Date(end_date) - as.Date(start_date))>=28,
+                        28, as.numeric(as.Date(end_date) - as.Date(start_date)))
+  
   a <- tryCatch(scaled.entropy.table.shape(x_home, metric = met,
-                                date_ranges_entire = list(c(pick.start(x_home, clust),
-                                                            pick.end(x_home, clust))),
-                                tested_sample_sequence = c(4,5,6),
-                                sample_days_min = pick.sample.min(met),
-                                all_time = all_time_choice) %>%
+                                           date_ranges_entire = list(c(start_date,
+                                                                       end_date)),
+                                           tested_sample_sequence =
+                                             seq(sample_min,sample_max,4),
+                                           location_type = 'living',
+                                           sample_days_min = sample_min,
+                                           all_time = all_time_choice) %>%
                   mutate(energy_cluster = clust),
-         error = function(e) NULL)
-# # give a variable name to the created data
-# assign(paste('home', x, met, sep = '_'),
-#          a,
-#          envir = .GlobalEnv)
+                error = function(e) NULL)
+  # # give a variable name to the created data
+  # assign(paste('home', x, met, sep = '_'),
+  #          a,
+  #          envir = .GlobalEnv)
   a
-  }
-         ) %>%
+}
+) %>%
   bind_rows()
 
 
 
 # test without error catch---------------------------
 
-   # test function for multiple homes
-a <- lapply('001', function(x_home) {
-            
+# test function for multiple homes
+a <- lapply('004', function(x_home) {
+  
+  start_date <- pick.start(x_home, clust)
+  end_date <- pick.end(x_home, clust)
+  sample_min <- pick.sample.min(met)
+  sample_max <- if_else(as.numeric(as.Date(end_date) - as.Date(start_date))>=28,
+                        28, as.numeric(as.Date(end_date) - as.Date(start_date)))
+  
   a <- scaled.entropy.table.shape(x_home, metric = met,
-                                date_ranges_entire = list(c(pick.start(x_home, clust),
-                                                            pick.end(x_home, clust))),
-                                tested_sample_sequence = c(4,5,6),
-                                all_time = all_time_choice) %>%
-                  mutate(energy_cluster = clust)
+                                  date_ranges_entire = list(c(start_date,
+                                                              end_date)),
+                                  location_type = 'living',
+                                  
+                                  tested_sample_sequence =
+                                    seq(sample_min,sample_max,4),
+                                  sample_days_min = sample_min,
+                                  all_time = all_time_choice) %>%
+    mutate(energy_cluster = clust)
   
   a
-  }
-         ) %>%
+}
+) %>%
   bind_rows()
 
 
