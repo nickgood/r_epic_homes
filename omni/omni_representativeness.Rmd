@@ -150,6 +150,7 @@ all_time <- NULL
 # entropy function minutely data ----------------------------
 
 
+
     
 # function to calculate scaled entropy for a house
 # during multiple different time periods
@@ -194,12 +195,13 @@ scaled.entropy.table.shape <- function(home_num, metric,
       stop()
     } 
     
+
     #define label for later use in table
     period_label <- paste(as.Date(monitor_season[1]), '-',
                           as.Date(monitor_season[2]))
     
     # warn that times will be rounded to full day for entire monitoring period
-    
+
     if(
         any( c(
         second(as.POSIXct(monitor_season[1])),
@@ -585,6 +587,7 @@ scaled.entropy.table.shape <- function(home_num, metric,
 start <- Sys.time()
 
 test1<- scaled.entropy.table.shape('004', 'pm25',
+
                            date_ranges_entire = list(
                              c('2020-12-01', '2020-12-31'),
                                                      c('2020-11-01',
@@ -3241,7 +3244,8 @@ a <- expand.grid(home=unique(entropy_cutoffs$home),
 
 
 # apply function to all thresholds in threshold_seq
- a <- lapply(threshold_seq, threshold.freq.table)
+ a <- lapply(threshold_seq, threshold.freq.table.seasons)
+
  a <- do.call(rbind, a)
 
  # ensure there weren't a significant amount of omissions for any metric type
@@ -3260,73 +3264,377 @@ ggplot(aes(x = sample_length, fill = thresh), data = a)+
   scale_x_continuous(breaks = c(7,14,21,28))
 
 
-# maybe limit to Aug-Feb (7 months), 15 homes (4 metrics) for now?
-7*15
+```
 
+---
+# Testing Functions
 
-# seasons--------------------------------------------------------------
+```{r integration_and_normality}
 
-
-# make dataframe of values for minimum sample length (in days) where entropy is less than 0.1
-entropy_cutoffs <- entropy_all %>%
-  filter(n_samp_avail >0.5) %>%
-  filter(
-    monitor_period %in% month.abb
-    ) %>%
-  filter(coeff <= thershold) %>% 
-  group_by(home, metric, monitor_period) %>%
-  summarise_at(vars(sample_length), min) %>%
-  ungroup()
-
-# fill in missing combinations so bar chart will have bars of constant width
-a <- expand.grid(home=unique(entropy_cutoffs$home),
-                 metric=unique(entropy_cutoffs$metric),
-                 monitor_period=unique(entropy_cutoffs$monitor_period))%>%
-  data.frame() %>%
-  left_join(entropy_cutoffs)
-
-
-
-# bar chart of when threshold was reached for each home
-ggplot(aes(x = home, y = sample_length, fill = metric), data = a)+
-  geom_col(position = 'dodge')+
-  facet_wrap(vars(monitor_period), nrow = 2)
-
-
-
-
-
-
-
-# make dataframe of values for minimum sample length (in days)
-# where entropy is less than threshold value
-threshold.freq.table.seasons <- function (threshold) {
-  
-  
-  entropy_cutoffs <- entropy_all %>%
-  filter(n_samp_avail >0.5) %>%
-  filter(
-    monitor_period %in% month.abb
-    ) %>%
-  filter(coeff <= threshold) %>% 
-  group_by(home, metric, monitor_period) %>%
-  summarise_at(vars(sample_length), min) %>%
-  ungroup()
-    
-
-  # fill in missing combinations so bar chart will have bars of constant width
-a <- expand.grid(home=unique(entropy_cutoffs$home),
-                 metric=unique(entropy_cutoffs$metric),
-                 monitor_period=unique(entropy_cutoffs$monitor_period))%>%
-  data.frame() %>%
-  left_join(entropy_cutoffs) %>%
-# count frequency of home-month instances when threshold was reached for each sample length
-  group_by(sample_length, metric) %>%
-  summarise(freq = n()) %>%
-  ungroup() %>%
-  filter(!is.na(sample_length)) %>%
-  mutate(thresh = as.factor(threshold))
-}
+# 
+# # define variables for testing
+# date_ranges_entire <- list(c('2020-10-13','2021-04-22'))
+# tested_sample_sequence <- seq(3,28,4)
+# sample_days_min <- 3
+# home_num <- '004'
+# location_type <- 'living'
+# data <- omni_data
+# monitor_season <- date_ranges_entire[1]
+# metric <- 'pm25'
+# days <- 16
+# days2 <- 16
+# all_time <- TRUE
+# 
+# 
+# date_ranges_entire <- NULL
+# tested_sample_sequence <- NULL
+# sample_days_min <- NULL
+# home_num <- NULL
+# location_type <- NULL
+# monitor_season <- NULL
+# monitor_period <- NULL
+# metric <- NULL
+# days <- NULL
+# days2 <- NULL
+# all_time <- NULL
+# 
+# 
+# 
+# # test function --------------------------
+# scaled.entropy.table.shape <- function(home_num, metric,
+#                                        
+#                                        # date range of entire monitoring period (if not month)
+#                                        # in the form: list(
+#                                        #                    c('YYYY-MM-DD', 'YYYY-MM-DD'),
+#                                        #                    c('YYYY-MM-DD', 'YYYY-MM-DD')
+#                                        #                  )
+#                                        # data in start and end day included
+#                                        date_ranges_entire,
+#                                        tested_sample_sequence, # sequence of tested short sampling period lengths (in days)
+#                                        sample_days_min, # amount of days in shortest theoretical sample
+#                                        location_type = 'living',
+#                                        data = omni_data) {
+#   
+#   
+#   if(metric %in% c('pm25', 'voc')) {
+#     # define LOD of metric to be 1/2 minimum detected (non-zero) value
+#     LOD <- data %>%
+#       filter(!!sym(metric)!=0) %>%
+#       pull(all_of(metric))%>%
+#       min()
+#   }
+#   
+# 
+#     
+#     
+#     
+#     # must unlist the listed range that is used in lapply funnction
+#     monitor_period <- unlist(monitor_period)
+#     
+#     #define label for later use in table
+#     period_label <- paste(as.Date(monitor_period[1]), '-',
+#                           as.Date(monitor_period[2]))
+#     
+#     # warn that times will be rounded to full day for entire monitoring period
+#     if(any(
+#       c(
+#         second(as.POSIXct(monitor_period[1])),
+#         minute(as.POSIXct(monitor_period[1])),
+#         hour(as.POSIXct(monitor_period[1])),
+#         
+#         second(as.POSIXct(monitor_period[2])),
+#         minute(as.POSIXct(monitor_period[2])),
+#         hour(as.POSIXct(monitor_period[2]))) > 0
+#     )) stop('Times cannot be specifed in date range endpoints.')
+#     
+# 
+#     
+#     # make df of entire monitoring period (approx. a year) 
+#     data_year <- data %>%
+#       filter(home == home_num & location == location_type) %>%
+#       dplyr::select(c(datetime, all_of(metric)))
+#     
+#     
+#     if(metric %in% c('pm25', 'voc')) {
+#       # convert 0 values to LOD/2 in to allow for log-normal distrib. estimation
+#       data_year <- data_year %>%
+#         mutate_at(all_of(metric), function(x) ifelse(x==0, LOD/2, x))
+#     }
+#     
+#     # make a vector of dates when value was recorded in year
+#     date_col_year <- data_year$datetime
+#     
+#     
+#     
+#     # make column of all dates (increments of 5 min) within year
+#     
+#     all_dates_year <- seq.POSIXt(
+#       from = as.POSIXct( data_year%>%pull(datetime) %>% min(), tz = 'UTC'),
+#       
+#       to =  as.POSIXct( data_year%>%pull(datetime) %>% max(),
+#                         tz = 'UTC'),
+#       by = '5 min')
+#     
+#     #calculate missingness of data in year
+#     year_data_avail <- length(date_col_year)/length(all_dates_year)
+#     
+#     
+#     
+#     # make column of specified metric for one home, one room
+#     data_season <- data_year %>%
+#       # choose season date range
+#       filter(
+#         datetime >= ymd(monitor_season[1]) &
+#           datetime <= ymd(monitor_season[2])
+#       )
+#     
+#     
+#     # make a vector of dates when value was recorded
+#     date_col_season <- data_season$datetime
+#     
+#     
+#     
+#     # make column of all dates (increments of 5 min) within season
+#     all_dates_season <- seq.POSIXt(from = as.POSIXct( monitor_season[1], tz = 'UTC'),
+#                                    to =  floor_date(as.POSIXct( monitor_season[2],
+#                                                                 tz = 'UTC')+24*60*60-1,
+#                                                     unit = '5 min'),
+#                                    by = '5 min')
+#     
+#     
+#     # calculate missingness of data points in the season
+#     season_data_avail <- length(date_col_season)/length(all_dates_season)
+#     
+#     # stop if missing 25% of data in season
+#     if(season_data_avail < 0.75) stop(paste('missing ',
+#                                             signif((1-season_data_avail)*100, 2),
+#                                             '% of daily data in season,',
+#                                             period_label))
+#     
+#     if(all_time == TRUE) {
+#       
+#       # stop if missing 25% of data in year
+#       if(year_data_avail < 0.75) stop(paste('missing ',
+#                                             signif((1-year_data_avail)*100, 2),
+#                                             '% of daily data in entire monitor period'))
+#       
+#       entire <- data_year
+#       
+#     } else { 
+#       entire <- data_season
+#     }
+#     
+#     entire_fit <- fitdistrplus::fitdist(pull(entire, metric),
+#                                         "lnorm", method = 'mle') %>%
+#       suppressWarnings()
+# 
+#     
+#     # make function of continuous distribution from the parameters
+#     # calculated in the fitted curve
+#     # note that meanlog and sdlog in dlnorm correspond to the mean and sd,
+#     # so you do not have to take log of them yourself
+#     
+#     
+#     log_fit_entire <- function(x) {
+#       
+#       fit_value <- dlnorm(x, meanlog = entire_fit$estimate['meanlog'],
+#                           sdlog = entire_fit$estimate['sdlog'])
+#       
+#       # make sure R does not convert to 0 if result is very small number
+#       ifelse( abs(fit_value) > .Machine$double.xmin,
+#               fit_value,
+#               .Machine$double.xmin)
+#     }
+#     
+#     # test goodness of fit for log_normal
+#     
+# 
+#     ggplot()+
+#       geom_line(aes(x = x_vals, y = log_fit_entire(x_vals)))+
+#       geom_histogram(aes(x = entire %>% pull(metric), y = ..density..),
+#                      binwidth = 0.5, alpha = 0.6)+
+#       coord_cartesian(xlim = c(0, 10))
+#     
+#     ggqqplot(entire %>% pull(metric)%>% log())
+#     
+#     # too many points for shapiro
+#     shapiro.test(entire %>% pull(metric) %>% log())
+#     
+#     # function to take a running window of all short sampling periods possible
+#     # within the longer montirong period,
+#     
+#       # for testing
+#       # y<- all_dates_season[(158*24*12):((158+28)*24*12)]
+#       
+#       a <- 
+#         runner(all_dates_season,
+#                k = days*24*12, # number of 5-min periods in short sampling period
+#                # only evaluate windows that start at 12AM
+#                # and windows that are full (ignore partial windows at start)
+#                at = seq(days*24*12, length(all_dates_season), 24*12),
+#                f = function(y) { # y = window, vector (length = k) of specified days per iteration
+#                  
+#                  sample <- data_season %>%
+#                    
+#                    # filter out only the days specified by the days in window y
+#                    filter(datetime %in% y)
+#                  
+#                  
+#                  # omit sampling period if missing more than
+#                  # 25 % of sampling period
+#                  if(nrow(sample) < 0.75 * days*24*12) { 
+#                    
+#                    a <- list(rep(NA, 2) %>% as.integer(), NULL)
+#                    
+#                    
+#                    
+#                    # if not missing 25% of sampling period...
+#                  } else { 
+#                    
+#                    sample_vals <- pull(sample, metric)
+#                    # fit a lognormal distribution to sample and extract
+#                    # logmean and logsd values
+#                    sample_fit <- fitdistrplus::fitdist(pull(sample, metric),
+#                                                        "lnorm", method = 'mle') %>%
+#                      suppressWarnings() # warnings not a problem in this case
+#                    
+#                    a <- list( 'estimates' = c(sample_fit$estimate['meanlog'],
+#                                           sample_fit$estimate['sdlog']),
+#                              'sample' = sample_vals)
+#                    
+#                    
+#                  }
+#                  
+#                  # return values for one running window
+#  
+#                  a
+#                }
+#         )
+# 
+#       
+#       
+#       # extract paramter estimates
+#       test_estimates <- lapply(seq(1,length(a)-1, 2), function(x) {
+#         tibble( 'meanlog' = a[[x]][1],
+#                 'sdlog' = a[[x]][2])
+#       }
+#       )
+#       # remove samples that are NA
+#       test_estimates <- test_estimates[-which(sapply(test_estimates,
+#                                                     function(x) sum(is.na(x)) != 0))]
+# 
+#       
+#       
+#       # extract sample data
+#       test_samples <- lapply(seq(2,length(a), 2), function(x) a[[x]])
+#       # remove NULL samples
+#       test_samples <- test_samples[-which(sapply(test_samples, is.null))]
+#       
+#       
+#       # make function from log-fit parameters
+#       log_fit_sample <- function(samp_num, x) {
+#         
+#         fit_value <- dlnorm(x, meanlog = test_estimates[[samp_num]]%>% pull(meanlog),
+#                             sdlog = test_estimates[[samp_num]]%>% pull(sdlog))
+#         
+#         # make sure R does not convert to 0 if result is very small number
+#         ifelse( abs(fit_value) > .Machine$double.xmin,
+#                 fit_value,
+#                 .Machine$double.xmin)
+#       }
+#       
+#       # find kld from log fit functions of sample and entire period
+#       # bounded from 0 to Inf
+#       kld_fit <- function(samp_num,x) {
+#         
+#         fit_ratio_value <- (log_fit_sample(samp_num,x))/(log_fit_entire(x))
+#         
+#         # make sure R does not convert to 0 if result is very small number
+#         fit_ratio_value <- ifelse( abs(fit_ratio_value) > .Machine$double.xmin,
+#                                    fit_ratio_value,
+#                                    .Machine$double.xmin)
+#         
+#         log_fit_sample(samp_num,x)*log(fit_ratio_value)
+#       }
+#       
+#       
+#      
+# 
+#       
+#       # # check for outliers
+#       # ## with raw data
+#       # ggplot()+
+#       #   geom_boxplot(aes(y = test_samples[[sample_number]]))
+#       # 
+#       # ## with logged data
+#       # ggplot()+
+#       #   geom_boxplot(aes(y = test_samples[[sample_number]] %>% log()))
+# 
+#       # look at samples vs fitted log distribution and dist for entire period
+#       ggplot()+
+#         geom_line(aes(x = x_vals, y = log_fit_sample(sample_number, x_vals)),
+#                   color = 'black')+
+#         geom_line(aes(x = x_vals, y = log_fit_entire( x_vals)),
+#                   color = 'red')+
+#       geom_histogram(aes(x = test_samples[[sample_number]],
+#                          y = ..density..),
+#                      binwidth = 0.5, alpha = 0.6, color = 'grey')+
+#         coord_cartesian(xlim = c(0, 12))
+#       
+#       
+# 
+#       # apply shapiro test to logged values and
+#       # see if samples are considered normal      
+#       shap_test_df <- lapply(lapply(test_samples, log), 
+#                              function(x) shapiro.test(x)$p.value)
+# 
+#       x_vals <- seq(0, 20, 0.1)
+#       
+#       sample_number <- 92
+#       
+#       # check kld function
+#       ggplot()+
+#         geom_line(aes(x = x_vals, y = kld_fit(sample_number, x_vals)))
+#       
+#       # check that the sample can be integrated
+#       integrate(kld_fit, lower = 0, upper = Inf, samp_num = sample_number)$value
+#       
+#       # # different integration method, works near zero, but much slower
+#       # cubintegrate(kld_fit, lower = 0, upper = Inf, method = "pcubature", 
+#       #              samp_num = sample_number)
+# 
+#       
+#       
+#       integrate.kld <- function(x) {
+#         
+#         sapply(x, function(y) {
+#           temp <- integrate(f = kld_fit, lower = 0, samp_num = y,
+#                             upper = Inf,
+#                             rel.tol = 1e-15)
+#           temp$value
+#         }
+#         ) %>% as.data.frame() %>% rename('integral' = '.') %>%
+#           bind_cols('sample' = x) %>%
+#           pull(integral)
+#       }
+#       
+#       
+#       
+#       # test integrate function for multiple inputs
+#       int <- integrate.kld(c(1:160))
+#       
+#       
+#       ggplot(data = NULL, aes(x = x_vals))+
+#         # geom_line(aes(y = integrate.kld(x_val)))+
+#         # geom_line(aes(y = kld_fit(x_val)))+
+#         geom_line(aes(y = log_fit_sample(x_vals)))+
+#         geom_line(aes(y = log_fit_entire(x_vals)))+
+#         
+#         scale_x_log10()
+#       
+#   
+# }
+# 
 
 
 # apply function to all thresholds in threshold_seq
