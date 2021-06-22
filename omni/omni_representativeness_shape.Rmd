@@ -666,83 +666,80 @@ lag_summary_df <- read_csv('./csv_created/lag_summary.csv')
   # pick.end('004', 'heat')
 
 
-  all_time_choice <- TRUE
- 
-  # pm25------------------
-   met <- 'pm25'
- 
-   loc <- 'kitchen'
-   
-      clust <- 'heat'
+# # test function for multiple homes
+# test_kit <- lapply(homes_all, function(x_home) {
+#   
+#   start_date <- pick.start(x_home, clust)
+#   end_date <- pick.end(x_home, clust)
+#   sample_min <- pick.sample.min(met)
+#   sample_max <- if_else(as.numeric(as.Date(end_date) - as.Date(start_date))>=28,
+#                         28, as.numeric(as.Date(end_date) - as.Date(start_date)))
+#   
+#   a <- 
+#     scaled.entropy.table.shape(x_home, metric = met,
+#                                            date_ranges_entire = list(c(start_date,
+#                                                                        end_date)),
+#                                            tested_sample_sequence =
+#                                              seq(sample_min,sample_max,8),
+#                                            location_type = loc,
+#                                            sample_days_min = sample_min,
+#                                            all_time = all_time_choice) %>%
+#                   mutate(energy_cluster = clust) 
+#   
+#   # # give a variable name to the created data
+#   # assign(paste('home', x, met, sep = '_'),
+#   #          a,
+#   #          envir = .GlobalEnv)
+#   a
+# }
+# ) %>%
+#   bind_rows()
+# 
 
 
 
-
-
-# test function for multiple homes
-test_kit <- lapply(homes_all, function(x_home) {
-  
-  start_date <- pick.start(x_home, clust)
-  end_date <- pick.end(x_home, clust)
-  sample_min <- pick.sample.min(met)
-  sample_max <- if_else(as.numeric(as.Date(end_date) - as.Date(start_date))>=28,
-                        28, as.numeric(as.Date(end_date) - as.Date(start_date)))
-  
-  a <- 
-    scaled.entropy.table.shape(x_home, metric = met,
-                                           date_ranges_entire = list(c(start_date,
-                                                                       end_date)),
-                                           tested_sample_sequence =
-                                             seq(sample_min,sample_max,8),
-                                           location_type = loc,
-                                           sample_days_min = sample_min,
-                                           all_time = all_time_choice) %>%
-                  mutate(energy_cluster = clust) 
-  
-  # # give a variable name to the created data
-  # assign(paste('home', x, met, sep = '_'),
-  #          a,
-  #          envir = .GlobalEnv)
-  a
-}
-) %>%
-  bind_rows()
-
-
-
-
-      clust <- 'ac'
-
-# test function for multiple homes
-test_kit_ac <- lapply(homes_all, function(x_home) {
-  
-  start_date <- pick.start(x_home, clust)
-  end_date <- pick.end(x_home, clust)
-  sample_min <- pick.sample.min(met)
-  sample_max <- if_else(as.numeric(as.Date(end_date) - as.Date(start_date))>=28,
-                        28, as.numeric(as.Date(end_date) - as.Date(start_date)))
-  
-  a <- 
-    scaled.entropy.table.shape(x_home, metric = met,
-                                           date_ranges_entire = list(c(start_date,
-                                                                       end_date)),
-                                           tested_sample_sequence =
-                                             seq(sample_min,sample_max,8),
-                                           location_type = loc,
-                                           sample_days_min = sample_min,
-                                           all_time = all_time_choice) %>%
-                  mutate(energy_cluster = clust) 
-  
-  # # give a variable name to the created data
-  # assign(paste('home', x, met, sep = '_'),
-  #          a,
-  #          envir = .GlobalEnv)
-  a
-}
-) %>%
-  bind_rows()
 # make csvs--------------------
-
+  all_time_choice <- TRUE
+  
+  # pm25------------------
+  met <- 'pm25'
+  
+  loc <- 'kitchen'
+  clust <- 'heat'
+   
+  {   
+    start <- Sys.Date()
+   rep_data <-  lapply(homes_all, function(x_home) {
+      
+      start_date <- pick.start(x_home, clust)
+      end_date <- pick.end(x_home, clust)
+      sample_min <- pick.sample.min(met)
+      sample_max <- if_else(as.numeric(as.Date(end_date) - as.Date(start_date))>=28,
+                            28, as.numeric(as.Date(end_date) - as.Date(start_date)))
+      
+        scaled.entropy.table.shape(x_home, metric = met,
+                                   date_ranges_entire = list(c(start_date,
+                                                               end_date)),
+                                   tested_sample_sequence =
+                                     seq(sample_min,sample_max,4),
+                                   location_type = loc,
+                                   sample_days_min = sample_min,
+                                   all_time = all_time_choice) %>%
+        mutate(energy_cluster = clust) 
+          }
+    ) %>%
+      bind_rows()
+    
+    # give a variable name to the created data
+    assign(paste(met, loc, clust, 'rep_data_shape', sep = '_'),
+           rep_data,
+           envir = .GlobalEnv)
+    
+        end <- Sys.Date()
+        run <- end-start
+  }
+  
+  
 # Notes on run time:
 # if doing 2 seasons
 # takes about 1.4 minutes per sample_length per home (assume 2 if full season)
