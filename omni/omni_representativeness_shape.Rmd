@@ -120,6 +120,7 @@ season_list <- list(fall)
 
 ```{r functions_shape}
 
+
 # give a row of NA values with identifers to help with identifying
 # causes of errors in function
 na.result <- function(error, season = NA, sample_days = NA, samp_avail = NA) {
@@ -1613,6 +1614,38 @@ test_kit <- lapply(homes_all, function(x_home) {
   bind_rows()
 
 
+
+
+      clust <- 'ac'
+
+# test function for multiple homes
+test_kit_ac <- lapply(homes_all, function(x_home) {
+  
+  start_date <- pick.start(x_home, clust)
+  end_date <- pick.end(x_home, clust)
+  sample_min <- pick.sample.min(met)
+  sample_max <- if_else(as.numeric(as.Date(end_date) - as.Date(start_date))>=28,
+                        28, as.numeric(as.Date(end_date) - as.Date(start_date)))
+  
+  a <- 
+    scaled.entropy.table.shape(x_home, metric = met,
+                                           date_ranges_entire = list(c(start_date,
+                                                                       end_date)),
+                                           tested_sample_sequence =
+                                             seq(sample_min,sample_max,8),
+                                           location_type = loc,
+                                           sample_days_min = sample_min,
+                                           all_time = all_time_choice) %>%
+                  mutate(energy_cluster = clust) 
+  
+  # # give a variable name to the created data
+  # assign(paste('home', x, met, sep = '_'),
+  #          a,
+  #          envir = .GlobalEnv)
+  a
+}
+) %>%
+  bind_rows()
 # make csvs--------------------
 
 # Notes on run time:
