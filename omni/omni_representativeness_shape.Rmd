@@ -295,18 +295,7 @@ scaled.entropy.table.shape <- function(home_num, metric,
     # calculate missingness of data points in the season
     season_data_avail <- length(date_col_season)/length(all_dates_season)
     
-    # stop if missing 25% of data in season
-    if(season_data_avail < 0.75) {
-      output <<- na.result(
-        paste0('season_missing_',
-               signif((1-season_data_avail)*100, 2),
-               '%'),
-        period_label
-      )
-      stop()
-    }
 
-    
     if(all_time == TRUE) {
       
       # stop if missing 25% of data in year
@@ -323,6 +312,18 @@ scaled.entropy.table.shape <- function(home_num, metric,
       entire <- data_year
       
     } else { 
+      
+          # stop if missing 25% of data in season
+    if(season_data_avail < 0.75) {
+      output <<- na.result(
+        paste0('season_missing_',
+               signif((1-season_data_avail)*100, 2),
+               '%'),
+        period_label
+      )
+      stop()
+    }
+      
       entire <- data_season
     }
     
@@ -704,11 +705,11 @@ lag_summary_df <- read_csv('./csv_created/lag_summary.csv')
   # pm25------------------
   met <- 'pm25'
   
-  loc <- 'kitchen'
+  loc <- 'bedroom'
   clust <- 'heat'
    
+      start <- Sys.Date()
   {   
-    start <- Sys.Date()
    rep_data <-  lapply(homes_all, function(x_home) {
       
       start_date <- pick.start(x_home, clust)
@@ -734,12 +735,11 @@ lag_summary_df <- read_csv('./csv_created/lag_summary.csv')
     assign(paste(met, loc, clust, 'rep_data_shape', sep = '_'),
            rep_data,
            envir = .GlobalEnv)
-    
+      }
         end <- Sys.Date()
-        run <- end-start
-  }
-  
-  
+        run <- end-start  
+        
+        
 # Notes on run time:
 # if doing 2 seasons
 # takes about 1.4 minutes per sample_length per home (assume 2 if full season)
