@@ -473,7 +473,10 @@ scaled.entropy.table.shape <- function(home_num, metric,
           
         
         # find kld value
-        integrate(kld_fit, lower = 0, upper = Inf)$value %>%
+        integrate(kld_fit, lower = 0,
+                  # increase tolerance to avoid "divergent" message
+                  rel.tol = .Machine$double.eps^0.5,  
+                  upper = Inf)$value %>%
           tryCatch(
             error = function(e)   {
               output <<- na.result( 'integration_issue',
@@ -1585,14 +1588,20 @@ lag_summary_df <- read_csv('./csv_created/lag_summary.csv')
 
 
   all_time_choice <- TRUE
-  clust <- 'heat'
-  
-met <- 'pm25'
+ 
+  # pm25------------------
+   met <- 'pm25'
+ 
+   loc <- 'kitchen'
+   
+      clust <- 'heat'
+
+
 
 
 
 # test function for multiple homes
-a <- lapply(home.list(c(1,4,10,11)), function(x_home) {
+test_kit <- lapply(homes_all, function(x_home) {
   
   start_date <- pick.start(x_home, clust)
   end_date <- pick.end(x_home, clust)
@@ -1601,50 +1610,20 @@ a <- lapply(home.list(c(1,4,10,11)), function(x_home) {
                         28, as.numeric(as.Date(end_date) - as.Date(start_date)))
   
   a <- 
-    # tryCatch(
     scaled.entropy.table.shape(x_home, metric = met,
                                            date_ranges_entire = list(c(start_date,
                                                                        end_date)),
                                            tested_sample_sequence =
-                                             seq(sample_min,sample_max,4),
-                                           location_type = 'living',
+                                             seq(sample_min,sample_max,8),
+                                           location_type = loc,
                                            sample_days_min = sample_min,
                                            all_time = all_time_choice) %>%
-                  mutate(energy_cluster = clust) # ,
-                # error = function(e) NULL)
+                  mutate(energy_cluster = clust) 
+  
   # # give a variable name to the created data
   # assign(paste('home', x, met, sep = '_'),
   #          a,
   #          envir = .GlobalEnv)
-  a
-}
-) %>%
-  bind_rows()
-
-
-
-# test without error catch---------------------------
-
-# test function for multiple homes
-a <- lapply('004', function(x_home) {
-  
-  start_date <- pick.start(x_home, clust)
-  end_date <- pick.end(x_home, clust)
-  sample_min <- pick.sample.min(met)
-  sample_max <- if_else(as.numeric(as.Date(end_date) - as.Date(start_date))>=28,
-                        28, as.numeric(as.Date(end_date) - as.Date(start_date)))
-  
-  a <- scaled.entropy.table.shape(x_home, metric = met,
-                                  date_ranges_entire = list(c(start_date,
-                                                              end_date)),
-                                  location_type = 'living',
-                                  
-                                  tested_sample_sequence =
-                                    seq(sample_min,sample_max,4),
-                                  sample_days_min = sample_min,
-                                  all_time = all_time_choice) %>%
-    mutate(energy_cluster = clust)
-
   a
 }
 ) %>%
