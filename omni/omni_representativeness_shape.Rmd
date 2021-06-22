@@ -35,21 +35,6 @@ library(ggpubr) # for tesing log-normality
 ```
 
 
-```{r import_omni_daily_data}
-# omni_daily_data<- read_csv('./csv_created/omni_daily_data.csv')
-
-```
-
-```{r import_omni_hourly_data}
-# omni_hourly_data<- read_csv('./csv_created/omni_hourly_data.csv')
-# 
-# zero_test <- omni_hourly_data %>%
-#   group_by(home, location) %>%
-#   summarize(pm25_zeros = sum(pm25 == 0), pm25_n = n()) %>%
-#   mutate(pm25_zero_pct = pm25_zeros/pm25_n*100)
-#   ungroup()
-```
-
 ```{r import_omni_minute_data}
 omni_data<- read_csv('./csv_created/omni_all_locations.csv')
 
@@ -118,7 +103,7 @@ season_list <- list(fall)
 
 ```
 
-```{r functions_shape}
+```{r function_shape_master}
 
 
 # give a row of NA values with identifers to help with identifying
@@ -706,9 +691,9 @@ lag_summary_df <- read_csv('./csv_created/lag_summary.csv')
   met <- 'pm25'
   
   loc <- 'bedroom'
-  clust <- 'heat'
+  clust <- 'shoulder'
    
-      start <- Sys.Date()
+      
   {   
    rep_data <-  lapply(homes_all, function(x_home) {
       
@@ -736,9 +721,7 @@ lag_summary_df <- read_csv('./csv_created/lag_summary.csv')
            rep_data,
            envir = .GlobalEnv)
       }
-        end <- Sys.Date()
-        run <- end-start  
-        
+
         
 # Notes on run time:
 # if doing 2 seasons
