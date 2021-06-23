@@ -688,10 +688,10 @@ lag_summary_df <- read_csv('./csv_created/lag_summary.csv')
   all_time_choice <- TRUE
   
   # pm25------------------
-  met <- 'pm25'
+  met <- 'voc'
   
-  loc <- 'bedroom'
-  clust <- 'shoulder'
+  loc <- 'living'
+  clust <- 'heat'
    
       
   {   
@@ -722,56 +722,52 @@ lag_summary_df <- read_csv('./csv_created/lag_summary.csv')
            envir = .GlobalEnv)
       }
 
-        
-# Notes on run time:
-# if doing 2 seasons
-# takes about 1.4 minutes per sample_length per home (assume 2 if full season)
 
 
-
-
+  
+  entropy_shape_df <- bind_rows(
+    pm25_bedroom_heat_rep_data_shape,
+    pm25_living_heat_rep_data_shape,
+    pm25_kitchen_heat_rep_data_shape,
+    pm25_bedroom_shoulder_rep_data_shape,
+    pm25_living_shoulder_rep_data_shape,
+    pm25_kitchen_shoulder_rep_data_shape,
+    pm25_bedroom_ac_rep_data_shape,
+    pm25_living_ac_rep_data_shape,
+    pm25_kitchen_ac_rep_data_shape,
+    # voc_bedroom_heat_rep_data_shape,
+    voc_living_heat_rep_data_shape#,
+    # voc_kitchen_heat_rep_data_shape,
+    # voc_bedroom_shoulder_rep_data_shape,
+    # voc_living_shoulder_rep_data_shape,
+    # voc_kitchen_shoulder_rep_data_shape,
+    # voc_bedroom_ac_rep_data_shape,
+    # voc_living_ac_rep_data_shape,
+    # voc_kitchen_ac_rep_data_shape
+  )
 
 # make csv of all season data
-write_csv(home_data, file =
-            paste0('./representativeness_data/rep_data_shape_season_', met, '_', Sys.Date(), '.csv'))
+write_csv(entropy_shape_df, file =
+            paste0('./csv_created/representativeness_data/rep_data_shape_', Sys.Date(), '.csv'))
 
 
 
 # read in csv file
-entropy_shape_season_pm25 <- read_csv(file = './representativeness_data/rep_data_shape_season_pm25.csv')
+entropy_shape_df <- read_csv(file = './csv_created/representativeness_data/rep_data_shape.csv')
 
 
 # # for binding new rows to old rows
-# a1 <- read_csv(file = './representativeness_data/rep_data_shape_season_pm25_ihs_2021-04-01.csv')
+# a <- read_csv(file = './csv_created/representativeness_data/rep_data_shape_2021-04-01.csv')
 # 
-# a <- rbind(a1, entropy_shape_season_pm25)
+# a <- rbind(a, rep_data_all)
 # 
 # write_csv(a, file =
-#             paste0('./representativeness_data/rep_data_shape_season_', met, '_', Sys.Date(), '.csv'))
+#             paste0('./csv_created/representativeness_data/rep_data_shape_', Sys.Date(), '.csv'))
 
 
-
-# for one home:
-a <- entropy_shape_season_pm25 %>%
-  filter(home == '009') %>%
-  filter(
-         monitor_period == paste(as.Date(fall[1]), '-',
-                             as.Date(fall[2]))
-
-|
-         monitor_period == paste(as.Date(winter[1]), '-',
-                             as.Date(winter[2]))
-
-|
-         monitor_period == paste(as.Date(decemb[1]), '-',
-                             as.Date(decemb[2])) |
-         monitor_period == 'Dec'
-
-
-)
-
+a <- entropy_shape_df %>% filter(period_compare == 'year')
 # plot results
-ggplot(aes(x = sample_length, y = coeff, color = monitor_period),
+ggplot(aes(x = sample_length, y = coeff, color = energy_cluster),
        data = a)+
   geom_line()+
   geom_point(size = 1)+
@@ -794,78 +790,6 @@ ggplot(aes(x = sample_length, y = coeff, color = monitor_period),
 
 # import entropy data
 entropy_pm25_shape_season <- read_csv(file = './representativeness_data/rep_data_shape_season_pm25_ihs.csv')
-
-
-entropy_all <- entropy_pm25_shape_season %>%
-  # ensure home column is not numeric
-  mutate_at(vars(home), function(x) {
-    if(is.numeric(x)) home.list(x) else x
-    }
-    ) %>%
-  mutate(
-      # make a column specifying shoulder seasons
-    season = case_when(
-      monitor_period %in% month.abb[c(10, 4)] ~ 'shoulder',
-          monitor_period %in% month.abb[c(11:12,1:3, 5:9)] ~ 'non-shoulder'),
-    # convert time periods to seasons
-    monitor_period = case_when(
-      monitor_period == paste(as.POSIXct(fall[1]),
-                              as.POSIXct(fall[2]), sep = ' - ') ~ 'fall',
-            monitor_period == paste(as.POSIXct(winter[1]),
-                              as.POSIXct(winter[2]), sep = ' - ') ~ 'winter',
-                  monitor_period == paste(as.POSIXct(decemb[1]),
-                              as.POSIXct(decemb[2]), sep = ' - ') ~ 'decemb',
-      TRUE ~ monitor_period
-
-    )
-  )
-
-# months ------------------------------------------------------
-
-
-# entropy.plot.metrics <- function (data, hm, metrics,
-#                                  # omit a sampling period of given length
-#                                  # if this proportion of possible samples
-#                                  # were not availabel in data
-#                                  sample_omit = 0.5
-#                                  ) {
-#   
-# # for one home:
-# a <- data %>%
-#   filter(home == hm &
-#            metric %in% metrics &
-#            n_samp_avail >= sample_omit)
-# 
-# # plot results
-# ggplot(aes(x = sample_length, y = coeff,
-#            color = season, shape = monitor_period), data = a)+
-#   geom_line()+
-#   geom_point(size = 1)+
-#   xlab('Sample Length, days')+
-#   ylab('Scaled Relative Entropy')+
-#   geom_hline(yintercept=threshold_seq, linetype="dashed", 
-#                 color = "black", size=0.5)+
-#   coord_cartesian(ylim = c(0,0.5))+
-#   ggtitle(paste('Home',hm)) +
-#   facet_wrap('metric') +
-#   scale_x_continuous(breaks=seq(0,28,7))+
-#   geom_ribbon(aes(ymin = low_val, ymax = high_val, fill = monitor_period),
-#               alpha = 0.3, color = NA)
-# }
-# 
-# 
-# a <- entropy_all %>%
-#   filter(
-#     monitor_period %in% month.abb
-#            )
-# 
-# 
-# # make plots for all homes
-# lapply(home.list(c(2:4,6,8:11,13,15,16)),
-#        entropy.plot.metrics,
-#               data = a,
-#        metrics = c('pm25_ihs', 'voc_ihs', 'temp', 'noise'))
-
 
 # seasons------------------------------------------------------
 
