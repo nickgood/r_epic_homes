@@ -674,7 +674,7 @@ test_pdf <- lapply(homes_all, function(x_home) {
 
 
 
-rep_data_all <- bind_rows(pm25_bedroom_heat_rep_data_shape_pdf,
+entropy_shape_pdf_df <- bind_rows(pm25_bedroom_heat_rep_data_shape_pdf,
                        pm25_living_heat_rep_data_shape_pdf,
                        pm25_kitchen_heat_rep_data_shape_pdf,
                        pm25_bedroom_shoulder_rep_data_shape_pdf,
@@ -684,140 +684,9 @@ rep_data_all <- bind_rows(pm25_bedroom_heat_rep_data_shape_pdf,
                        pm25_living_ac_rep_data_shape_pdf,
                        pm25_kitchen_ac_rep_data_shape_pdf)
 
-# make csv of all season data
-write_csv(rep_data_all, file =
+# make csv of all data
+write_csv(entropy_shape_pdf_df, file =
             paste0('./csv_created/representativeness_data/rep_data_shape_pdf_', Sys.Date(), '.csv'))
-
-
-
-# read in csv file
-entropy_shape_season_pm25 <- read_csv(file = './csv_created/representativeness_data/rep_data_shape_pdf.csv')
-
-
-# # for binding new rows to old rows
-# a1 <- read_csv(file = './representativeness_data/rep_data_shape_season_pm25_ihs_2021-04-01.csv')
-# 
-# a <- rbind(a1, entropy_shape_season_pm25)
-# 
-# write_csv(a, file =
-#             paste0('./representativeness_data/rep_data_shape_season_', met, '_', Sys.Date(), '.csv'))
-
-
-
-# for one home:
-a <- entropy_shape_season_pm25 %>%
-  filter(home == '009') %>%
-  filter(
-         monitor_period == paste(as.Date(fall[1]), '-',
-                             as.Date(fall[2]))
-
-|
-         monitor_period == paste(as.Date(winter[1]), '-',
-                             as.Date(winter[2]))
-
-|
-         monitor_period == paste(as.Date(decemb[1]), '-',
-                             as.Date(decemb[2])) |
-         monitor_period == 'Dec'
-
-
-)
-
-# plot results
-ggplot(aes(x = sample_length, y = coeff, color = monitor_period),
-       data = a)+
-  geom_line()+
-  geom_point(size = 1)+
-  xlab('Sample Length, days')+
-  ylab('Scaled Relative Entropy')+
-  geom_hline(yintercept=0.1, linetype="dashed", 
-                color = "black", size=0.5)+
-  coord_cartesian(ylim = c(0,0.5))
-
-
-
-
-```
-
-
-```{r shape_data_maker_range_pdf, eval = FALSE}
-
-
-
-# Notes on run time:
-# if doing 2 seasons
-# takes about 1.4 minutes per sample_length per home (assume 2 if full season)
-
-# pm25_ihs--------------------------------------
-met <- 'pm25_ihs'
-
-home1 <- make.data.range.pdf.shape('001', met, season_list, sequence)
-home2 <- make.data.range.pdf.shape('002', met, season_list, sequence)
-
-start <- Sys.time()
-home3 <- make.data.range.pdf.shape('003', met, season_list, sequence)
-end <- Sys.time()
-time <- end-start
-
-home4 <- make.data.range.pdf.shape('004', met, season_list, sequence)
-home5 <- make.data.range.pdf.shape('005', met, season_list, sequence)
-home6 <- make.data.range.pdf.shape('006', met, season_list, sequence)
-home7 <- make.data.range.pdf.shape('007', met, season_list, sequence)
-home8 <- make.data.range.pdf.shape('008', met, season_list, sequence)
-home9 <- make.data.range.pdf.shape('009', met, season_list, sequence)
-home10 <- make.data.range.pdf.shape('010', met, season_list, sequence)
-home11 <- make.data.range.pdf.shape('011', met, season_list, sequence)
-home12 <- make.data.range.pdf.shape('012', met, season_list, sequence)
-home13 <- make.data.range.pdf.shape('013', met, season_list, sequence)
-home14 <- make.data.range.pdf.shape('014', met, season_list, sequence)
-home15 <- make.data.range.pdf.shape('015', met, season_list, sequence)
-home16 <- make.data.range.pdf.shape('016', met, season_list, sequence)
-
-
-# make a list of all dataframes
-home_data_list <- lapply(c(1:16),
-                        function(x) tryCatch(get(paste0('home', x)),
-                                             error = function(e){
-                                               NULL
-                                               }
-                                             ))
-
-
-
-# #combine into one dataframe
-# home_data3 <- do.call(rbind, home_data_list)
-# 
-# 
-# # make csv of all season data
-# write_csv(rbind(home_data, home_data2, home_data3), file =
-#             paste0('./representativeness_data/rep_data_shape_season_pdf_3_', met, '_', Sys.Date(), '.csv'))
-
-
-#combine into one dataframe
-home_data <- do.call(rbind, home_data_list)
-
-
-# to combine new data with old data
-# home_data <- do.call(home_data, entropy_shape_season_pdf_pm25)
-
-
-# make csv of all season data
-write_csv(home_data, file =
-            paste0('./representativeness_data/rep_data_shape_season_pdf_', met, '_', Sys.Date(), '.csv'))
-
-
-
-
-# # for binding new rows to old rows
-# a1 <- read_csv(file = './representativeness_data/rep_data_shape_season_pdf_pm25_ihs_2021-04-01.csv')
-# 
-# a <- rbind(a1, entropy_shape_season_pm25)
-# 
-# write_csv(a, file =
-#             paste0('./representativeness_data/rep_data_shape_season_pdf_', met, '_', Sys.Date(), '.csv'))
-
-
-
 
 
 
@@ -825,146 +694,19 @@ write_csv(home_data, file =
 
 ### Testing Different Entropy Thresholds
 
-### Effect on when average Scaled Entropy crosses below threshold
+```{r import_pdf_data}
 
-```{r threshold_plots_shape}
-
-# months--------------------------------------------------------------
-
-# # make dataframe of values for minimum sample length (in days) where entropy is less than 0.1
-# entropy_cutoffs <- entropy_all %>%
-#   filter(n_samp_avail >0.5 & method == 'shape') %>%
-#   filter(
-#     monitor_period %in% month.abb
-#     ) %>%
-#   filter(coeff <= threshold) %>% 
-#   group_by(home, metric, monitor_period) %>%
-#   summarise_at(vars(sample_length), min) %>%
-#   ungroup()
-# 
-# # fill in missing combinations so bar chart will have bars of constant width
-# a <- expand.grid(home=unique(entropy_cutoffs$home),
-#                  metric=unique(entropy_cutoffs$metric),
-#                  monitor_period=unique(entropy_cutoffs$monitor_period))%>%
-#   data.frame() %>%
-#   left_join(entropy_cutoffs)
-# 
-# 
-# 
-# # bar chart of when threshold was reached for each home
-# ggplot(aes(x = home, y = sample_length, fill = metric), data = a)+
-#   geom_col(position = 'dodge')+
-#   facet_wrap(vars(monitor_period), nrow = 2)
-# 
-# 
-# 
-# 
-# 
-# 
-# 
-# # make dataframe of values for minimum sample length (in days)
-# # where entropy is less than threshold value
-# threshold.freq.table <- function (threshold) {
-#   
-#   
-#   entropy_cutoffs <- entropy_all %>%
-#   filter(n_samp_avail >0.5 & method == 'shape') %>%
-#   filter(
-#     monitor_period %in% month.abb
-#     ) %>%
-#   filter(coeff <= threshold) %>% 
-#   group_by(home, metric, monitor_period) %>%
-#   summarise_at(vars(sample_length), min) %>%
-#   ungroup()
-#     
-# 
-#   # fill in missing combinations so bar chart will have bars of constant width
-# a <- expand.grid(home=unique(entropy_cutoffs$home),
-#                  metric=unique(entropy_cutoffs$metric),
-#                  monitor_period=unique(entropy_cutoffs$monitor_period))%>%
-#   data.frame() %>%
-#   left_join(entropy_cutoffs) %>%
-# # count frequency of home-month instances when threshold was reached for each sample length
-#   group_by(sample_length, metric) %>%
-#   summarise(freq = n()) %>%
-#   ungroup() %>%
-#   filter(!is.na(sample_length)) %>%
-#   mutate(thresh = as.factor(threshold))
-# }
-# 
-# 
-# # apply function to all thresholds in threshold_seq
-#  a <- lapply(threshold_seq, threshold.freq.table)
-#  a <- do.call(rbind, a)
-# 
-#  # ensure there weren't a significant amount of omissions for any metric type
-#  # (because the threshod may never have been reached)
-#  
-#  # test <- a %>%
-#  #   group_by(metric) %>%
-#  #   summarise(n = sum(freq)) %>%
-#  #   ungroup()
-# 
-#  # histogram of when threshold was reached for all home/month combos
-# ggplot(aes(x = sample_length, fill = thresh), data = a)+
-#   geom_density(alpha = 0.5)+
-#   facet_wrap(vars(metric))+
-#   xlab("Sample Length Required to Meet Representativeness Threshold, days")+
-#   scale_x_continuous(breaks = c(7,14,21,28))
+# read in csv file
+entropy_shape_pdf_df <- read_csv(file = './csv_created/representativeness_data/rep_data_shape_pdf.csv')
 
 
-# maybe limit to Aug-Feb (7 months), 15 homes (4 metrics) for now?
-
-
-# seasons--------------------------------------------------------------
-
-
-# make dataframe of values for minimum sample length (in days)
-# where entropy is less than threshold value
-threshold.freq.table.seasons <- function (threshold) {
-  
-  
-  a <- entropy_all %>%
-  filter(n_samp_avail >0.5 & method == 'shape') %>%
-  filter(
-    monitor_period %in% c('fall', 'winter')
-    ) %>%
-  filter(coeff <= threshold) %>% 
-  group_by(home, metric, monitor_period) %>%
-  summarise_at(vars(sample_length), min) %>%
-  ungroup() %>%
-    mutate('thresh' = threshold)
-    
-
-}
-
-
-# apply function to all thresholds in threshold_seq
- a <- lapply(threshold_seq, threshold.freq.table.seasons)
- a <- do.call(rbind, a)
-
- # ensure there weren't a significant amount of omissions for any metric type
- # (because the threshod may never have been reached)
- 
- # test <- a %>%
- #   group_by(metric) %>%
- #   summarise(n = sum(freq)) %>%
- #   ungroup()
- 
-   lvls <- levels(as.factor(a$thresh))
-rows <- by(a, a$thresh, function(x) nrow(x))
-labels <- paste(lvls,", n=",as.integer(rows),sep="")
-
- # histogram of when threshold was reached for all home/month combos
-ggplot(aes(x = sample_length, fill = as.factor(thresh)), data = a)+
-  geom_density(alpha = 0.5)+
-  facet_wrap(vars(metric))+
-  xlab("Sample Length Required to Meet Representativeness Threshold, days")+
-  scale_x_continuous(breaks = c(7,14,21,28))+
-  scale_fill_discrete(labels = labels)+
-  annotate('text', x = 14, y = 0.15, label = '*max n = 16 (number of homes)')
-
-
+  # # for binding new rows to old rows
+# a <- read_csv(file = './csv_created/representativeness_data/rep_data_shape_pdf.csv')
+# 
+# a <- rbind(a, entropy_shape_pdf_df)
+# 
+# write_csv(a, file =
+#             paste0('./csv_created/representativeness_data/rep_data_shape_pdf', Sys.Date(), '.csv'))
 
 ```
 
@@ -972,39 +714,11 @@ ggplot(aes(x = sample_length, fill = as.factor(thresh)), data = a)+
 
 ```{r pdf_plots_shape}
 
-# read in csv file
-entropy_shape_season_pdf_pm25 <- read_csv(file = './representativeness_data/rep_data_shape_season_pdf_pm25_ihs.csv')
-
-
-entropy_all_pdf_shape <- entropy_shape_season_pdf_pm25  %>%
-  # ensure home column is not numeric
-  mutate_at(vars(home), function(x) {
-    if(is.numeric(x)) home.list(x) else x
-    }
-    ) %>%
-  mutate(
-      # make a column specifying shoulder seasons
-    season = case_when(
-      monitor_period %in% month.abb[c(10, 4)] ~ 'shoulder',
-          monitor_period %in% month.abb[c(11:12,1:3, 5:9)] ~ 'non-shoulder'),
-    # convert time periods to seasons
-    monitor_period = case_when(
-      monitor_period == paste(as.POSIXct(fall[1]),
-                              as.POSIXct(fall[2]), sep = ' - ') ~ 'fall',
-            monitor_period == paste(as.POSIXct(winter[1]),
-                              as.POSIXct(winter[2]), sep = ' - ') ~ 'winter',
-                  monitor_period == paste(as.POSIXct(decemb[1]),
-                              as.POSIXct(decemb[2]), sep = ' - ') ~ 'decemb',
-      TRUE ~ monitor_period
-
-    )
-  )
-
 
 # seasons pdf---------------------------------------------------------------
 
 
-a <- entropy_all_pdf_shape %>%
+a <- entropy_shape_pdf_df %>%
   filter(sample_length %in% pdf_days)
 
 # # count the fraction of 3-day samples that have a scaled entropy > 1
