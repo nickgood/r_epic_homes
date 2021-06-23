@@ -652,14 +652,18 @@ test_pdf <- lapply(homes_all, function(x_home) {
                                            all_time = all_time_choice) %>%
                   mutate(energy_cluster = clust) 
   
-  # # give a variable name to the created data
-  # assign(paste('home', x, met, sep = '_'),
-  #          a,
-  #          envir = .GlobalEnv)
+    # give a variable name to the created data
+    assign(paste(met, loc, clust, 'rep_data_shape_pdf', sep = '_'),
+           rep_data,
+           envir = .GlobalEnv)
+    
   a
 }
 ) %>%
   bind_rows()
+
+
+
 
 
 # make csvs--------------------
@@ -670,16 +674,24 @@ test_pdf <- lapply(homes_all, function(x_home) {
 
 
 
-
+rep_data_all <- bind_rows(pm25_bedroom_heat_rep_data_shape_pdf,
+                       pm25_living_heat_rep_data_shape_pdf,
+                       pm25_kitchen_heat_rep_data_shape_pdf,
+                       pm25_bedroom_shoulder_rep_data_shape_pdf,
+                       pm25_living_shoulder_rep_data_shape_pdf,
+                       pm25_kitchen_shoulder_rep_data_shape_pdf
+                       pm25_bedroom_ac_rep_data_shape_pdf,
+                       pm25_living_ac_rep_data_shape_pdf,
+                       pm25_kitchen_ac_rep_data_shape_pdf)
 
 # make csv of all season data
-write_csv(home_data, file =
-            paste0('./representativeness_data/rep_data_shape_pdf_', met, '_', Sys.Date(), '.csv'))
+write_csv(rep_data_all, file =
+            paste0('./csv_created/representativeness_data/rep_data_shape_pdf_', Sys.Date(), '.csv'))
 
 
 
 # read in csv file
-entropy_shape_season_pm25 <- read_csv(file = './representativeness_data/rep_data_shape_season_pm25.csv')
+entropy_shape_season_pm25 <- read_csv(file = './csv_created/representativeness_data/rep_data_shape_pdf.csv')
 
 
 # # for binding new rows to old rows
