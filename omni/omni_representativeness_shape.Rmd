@@ -703,8 +703,8 @@ test_kit <- lapply('009', function(x_home) {
 # make csvs--------------------
   all_time_choice <- TRUE
     met <- 'pm25'
-    loc <- 'living'
-    clust <- 'heat' # can do multiple
+    loc <- 'bedroom'
+    clust <- 'ac' # can do multiple
    
     
     
@@ -754,7 +754,7 @@ test_kit <- lapply('009', function(x_home) {
     pm25_kitchen_shoulder_rep_data_shape,
     pm25_bedroom_ac_rep_data_shape,
     pm25_living_ac_rep_data_shape,
-    pm25_kitchen_ac_rep_data_shape,
+    pm25_kitchen_ac_rep_data_shape
     # voc_bedroom_heat_rep_data_shape,
     # voc_living_heat_rep_data_shape,
     # voc_kitchen_heat_rep_data_shape,
