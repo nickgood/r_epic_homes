@@ -227,53 +227,52 @@ scaled.entropy.table.shape.pdf <- function(home_num, metric,
     }
 
     
-    # make df of entire monitoring period (approx. a year) 
-    # from all indoor sensors
+    # make df of entire monitoring period (approx. a year)
+    # recorded from given location
     data_year <- data %>%
-      filter(home == home_num & location %in% c('living',
-                                                'bedroom', 'kitchen')) 
+      filter(home == home_num & location == location_type)
     
+
     if(metric %in% c('pm25', 'voc')) {
       # convert 0 values to LOD/2 in to allow for log-normal distrib. estimation
       data_year <- data_year %>%
         mutate_at(all_of(metric), function(x) ifelse(x==0, LOD/2, x))
     }
-    
-    # make a vector of dates when a value was recorded in year
-    # in given location
-    date_col_year <- data_year %>% filter(location == location_type) %>%
-      pull(datetime) %>% unique()
 
-    
+
     # make column of all dates (increments of 5 min) within year
     # including all locations
     all_dates_year <- seq.POSIXt(
-      from = as.POSIXct( data_year%>%pull(datetime) %>% min(), tz = 'UTC'),
-      
-      to =  as.POSIXct( data_year%>%pull(datetime) %>% max(),
-                        tz = 'UTC'),
+      from = as.POSIXct(
+        data %>%
+      filter(home == home_num &
+               location %in% c('living', 'bedroom', 'kitchen'))%>%
+        pull(datetime) %>% min(), tz = 'UTC'),
+
+      to =  as.POSIXct( data %>%
+      filter(home == home_num &
+               location %in% c('living', 'bedroom', 'kitchen'))%>%
+        pull(datetime) %>% max(), tz = 'UTC'),
       by = '5 min')
+
     
     #calculate missingness of data in year for given location
-    year_data_avail <- length(date_col_year)/length(all_dates_year)
-    
-    
-    
-    # make df for season with all locations
+    year_data_avail <-
+      length(data_year %>% pull(datetime) %>% unique())/
+      length(all_dates_year)
+
+
+
+
+    # make df for recorded values in season for given location
     data_season <- data_year %>%
       # choose season date range
       filter(
         datetime >= ymd(monitor_season[1]) &
           datetime <= ymd(monitor_season[2])
       )
-    
-    
-    # make a vector of dates when value was recorded in given location
-    date_col_season <- data_season %>% filter(location == location_type) %>%
-      pull(datetime) %>% unique()
-    
-    
-    
+
+
     # make column of all dates (increments of 5 min) within season
     # including all locations
     all_dates_season <- seq.POSIXt(from = as.POSIXct( monitor_season[1], tz = 'UTC'),
@@ -281,11 +280,12 @@ scaled.entropy.table.shape.pdf <- function(home_num, metric,
                                                                 tz = 'UTC')+24*60*60-1,
                                                     unit = '5 min'),
                                    by = '5 min')
-    
-    
+
+
     # calculate missingness of data points in the season
-    season_data_avail <- length(date_col_season)/length(all_dates_season)
-    
+    season_data_avail <-
+      length(data_season %>% pull(datetime) %>% unique())/
+      length(all_dates_season)
 
     
     if(all_time == TRUE) {
