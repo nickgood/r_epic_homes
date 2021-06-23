@@ -145,17 +145,26 @@ days2 <- 16
 all_time <- TRUE
 
 
-date_ranges_entire <- NULL
-tested_sample_sequence <- NULL
-sample_days_min <- NULL
-home_num <- NULL
-location_type <- NULL
-monitor_season <- NULL
-monitor_period <- NULL
-metric <- NULL
-days <- NULL
-days2 <- NULL
-all_time <- NULL
+# remove variables after done testing
+rm(tested_sample_sequence,
+   date_ranges_entire,
+sample_days_min,
+home_num,
+monitor_season,
+monitor_period,
+metric,
+days,
+days2,
+all_time,
+data,
+data_season,
+data_year,
+entire,
+date_col_season,
+date_col_year,
+all_dates_season,
+all_dates_year
+)
 
 # entropy function minutely data ----------------------------
 
@@ -563,7 +572,7 @@ test<- scaled.entropy.table.shape.pdf('004', 'pm25',
                              c('2020-12-01', '2020-12-31'),
                                                      c('2020-11-01',
                                                        '2020-11-30')),
-                           tested_sample_sequence = c(4,5,6),
+                           tested_sample_sequence = c(4,5),
                            location_type = 'living',
                            sample_days_min = 3,
                            all_time = TRUE)
@@ -628,11 +637,12 @@ lag_summary_df <- read_csv('./csv_created/lag_summary.csv')
  
    met <- 'pm25'
  
-   loc <- 'living'
+   loc <- 'kitchen'
    
       clust <- 'heat'
       
-rep_pdf <- lapply(homes_all, function(x_home) {
+      
+rep_data <- lapply(homes_all, function(x_home) {
   
   start_date <- pick.start(x_home, clust)
   end_date <- pick.end(x_home, clust)
@@ -662,25 +672,24 @@ rep_pdf <- lapply(homes_all, function(x_home) {
   bind_rows()
 
 
-# Notes on run time:
-# if doing 2 seasons
-# takes about 1.4 minutes per sample_length per home (assume 2 if full season)
 
 
 
-entropy_shape_pdf_df <- bind_rows(pm25_bedroom_heat_rep_data_shape_pdf,
-                       pm25_living_heat_rep_data_shape_pdf,
-                       pm25_kitchen_heat_rep_data_shape_pdf,
-                       pm25_bedroom_shoulder_rep_data_shape_pdf,
-                       pm25_living_shoulder_rep_data_shape_pdf,
-                       pm25_kitchen_shoulder_rep_data_shape_pdf
-                       pm25_bedroom_ac_rep_data_shape_pdf,
-                       pm25_living_ac_rep_data_shape_pdf,
-                       pm25_kitchen_ac_rep_data_shape_pdf)
+entropy_shape_pdf_df <- bind_rows(
+  # pm25_bedroom_heat_rep_data_shape_pdf,
+  pm25_living_heat_rep_data_shape_pdf,
+  pm25_kitchen_heat_rep_data_shape_pdf,
+  # pm25_bedroom_shoulder_rep_data_shape_pdf,
+  # pm25_living_shoulder_rep_data_shape_pdf,
+  # pm25_kitchen_shoulder_rep_data_shape_pdf
+  # pm25_bedroom_ac_rep_data_shape_pdf,
+  # pm25_living_ac_rep_data_shape_pdf,
+  # pm25_kitchen_ac_rep_data_shape_pdf
+  )
 
 # make csv of all data
 write_csv(entropy_shape_pdf_df, file =
-            paste0('./csv_created/representativeness_data/rep_data_shape_pdf_', Sys.Date(), '.csv'))
+            paste0('./csv_created/representativeness_data/rep_data_shape_pdf_partial', Sys.Date(), '.csv'))
 
 
 
