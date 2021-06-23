@@ -100,6 +100,8 @@ samp_seq <- seq(3:6)
 # list of seasons to use as long-monitroing period (ranges)
 season_list <- list(fall)
 
+# thresholds for representativeness
+rep_threshold_seq <- c(0.4, 0.5, 0.6)
 
 ```
 
@@ -500,7 +502,7 @@ scaled.entropy.table.shape <- function(home_num, metric,
       
       
       list('kld_avg' = mean(unlist(a)),
-           'kld_se' = sd(unlist(a))/length(unlist(a)),
+           'kld_sd' = sd(unlist(a)),
            
            'n_samp_avail' = n_samp_avail)
       
@@ -518,7 +520,7 @@ scaled.entropy.table.shape <- function(home_num, metric,
     
     kld_avg_max <- a[['kld_avg']]
     
-    kld_se_max <- a[['kld_se']]
+    kld_sd_max <- a[['kld_sd']]
     
     # apply function to find scaled_entropy dataframe for
     # sampling period of length "days2" to range of days in tested_sample_sequence
@@ -530,23 +532,24 @@ scaled.entropy.table.shape <- function(home_num, metric,
                                   
                                   # calculate average KLD for all short sampling period of length "days2"
                                   a <- kld.avg(days2)
+                                  kld_avg <- a[['kld_avg']]
+                                  kld_sd <- a[['kld_sd']]
                                   
                                   
                                   
-                                  # calculate the confidence interval for ratio of two means
-                                  # https://i.stack.imgur.com/vO8Ip.png
-                                  b <- ((a[['kld_avg']])/kld_avg_max)*
-                                    sqrt(
-                                      ((a[['kld_se']])^2)/((a[['kld_avg']])^2)+ (kld_se_max^2)/(kld_avg_max^2)
-                                    )
-                                  
-                                  
+                                  # calculate the sd for ratio of two means
+                                  b <- (kld_avg/kld_avg_max)*sqrt(
+                                    kld_sd^2/kld_avg^2+
+                                      kld_sd_max^2/kld_avg_max^2
+                                  )
+                                    
+
                                   
                                   a <- tibble(
-                                    'coeff' = a[['kld_avg']]/kld_avg_max, # mean scaled entropy value
+                                    'coeff' = kld_avg/kld_avg_max, # mean scaled entropy value
                                     # values for confidence intervals
-                                    'high_val' = a[['kld_avg']]/kld_avg_max+1.96*b,
-                                    'low_val' = a[['kld_avg']]/kld_avg_max-1.96*b,
+                                    'high_val' = kld_avg/kld_avg_max+b,
+                                    'low_val' = kld_avg/kld_avg_max-b,
                                     'sample_length' = days2,
                                     'monitor_season' = period_label,
                                     'n_samp_avail' = a[['n_samp_avail']], # amount of samples with sufficient data
@@ -652,35 +655,35 @@ lag_summary_df <- read_csv('./csv_created/lag_summary.csv')
   # pick.end('004', 'heat')
 
 
-# # test function for multiple homes
-# test_kit <- lapply(homes_all, function(x_home) {
-#   
-#   start_date <- pick.start(x_home, clust)
-#   end_date <- pick.end(x_home, clust)
-#   sample_min <- pick.sample.min(met)
-#   sample_max <- if_else(as.numeric(as.Date(end_date) - as.Date(start_date))>=28,
-#                         28, as.numeric(as.Date(end_date) - as.Date(start_date)))
-#   
-#   a <- 
-#     scaled.entropy.table.shape(x_home, metric = met,
-#                                            date_ranges_entire = list(c(start_date,
-#                                                                        end_date)),
-#                                            tested_sample_sequence =
-#                                              seq(sample_min,sample_max,8),
-#                                            location_type = loc,
-#                                            sample_days_min = sample_min,
-#                                            all_time = all_time_choice) %>%
-#                   mutate(energy_cluster = clust) 
-#   
-#   # # give a variable name to the created data
-#   # assign(paste('home', x, met, sep = '_'),
-#   #          a,
-#   #          envir = .GlobalEnv)
-#   a
-# }
-# ) %>%
-#   bind_rows()
-# 
+# test function for multiple homes
+test_kit <- lapply('009', function(x_home) {
+
+  start_date <- pick.start(x_home, clust)
+  end_date <- pick.end(x_home, clust)
+  sample_min <- pick.sample.min(met)
+  sample_max <- if_else(as.numeric(as.Date(end_date) - as.Date(start_date))>=28,
+                        28, as.numeric(as.Date(end_date) - as.Date(start_date)))
+
+  a <-
+    scaled.entropy.table.shape(x_home, metric = met,
+                                           date_ranges_entire = list(c(start_date,
+                                                                       end_date)),
+                                           tested_sample_sequence =
+                                             seq(sample_min,sample_max,8),
+                                           location_type = loc,
+                                           sample_days_min = sample_min,
+                                           all_time = all_time_choice) %>%
+                  mutate(energy_cluster = clust)
+
+  # # give a variable name to the created data
+  # assign(paste('home', x, met, sep = '_'),
+  #          a,
+  #          envir = .GlobalEnv)
+  a
+}
+) %>%
+  bind_rows()
+
 
 
 
@@ -746,36 +749,20 @@ lag_summary_df <- read_csv('./csv_created/lag_summary.csv')
     # voc_kitchen_ac_rep_data_shape
   )
 
+  
+  # # for binding new rows to old rows
+# a <- read_csv(file = './csv_created/representativeness_data/rep_data_shape.csv')
+# 
+# a <- rbind(a, entropy_shape_df)
+# 
+# write_csv(a, file =
+#             paste0('./csv_created/representativeness_data/rep_data_shape_', Sys.Date(), '.csv'))
+
 # make csv of all season data
 write_csv(entropy_shape_df, file =
             paste0('./csv_created/representativeness_data/rep_data_shape_', Sys.Date(), '.csv'))
 
 
-
-# read in csv file
-entropy_shape_df <- read_csv(file = './csv_created/representativeness_data/rep_data_shape.csv')
-
-
-# # for binding new rows to old rows
-# a <- read_csv(file = './csv_created/representativeness_data/rep_data_shape_2021-04-01.csv')
-# 
-# a <- rbind(a, rep_data_all)
-# 
-# write_csv(a, file =
-#             paste0('./csv_created/representativeness_data/rep_data_shape_', Sys.Date(), '.csv'))
-
-
-a <- entropy_shape_df %>% filter(period_compare == 'year')
-# plot results
-ggplot(aes(x = sample_length, y = coeff, color = energy_cluster),
-       data = a)+
-  geom_line()+
-  geom_point(size = 1)+
-  xlab('Sample Length, days')+
-  ylab('Scaled Relative Entropy')+
-  geom_hline(yintercept=0.1, linetype="dashed", 
-                color = "black", size=0.5)+
-  coord_cartesian(ylim = c(0,0.5))
 
 
 
@@ -787,103 +774,82 @@ ggplot(aes(x = sample_length, y = coeff, color = energy_cluster),
 
 ```{r shape_plotter}
 
-
 # import entropy data
-entropy_pm25_shape_season <- read_csv(file = './representativeness_data/rep_data_shape_season_pm25_ihs.csv')
-
-# seasons------------------------------------------------------
+entropy_shape_df <- read_csv(file = './csv_created/representativeness_data/rep_data_shape.csv')
 
 
-entropy.plot.metrics.seasons <- function (data, hm, metrics,
-                                 # omit a sampling period of given length
-                                 # if this proportion of possible samples
-                                 # were not availabel in data
-                                 sample_omit = 0.5
-                                 ) {
+# # plot results for one home
+# 
+# a <- entropy_shape_df %>% filter(home == '009' & period_compare == 'year' )%>%
+#   group_by(sample_length, metric, energy_cluster) %>%
+#   summarize(coeff = mean(coeff, na.rm = TRUE)) %>% # average klds from all rooms
+#   ungroup()
+# 
+# 
+# ggplot(aes(x = sample_length, y = coeff, color = energy_cluster),
+#        data = a)+
+#   geom_line()+
+#   geom_point(size = 1)+
+#   xlab('Sample Length, days')+
+#   ylab('Scaled Relative Entropy')+
+#   geom_hline(yintercept=0.1, linetype="dashed", 
+#                 color = "black", size=0.5)+
+#   coord_cartesian(ylim = c(0,1)) +
+#   facet_wrap(vars(metric))
+
+
+# all_homes------------------------------------------------------
+entropy.plot <- function (
+  hm,
+  # omit a sampling period of given length
+  # if this proportion of possible samples
+  # were not availabel in data
+  metrics = c('pm25', 'voc'),
+  sample_omit = 0.5,
+  data = entropy_shape_df
+) {
   
-# for one home:
-a <- data %>%
-  filter(home == hm &
-           metric %in% metrics &
-           n_samp_avail >= sample_omit)
+  # for one home:
+  a <- data %>%
+    filter(home == hm &
+             metric %in% metrics &
+             n_samp_avail >= sample_omit) %>%
+    group_by(sample_length, metric, energy_cluster) %>%
+    # average klds from all rooms
+    summarize(coeff = mean(coeff, na.rm = TRUE), .groups = 'drop') 
 
-
-
-# plot results
-ggplot(aes(x = sample_length, y = coeff,
-           color = monitor_period), data = a)+
-  geom_line()+
-  geom_point(size = 1)+
-  xlab('Sample Length, days')+
-  ylab('Scaled Relative Entropy')+
-  geom_hline(yintercept=threshold_seq, linetype="dashed", 
-                color = "black", size=0.5)+
-  coord_cartesian(ylim = c(0,0.5))+
-  ggtitle(paste('Home',hm)) +
-  facet_wrap('metric') +
-  scale_x_continuous(breaks=seq(0,28,7)) +
-  geom_ribbon(aes(ymin = low_val, ymax = high_val, fill = monitor_period),
-              alpha = 0.3, color = NA)
+  if(nrow(a) == 0) {
+    plot <- NULL # return NULL if no data for home/metric/cluster combo
+  }else {
+    
+    # plot results
+    plot <- ggplot(aes(x = sample_length, y = coeff,
+                       color = energy_cluster), data = a)+
+      geom_line()+
+      geom_point(size = 1)+
+      xlab('Sample Length, days')+
+      ylab('Scaled Relative Entropy')+
+      geom_hline(yintercept=rep_threshold_seq, linetype="dashed", 
+                 color = "black", size=0.5)+
+      coord_cartesian(ylim = c(0,1))+
+      ggtitle(paste('Home',hm)) +
+      facet_wrap(vars(metric)) +
+      scale_x_continuous(breaks=seq(0,28,7))
+    # geom_ribbon(aes(ymin = low_val, ymax = high_val, fill = monitor_period),
+    #             alpha = 0.3, color = NA)
+  }
+  plot
 }
 
 
-a <- entropy_all %>%
-  filter(
-    monitor_period %in% c('fall', 'winter')
-           )
 
 # # test for one home
 # entropy.plot.metrics.seasons(a, '003', c('pm25_ihs'))
 
 
 # make plots for all homes
-lapply(home.list(c(3,6:12)),
-       entropy.plot.metrics.seasons,
-              data = a,
-       metrics = c('pm25_ihs'))
-
-# # not working
-# # make plots for all homes
-# lapply(home.list(c(1,3,4,6:16)),
-#        function (x) {
-#          tryCatch(
-#            entropy.plot.metrics.seasons(
-#            data = a,
-#            hm = x,
-#            metrics = c('pm25_ihs')),
-#            error = function(e)  NULL)
-#          
-#        }
-# )
-
-
-
-
-# compare ontinuous and discrete representative functions ----------------------
-
-# for one home:
-a <- entropy_all %>%
-  filter(home == '008' &
-           metric %in% c('pm25') &
-           n_samp_avail >= 0.5)
-
-# plot results
-ggplot(aes(x = sample_length, y = coeff,
-           color = season, shape = monitor_period), data = a)+
-  geom_line()+
-  geom_point(size = 1)+
-  xlab('Sample Length, days')+
-  ylab('Scaled Relative Entropy')+
-  geom_hline(yintercept=c(0.1, 0.2, 0.3), linetype="dashed",
-                color = "black", size=0.5)+
-  coord_cartesian(ylim = c(0,0.5))+
-  ggtitle(paste('Home','008')) +
-  # facet_wrap('metric') +
-  scale_x_continuous(breaks=seq(0,28,7))+
-  geom_ribbon(aes(ymin = low_val, ymax = high_val, fill = monitor_period),
-              alpha = 0.3, color = NA)
-
-
+lapply(homes_all,
+       entropy.plot)
 
 
 
