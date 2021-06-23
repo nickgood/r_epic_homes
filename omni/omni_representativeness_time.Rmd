@@ -171,7 +171,7 @@ all_dates_year
 
 # function to calculate scaled entropy for a house
 # during multiple different time periods
-scaled.entropy.table.shape <- function(
+scaled.entropy.table.time <- function(
   home_num, metric,
   
   # date range of entire monitoring period
@@ -250,7 +250,7 @@ scaled.entropy.table.shape <- function(
     }
 
 
-    # make column of all dates (increments of 5 min) within year
+    # make column of all dates (increments of 5 min) within sampling year
     # including all locations
     all_dates_year <- seq.POSIXt(
       from = as.POSIXct(
@@ -265,7 +265,7 @@ scaled.entropy.table.shape <- function(
         pull(datetime) %>% max(), tz = 'UTC'),
       by = '5 min')
 
-    
+        
     #calculate missingness of data in year for given location
     year_data_avail <-
       length(data_year %>% pull(datetime) %>% unique())/
@@ -284,7 +284,6 @@ scaled.entropy.table.shape <- function(
 
 
     # make column of all dates (increments of 5 min) within season
-    # including all locations
     all_dates_season <- seq.POSIXt(from = as.POSIXct( monitor_season[1], tz = 'UTC'),
                                    to =  floor_date(as.POSIXct( monitor_season[2],
                                                                 tz = 'UTC')+24*60*60-1,
@@ -328,17 +327,23 @@ scaled.entropy.table.shape <- function(
 
       entire <- data_season
     }
+    
+    entire <- entire %>%
+      group_by(day_time = hour(datetime)*3600 + minute(datetime)*60) %>%
+      summarise_at(all_of(metric), list(mean = ~mean(., na.rm = TRUE)),
+                   .groups = 'drop') %>%
+      pull(mean)
+    
+    # ensure no na values
+    if(any(is.na(entire))) {
+      output <<- na.result('na_in_entire', period_label)
+      stop()
+    }
+    
 
-entire <- entire %>%
-  group_by(datetime) %>%
-  summarise_at(all_of(metric), list(mean = ~mean(., na.rm = TRUE),
-                                    # count amount of 15 min values
-                                    # that were averaged for each
-                                    # hour-of-day avg value
-                                    n_5min = ~n()), .groups = 'drop')
 
 # stop if a 5_min period of day is completely missing data
-if(nrow(entire) < 24*60/5) {
+if(length(entire) < 24*60/5) {
   output <<- na.result('missing_hour', period_label)
       stop()
 }
@@ -355,10 +360,10 @@ if(nrow(entire) < 24*60/5) {
       a <-
         runner(
           all_dates_season,
-          k = days*24*12, # number of 5-min periods in short sampling period
+          k = days*24*60/5, # number of 5-min periods in short sampling period
           # only evaluate windows that start at 12AM
           # and windows that are full (ignore partial windows at start)
-          at = seq(days*24*12, length(all_dates_season), 24*12),
+          at = seq(days*24*60/5, length(all_dates_season), 24*60/5),
           f = function(y) { # y = window, vector (length = k) of specified days per iteration
             
             # filter out only given room
@@ -378,11 +383,16 @@ if(nrow(entire) < 24*60/5) {
             } else {
               
              a <- sample %>%
-               group_by(datetime) %>%
-             summarise_at(all_of(metric), mean, na.rm = TRUE) %>%
-             ungroup() %>%
-             #result in only the metric averages
-             pull(all_of(metric))
+               group_by(day_time = hour(datetime)*3600 + minute(datetime)*60) %>%
+               summarise_at(all_of(metric), list(mean = ~mean(., na.rm = TRUE)),
+                            .groups = 'drop') %>%
+               pull(mean)
+             
+             # ensure no na values
+             if(any(is.na(a))) {
+               output <<- na.result('na_in_sample', period_label)
+               stop()
+             }
            
            # omit sampling period if there is not an avg value
            # for all 5-min period bins in the period
@@ -422,7 +432,7 @@ if(nrow(entire) < 24*60/5) {
 a <- lapply(colnames(a), function(x) {
   a %>%
   pull(x) %>%
-    entropy::KL.plugin(pull(entire, mean), unit = 'log2')
+    kld(entire)
 })
   
 # average all the resulting KLDs to find average KLD and standard error (se)
@@ -508,7 +518,7 @@ list('kld_avg' = mean(unlist(a)),
 
   # bind all into a dataframe
   entropy_data_season <- bind_rows(a) %>%
-    mutate(method = 'shape',
+    mutate(method = 'time',
            home = home_num,
            metric = metric,
            location = location_type,
@@ -525,7 +535,7 @@ list('kld_avg' = mean(unlist(a)),
 # test function--------------------------
 start <- Sys.time()
 
-test<- scaled.entropy.table.shape('004', 'pm25',
+test<- scaled.entropy.table.time('004', 'pm25',
 
                            date_ranges_entire = list(
                              c('2020-12-01', '2020-12-31'),
