@@ -619,21 +619,20 @@ lag_summary_df <- read_csv('./csv_created/lag_summary.csv')
   # pick.end('004', 'heat')
 
 
+# test function for multiple homes
+      
+      # make csvs--------------------
+
+  
   all_time_choice <- TRUE
  
-  # pm25------------------
    met <- 'pm25'
  
    loc <- 'living'
    
-      clust <- 'shoulder'
-
-
-
-
-
-# test function for multiple homes
-test_pdf <- lapply(homes_all, function(x_home) {
+      clust <- 'heat'
+      
+rep_pdf <- lapply(homes_all, function(x_home) {
   
   start_date <- pick.start(x_home, clust)
   end_date <- pick.end(x_home, clust)
@@ -646,7 +645,7 @@ test_pdf <- lapply(homes_all, function(x_home) {
                                            date_ranges_entire = list(c(start_date,
                                                                        end_date)),
                                            tested_sample_sequence =
-                                             seq(sample_min,sample_max,8),
+                                             seq(sample_min,sample_max,4),
                                            location_type = loc,
                                            sample_days_min = sample_min,
                                            all_time = all_time_choice) %>%
@@ -662,11 +661,6 @@ test_pdf <- lapply(homes_all, function(x_home) {
 ) %>%
   bind_rows()
 
-
-
-
-
-# make csvs--------------------
 
 # Notes on run time:
 # if doing 2 seasons
