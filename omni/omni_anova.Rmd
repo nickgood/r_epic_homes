@@ -406,7 +406,7 @@ sum.square<- function(data = omni_avg_data, hm, met,
 ```{r df_sum_squares, eval = FALSE}
 
 # test variances for all homes/locations/metrics
-ss_df <- map(metrics_all, function(x_metric) {
+ss_df2 <- map(metrics_all, function(x_metric) {
   
   map(homes_all, function(x_home) {
     sum.square(hm = x_home, met = x_metric,
@@ -425,6 +425,7 @@ ss_test <- ss_df %>%
   filter(within_bedroom<between |
          within_kitchen<between | 
            within_living<between )
+
 
 
 ```
