@@ -1,0 +1,120 @@
+---
+title: "Sense Fraction In Use"
+output: html_document
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.path = 'figures/',
+  warning = FALSE,
+  message = FALSE,
+  echo = FALSE,
+  fig.width = 10, fig.height = 16,
+  cache = FALSE)
+
+```
+
+```{r source_functions_libraries, eval = TRUE}
+# reads source
+source("../functions_epic.R")
+# add extra libraries for cluster analysis
+library('cluster')
+library('factoextra')
+
+
+```
+
+```{r data_import, eval = TRUE}
+data <- read_rds("../output/sense_all.rds")
+```
+
+# Daily Device Overviews  
+
+## Fraction On  
+
+```{r function_daily_fraction, include = FALSE}
+
+# function to test daily usage per device by home
+
+daily.fraction <- function(home_id # home id, in form: '003'
+                       ) {
+a <- data %>%
+  filter(job_id == home_id) %>%
+  mutate(dateday = floor_date(datetime, unit = 'day'),
+         sense_device_name = if_else(is.na(sense_device_name),
+                                     device_id, sense_device_name)) %>%
+  group_by(sense_device_name, dateday) %>%
+  summarise(
+    mins = n(), # amount of minutes device was on during specified day
+    .groups = "drop") %>%
+  mutate(d_min =  60 * 24, # amoutn of minutes in each day
+         pct = mins * 100 / d_min,
+         pct = if_else(pct == Inf, 0, pct),
+         pct = if_else(d_min < 50, 0, pct))
+
+# plot for specified home
+ggplot(a, aes(x = dateday, y = pct) ) +
+geom_segment(aes(xend = dateday, y = 0, yend = pct)) +
+    theme(panel.grid.minor.y = element_blank(),
+      panel.grid.major.y = element_blank(),
+      legend.position="none") +
+coord_cartesian(ylim = c(0,100))+
+  # scale_x_continuous(breaks = c(0, 3, 6, 9, 12, 15, 18, 21, 24)) +
+    xlab("Date") +
+    ylab("Time in use (%)") +
+    #scale_x_log10() +
+  facet_wrap(~sense_device_name, ncol = 4, scales = "fixed")+
+  ggtitle(paste('Home', home_id, 'Fraction On'))
+}
+
+
+```
+
+```{r plot_daily_frac_overview}
+
+# apply above function to all homes
+lapply(levels(as.factor(data$job_id)), daily.fraction)
+```
+
+
+## Consumption  
+
+```{r functions_daily_consum, include = FALSE}
+
+# function to test daily usage per device by home
+
+daily.consumption <- function(home_id # home id, in form: '003'
+                       ) {
+a <- data %>%
+  filter(job_id == home_id) %>%
+  mutate(dateday = floor_date(datetime, unit = 'day'),
+         sense_device_name = if_else(is.na(sense_device_name),
+                                     device_id, sense_device_name)) %>%
+  group_by(sense_device_name, dateday) %>%
+  summarise(
+    consumption = sum(consumption_kwh, na.rm = TRUE),
+    .groups = "drop")
+
+# plot for specified home
+ggplot(a, aes(x = dateday, y = consumption) ) +
+geom_segment(aes(xend = dateday, y = 0, yend = consumption)) +
+    theme(panel.grid.minor.y = element_blank(),
+      panel.grid.major.y = element_blank(),
+      legend.position="none") +
+# coord_cartesian(ylim = c(0,100))+
+  # scale_x_continuous(breaks = c(0, 3, 6, 9, 12, 15, 18, 21, 24)) +
+    xlab("Date") +
+    ylab("Consumption (kwh)") +
+    #scale_x_log10() +
+  facet_wrap(~sense_device_name, ncol = 4, scales = "fixed")+
+  ggtitle(paste('Home', home_id, 'Consumption'))
+}
+
+
+```
+
+```{r plot_daily_consum_overview}
+# homes 3 and 16 do not have data available
+
+# apply above function to all homes
+lapply(levels(as.factor(data$job_id)), daily.consumption)
+```
