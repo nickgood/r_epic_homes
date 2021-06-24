@@ -632,8 +632,8 @@ lag_summary_df <- read_csv('./csv_created/lag_summary.csv')
       
       # make csvs--------------------
 
-  
-  all_time_choice <- TRUE
+
+    all_time_choice <- TRUE
  
    met <- 'pm25'
  
@@ -641,8 +641,8 @@ lag_summary_df <- read_csv('./csv_created/lag_summary.csv')
    
       clust <- 'heat'
       
-      
-rep_data <- lapply(homes_all, function(x_home) {
+{
+a_data <- lapply(homes_all, function(x_home) {
   
   start_date <- pick.start(x_home, clust)
   end_date <- pick.end(x_home, clust)
@@ -650,7 +650,6 @@ rep_data <- lapply(homes_all, function(x_home) {
   sample_max <- if_else(as.numeric(as.Date(end_date) - as.Date(start_date))>=28,
                         28, as.numeric(as.Date(end_date) - as.Date(start_date)))
   
-  a <- 
     scaled.entropy.table.shape.pdf(x_home, metric = met,
                                            date_ranges_entire = list(c(start_date,
                                                                        end_date)),
@@ -660,36 +659,73 @@ rep_data <- lapply(homes_all, function(x_home) {
                                            sample_days_min = sample_min,
                                            all_time = all_time_choice) %>%
                   mutate(energy_cluster = clust) 
-  
-    # give a variable name to the created data
-    assign(paste(met, loc, clust, 'rep_data_shape_pdf', sep = '_'),
-           rep_data,
-           envir = .GlobalEnv)
-    
-  a
+
 }
 ) %>%
   bind_rows()
 
+  
+    # # give a variable name to the created data
+    # assign(paste(met, loc, clust, 'rep_data_shape_pdf', sep = '_'),
+    #        rep_data,
+    #        envir = .GlobalEnv)
 
+}
+      
+         loc <- 'bedroom'
+   
+      clust <- 'ac'
+      
+{
+a_data <- lapply(homes_all, function(x_home) {
+  
+  start_date <- pick.start(x_home, clust)
+  end_date <- pick.end(x_home, clust)
+  sample_min <- pick.sample.min(met)
+  sample_max <- if_else(as.numeric(as.Date(end_date) - as.Date(start_date))>=28,
+                        28, as.numeric(as.Date(end_date) - as.Date(start_date)))
+  
+    scaled.entropy.table.shape.pdf(x_home, metric = met,
+                                           date_ranges_entire = list(c(start_date,
+                                                                       end_date)),
+                                           tested_sample_sequence =
+                                             seq(sample_min,sample_max,4),
+                                           location_type = loc,
+                                           sample_days_min = sample_min,
+                                           all_time = all_time_choice) %>%
+                  mutate(energy_cluster = clust) 
 
+}
+) %>%
+  bind_rows()
 
+  
+    # # give a variable name to the created data
+    # assign(paste(met, loc, clust, 'rep_data_shape_pdf', sep = '_'),
+    #        rep_data,
+    #        envir = .GlobalEnv)
 
+}
+
+# need to add kit_heat and bed_ac
+# just define them as a_data and b_data without assigning!!!!!!!!
 entropy_shape_pdf_df <- bind_rows(
-  # pm25_bedroom_heat_rep_data_shape_pdf,
+  # pm25_bedroom_heat_rep_data_shape_pdf, # actually liv_heat  
   pm25_living_heat_rep_data_shape_pdf,
-  pm25_kitchen_heat_rep_data_shape_pdf,
-  # pm25_bedroom_shoulder_rep_data_shape_pdf,
-  # pm25_living_shoulder_rep_data_shape_pdf,
-  # pm25_kitchen_shoulder_rep_data_shape_pdf
-  # pm25_bedroom_ac_rep_data_shape_pdf,
-  # pm25_living_ac_rep_data_shape_pdf,
-  # pm25_kitchen_ac_rep_data_shape_pdf
+  # pm25_kitchen_heat_rep_data_shape_pdf, # actually liv_heat 
+  pm25_bedroom_shoulder_rep_data_shape_pdf,
+  pm25_living_shoulder_rep_data_shape_pdf,
+  pm25_kitchen_shoulder_rep_data_shape_pdf,
+  pm25_bedroom_ac_rep_data_shape_pdf,
+  pm25_living_ac_rep_data_shape_pdf,
+  pm25_kitchen_ac_rep_data_shape_pdf,
+  a_data,
+  b_data
   )
 
 # make csv of all data
 write_csv(entropy_shape_pdf_df, file =
-            paste0('./csv_created/representativeness_data/rep_data_shape_pdf_partial', Sys.Date(), '.csv'))
+            paste0('./csv_created/representativeness_data/rep_data_shape_pdf_', Sys.Date(), '.csv'))
 
 
 
