@@ -687,13 +687,13 @@ loc <- 'bedroom'
 
 
   entropy_time_df <- bind_rows(
-    # pm25_bedroom_heat_rep_data_time,
+    pm25_bedroom_heat_rep_data_time,
     pm25_living_heat_rep_data_time,
     pm25_kitchen_heat_rep_data_time,
-    # pm25_bedroom_shoulder_rep_data_time,
+    pm25_bedroom_shoulder_rep_data_time,
     pm25_living_shoulder_rep_data_time,
     pm25_kitchen_shoulder_rep_data_time,
-    # pm25_bedroom_ac_rep_data_time,
+    pm25_bedroom_ac_rep_data_time,
     pm25_living_ac_rep_data_time,
     pm25_kitchen_ac_rep_data_time
     # voc_bedroom_heat_rep_data_time,
@@ -730,6 +730,9 @@ write_csv(entropy_time_df, file =
 
 ```{r time_plotter}
 
+# read in time entropy data
+entropy_time_df <- read_csv(file =
+            './csv_created/representativeness_data/rep_data_time.csv')
 
 # import entropy data
 entropy_pm25 <- read_csv(file = './representativeness_data/rep_data_pm25.csv')
