@@ -9,8 +9,7 @@ knitr::opts_chunk$set(fig.path = 'figures/',
   message = FALSE,
   echo = FALSE,
   fig.width = 10, fig.height = 16,
-  cache = FALSE,
-  eval = FALSE)
+  cache = FALSE)
 
 ```
 
@@ -31,7 +30,7 @@ data <- read_rds("../output/sense_all.rds")
 # Cluster days based on heating and ac behaviours using PAM 
 
 
-```{r functions_pam_cluster, include = FALSE, eval = FALSE}
+```{r functions_pam_cluster, include = FALSE}
 
 
 
@@ -193,7 +192,7 @@ cluster.plots <- function(
 ```
 
 
-```{r pam_cluster_df_maker, eval = FALSE}
+```{r pam_cluster_df_maker}
 
 hm <- '001'
 # 2 feasible ac units...
@@ -285,7 +284,7 @@ hm <- '017'
 
 ## By Per-Device Fraction On
 
-```{r plot_pam_cluster_fraction, eval = FALSE, fig.width=10, fig.height=3}
+```{r plot_pam_cluster_fraction, fig.width=10, fig.height=3}
 
 # make plots for all homes
 hm <- '001'
@@ -360,7 +359,7 @@ cluster.plots(hm, get(paste0('cluster_df_', hm)),2, 'pct')
 ```
 
 ## By Per-Device Consumption
-```{r plot_pam_cluster_consum, eval = FALSE, fig.width=10, fig.height=3}
+```{r plot_pam_cluster_consum, fig.width=10, fig.height=3}
 
 # make plots for all homes
 hm <- '001'
@@ -434,7 +433,7 @@ cluster.plots(hm, get(paste0('cluster_df_', hm)),2, 'consumption')
 ```
 
 ## By Summed Heat/AC consumption
-```{r pam_cluster_df_maker_consum_summed, eval = FALSE}
+```{r pam_cluster_df_maker_consum_summed}
 
 hm <- '001'
 # 2 feasible ac units...
@@ -524,7 +523,7 @@ hm <- '017'
 
 ```
 
-```{r plot_pam_cluster_consum_summed, eval = FALSE, fig.width=10, fig.height=3}
+```{r plot_pam_cluster_consum_summed, fig.width=10, fig.height=3}
 
 # make plots for all homes
 hm <- '001'
@@ -599,7 +598,7 @@ cluster.plots(hm, get(paste0('cluster_df_', hm)),2, 'consumption')
 
 
 # Compare Clustering Methods  
-```{r function_cluster_compare, eval = FALSE}
+```{r function_cluster_compare}
 
 
 cluster.methods <- function(home_id, devices,
@@ -738,7 +737,7 @@ return(list( boxplot, cluster_point_plot, cluster_time_plot))
 
 ```
 
-```{r plots_cluster_compare, eval = FALSE, fig.width=10, fig.height=5}
+```{r plots_cluster_compare, fig.width=10, fig.height=5}
 
 # define variables
 # just compare methods for daily fraction of time-on (pct)
