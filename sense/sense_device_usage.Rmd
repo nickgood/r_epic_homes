@@ -1214,7 +1214,6 @@ ac threshold set at `r ac_usage_thresh`% for daily % time on
 
 
 
-
 hm <- '001'
 # 2 feasible ac units...
 cluster.manual(hm, c('heat 6','ac'))
@@ -1365,3 +1364,101 @@ write_csv(home_type_df, './csv_created_sense/home_type_df.csv')
 
 
 ```
+
+## Make Data with Cluster Column
+
+```{r cluster_data_maker, eval = TRUE, fig.width=8, fig.height=1}
+
+
+
+hm <- '001'
+# 2 feasible ac units...
+cluster_df_001 <- cluster.manual(hm, c('heat 6','ac'), return_data = TRUE)
+
+
+hm <- '002'
+#
+cluster_df_002 <- cluster.manual(hm, c('furnace','ac 2'), return_data = TRUE)
+
+
+hm <- '007'
+# 
+cluster_df_007 <- cluster.manual(hm, c('heat 2','ac'), return_data = TRUE)
+
+
+hm <- '009'
+# many heats that could be feasible...
+# consider summing consumption from heat 2 and 3 with furnace to cluster
+cluster_df_009 <- cluster.manual(hm, c('furnace','ac'), return_data = TRUE)
+
+
+
+hm <- '012'
+#
+cluster_df_012 <- cluster.manual(hm, c('furnace','ac'), return_data = TRUE)
+
+
+hm <- '004'
+# no AC
+cluster_df_004 <- cluster.manual.heat(hm, c('furnace'), return_data = TRUE)
+
+
+
+hm <- '010'
+# no ac (later enrollment), also no one heat that makes complete sense by itself...
+cluster_df_010 <- cluster.manual.heat(hm, c('heat 2'), return_data = TRUE)
+
+
+hm <- '011'
+# no ac (later enrollment)
+cluster_df_011 <- cluster.manual.heat(hm, c('heat 6'), return_data = TRUE)
+
+
+
+hm <- '013'
+# only 4 days of ac detected, so not used to cluster
+# no heats consume much, but heat 2 is on most often/constently
+cluster_df_013 <- cluster.manual.heat(hm, c('heat 2'), return_data = TRUE)
+
+
+
+hm <- '015'
+# no ac, multiple feasible heats
+cluster_df_015 <- cluster.manual.heat(hm, c('furnace'), return_data = TRUE)
+
+
+
+hm <- '006'
+#
+cluster_df_006 <- cluster.manual(hm, c('heat 1','ac'), return_data = TRUE)
+
+
+
+hm <- '008'
+# many heats that could be feasible...
+# heat 1 and 2 on approx same fraction, but 2 consumes more energy
+cluster_df_008 <- cluster.manual(hm, c('heat 2','ac'), return_data = TRUE)
+
+
+
+hm <- '014'
+# heat doesn't look feasible...
+# ac on at unexpected months
+cluster_df_014 <- cluster.manual(hm, c('heat 1','ac'), return_data = TRUE)
+
+
+# combine all data frames
+
+
+
+
+daily_energy_data_clustered <- 
+  lapply(home.list(c(1,2,4:15)),
+         function(x) get(paste0('cluster_df_', x))) %>%
+  bind_rows()
+
+
+
+```
+
+
