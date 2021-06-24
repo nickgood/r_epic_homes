@@ -48,6 +48,18 @@ zero_test <- omni_data %>%
 ```
 
 
+```{r import_energy_cluster_homes}
+# import energy cluster dataframe for all homes
+energy_cluster_df <- read_csv('../sense/csv_created_sense/energy_cluster_df.csv')
+```
+
+```{r import_acf_lags}
+# import summary df of how many lags required
+# before autocorrelation was insignificant
+lag_summary_df <- read_csv('./csv_created/lag_summary.csv')
+```
+
+
 
 ```{r functions_misc}
 
@@ -70,24 +82,6 @@ threedig <- function(x) {
 }
 
 home.list <- function(x) sapply(x, threedig)
-
-
-#function to make density plot of variable x (a column)
-dens.plot <- function(data, metric, rm) {
-  
-ggdensity(data %>%
-            filter(room == rm) %>%
-            pull(all_of(metric)), 
-          main = paste("Density plot of", rm, metric),
-          xlab = metric)
-}
-
-
-
-
-```
-
-```{r function_time_master}
 
 
 # function to calculate Kullback-Liebler Distance between two vectors
@@ -118,7 +112,9 @@ na.result <- function(error, season = NA, sample_days = NA, samp_avail = NA) {
 }
 
 
+```
 
+```{r function_time_master}
 
 # calculate kld for continuous probability distributions
 
@@ -159,8 +155,6 @@ all_dates_year
 
 
 # entropy function minutely data ----------------------------
-
-
 
 
 # function to calculate scaled entropy for a house
@@ -526,61 +520,38 @@ list('kld_avg' = mean(unlist(a)),
 
 
 
+
 # test function--------------------------
-start <- Sys.time()
-
-test<- scaled.entropy.table.time('004', 'pm25',
-
-                           date_ranges_entire = list(
-                             c('2020-12-01', '2020-12-31'),
-                                                     c('2020-11-01',
-                                                       '2020-11-30')),
-                           tested_sample_sequence = c(4,5,6),
-                           location_type = 'living',
-                           sample_days_min = 3,
-                           all_time = TRUE)
-
-
-
-end <- Sys.time()
-run2 <- end- start
-
-# # look into bootstrapping
-# a_orig # all kld results
-# boot1 <- sample(a_orig, size = 2, replace = T)
-# boot <- lapply(1:20, function(i) sample(a_orig, replace = T))
-
-
-```
-
-
-
-
-
-
-```{r define_variables}
-
-
-# list of all home numbers
-homes_all <- home.list(1:17)
-
-# sequence of representative thresholds to test
-threshold_seq <- c(0.1, 0.2, 0.3)
-
+# start <- Sys.time()
+# 
+# test<- scaled.entropy.table.time('004', 'pm25',
+# 
+#                            date_ranges_entire = list(
+#                              c('2020-12-01', '2020-12-31'),
+#                                                      c('2020-11-01',
+#                                                        '2020-11-30')),
+#                            tested_sample_sequence = c(4,5,6),
+#                            location_type = 'living',
+#                            sample_days_min = 3,
+#                            all_time = TRUE)
+# 
+# 
+# 
+# end <- Sys.time()
+# run2 <- end- start
+# 
+# # # look into bootstrapping
+# # a_orig # all kld results
+# # boot1 <- sample(a_orig, size = 2, replace = T)
+# # boot <- lapply(1:20, function(i) sample(a_orig, replace = T))
+# 
+# 
 
 ```
 
 
 
-## Time structure
-
-```{r shape_data_maker_range, eval = FALSE}
-# import energy cluster dataframe for all homes
-energy_cluster_df <- read_csv('../sense/csv_created_sense/energy_cluster_df.csv')
-
-# import summary df of how many lags required
-# before autocorrelation was insignificant
-lag_summary_df <- read_csv('./csv_created/lag_summary.csv')
+```{r functions_csv_creation}
 
 # make functions to look up starting and ending date of
 # energy cluster period based on home
@@ -606,7 +577,27 @@ lag_summary_df <- read_csv('./csv_created/lag_summary.csv')
   # # test functions
    # pick.start('006', 'heat')
   # pick.end('004', 'heat')
+```
 
+
+
+```{r define_variables}
+
+
+# list of all home numbers
+homes_all <- home.list(1:17)
+
+# sequence of representative thresholds to test
+threshold_seq <- c(0.1, 0.2, 0.3)
+
+
+```
+
+
+
+## Time structure
+
+```{r shape_data_maker_range, eval = FALSE}
 
 # test function for multiple homes
 test_rep <- lapply('009', function(x_home) {
@@ -645,7 +636,7 @@ test_rep <- lapply('009', function(x_home) {
   all_time_choice <- TRUE
    
 clust <- c('heat', 'shoulder', 'ac') # can do multiple
-met <- 'pm25'
+met <- 'voc'
 loc <- 'bedroom'
 
    
@@ -686,35 +677,35 @@ loc <- 'bedroom'
     }
 
 
-  entropy_time_df <- bind_rows(
-    pm25_bedroom_heat_rep_data_time,
-    pm25_living_heat_rep_data_time,
-    pm25_kitchen_heat_rep_data_time,
-    pm25_bedroom_shoulder_rep_data_time,
-    pm25_living_shoulder_rep_data_time,
-    pm25_kitchen_shoulder_rep_data_time,
-    pm25_bedroom_ac_rep_data_time,
-    pm25_living_ac_rep_data_time,
-    pm25_kitchen_ac_rep_data_time
-    # voc_bedroom_heat_rep_data_time,
-    # voc_living_heat_rep_data_time,
-    # voc_kitchen_heat_rep_data_time,
-    # voc_bedroom_shoulder_rep_data_time,
-    # voc_living_shoulder_rep_data_time,
-    # voc_kitchen_shoulder_rep_data_time,
-    # voc_bedroom_ac_rep_data_time,
-    # voc_living_ac_rep_data_time,
-    # voc_kitchen_ac_rep_data_time
-  )
+  # entropy_time_df <- bind_rows(
+  #   # pm25_bedroom_heat_rep_data_time,
+  #   # pm25_living_heat_rep_data_time,
+  #   # pm25_kitchen_heat_rep_data_time,
+  #   # pm25_bedroom_shoulder_rep_data_time,
+  #   # pm25_living_shoulder_rep_data_time,
+  #   # pm25_kitchen_shoulder_rep_data_time,
+  #   # pm25_bedroom_ac_rep_data_time,
+  #   # pm25_living_ac_rep_data_time,
+  #   # pm25_kitchen_ac_rep_data_time,
+  #   # voc_bedroom_heat_rep_data_time,
+  #   # voc_living_heat_rep_data_time,
+  #   # voc_kitchen_heat_rep_data_time,
+  #   # voc_bedroom_shoulder_rep_data_time,
+  #   # voc_living_shoulder_rep_data_time,
+  #   # voc_kitchen_shoulder_rep_data_time,
+  #   # voc_bedroom_ac_rep_data_time,
+  #   # voc_living_ac_rep_data_time,
+  #   # voc_kitchen_ac_rep_data_time
+  # )
 
   
-  # # for binding new rows to old rows
+# # for binding new rows to old rows
 # a <- read_csv(file = './csv_created/representativeness_data/rep_data_time.csv')
 # 
 # a <- rbind(a, entropy_time_df)
 # 
 # write_csv(a, file =
-#             paste0('./csv_created/representativeness_data/rep_data_time_', Sys.Date(), '.csv'))
+#             paste0('./csv_created/representativeness_data/rep_data_time_combine_', Sys.Date(), '.csv'))
 
 # make csv of all season data
 write_csv(entropy_time_df, file =
