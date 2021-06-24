@@ -25,6 +25,20 @@ library('factoextra')
 
 ```{r functions_misc}
 
+##Define a char vector of home numbers using a number vector,
+##ex: x <- home.list(c(1:15)) for homes 1-15
+threedig <- function(x) {
+  if (nchar(x) == 1) {a <- paste0('00', x)
+  return(a)
+  }
+  
+  if (nchar(x) == 2) {a<- paste0('0', x)
+  return(a)
+  }
+  else return(a)
+}
+
+home.list <- function(x) sapply(x, threedig)
 ```
 
 ```{r data_import, eval = TRUE}
@@ -505,7 +519,7 @@ cluster_df_014 <- cluster.manual(hm, c('heat 1','ac'), return_data = TRUE)
 
 # combine all data frames
 daily_energy_data_clustered <- 
-  lapply(home.list(c(1,2,4:15)),
+  lapply(home.list(c(1,2,4,6:15)),
          function(x) get(paste0('cluster_df_', x))) %>%
   bind_rows()
 
