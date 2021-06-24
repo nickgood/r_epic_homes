@@ -1115,7 +1115,7 @@ ggplot(aes(x = sample_length, fill = thresh), data = a)+
 date_ranges_entire <- list(c('2020-10-13','2021-04-22'))
 tested_sample_sequence <- seq(3,28,4)
 sample_days_min <- 3
-home_num <- '004'
+home_num <- '009'
 location_type <- 'living'
 data <- omni_data
 monitor_season <- date_ranges_entire[1]
@@ -1235,9 +1235,15 @@ all_time <- TRUE
       entire <- data_season
     }
 
-    # remove outliers
+    # remove extreme outliers
     
-    outlier
+    entire <- entire %>%
+       rstatix::identify_outliers(all_of(metric)) %>%
+      full_join(entire, by = c('datetime', metric)) %>%
+      mutate_at(vars(is.outlier, is.extreme), function(x) {
+        ifelse(is.na(x), FALSE, x)
+      }) %>%
+   filter(is.extreme != TRUE)
     
     
     # fit different distributions to data ----------------
@@ -1250,9 +1256,9 @@ all_time <- TRUE
         
     entire_fit_gam <- fitdistrplus::fitdist(pull(entire, metric),
                                         "gamma", method = 'mle')
-    
         # test different distributions fits ----------------
 
+        
     plot.legend <- c("lnorm", "wieb", "gam")
 
     fitdistrplus::denscomp(list(entire_fit,
@@ -1480,18 +1486,6 @@ all_time <- TRUE
 
 ```
 
-## check different distributions
-
-```{r distribution_check}
-
-data <- omni_data %>%
-  filter(home== '010', location == 'living') %>%
-  pull('pm25')
-
-
-dist
-
-```
 
 ## old function when rooms were only pooled for entire monitoring period
 
