@@ -646,7 +646,7 @@ test_rep <- lapply('009', function(x_home) {
    
 clust <- c('heat', 'shoulder', 'ac') # can do multiple
 met <- 'pm25'
-loc <- 'living'
+loc <- 'bedroom'
 
    
     # apply function to all clusters if desired
@@ -684,93 +684,18 @@ loc <- 'living'
     }
     )
     }
-    
-    loc <- 'kitchen'
 
-    # apply function to all clusters if desired
-    {lapply(clust, function(cluster_type) {
-      
-      rep_data <-  lapply(homes_all, function(x_home) {
-        
-        start_date <- pick.start(x_home, cluster_type)
-        end_date <- pick.end(x_home, cluster_type)
-        sample_min <- pick.sample.min(met)
-        sample_max <- if_else(
-          as.numeric(as.Date(end_date) - as.Date(start_date))>=28,
-          28,
-          as.numeric(as.Date(end_date) - as.Date(start_date))
-          )
-        
-        scaled.entropy.table.time(
-          x_home, metric = met,
-          date_ranges_entire = list(c(start_date,
-                                      end_date)),
-          tested_sample_sequence =
-            seq(sample_min,sample_max,4),
-          sample_days_min = sample_min,
-          location_type = loc,
-          all_time = all_time_choice) %>%
-          mutate(energy_cluster = cluster_type) 
-      }
-      ) %>%
-        bind_rows()
-      
-      # give a variable name to the created data
-      assign(paste(met, loc, cluster_type, 'rep_data_time', sep = '_'),
-             rep_data,
-             envir = .GlobalEnv)
-    }
-    )
-    }
-    
-        loc <- 'kitchen'
-
-    # apply function to all clusters if desired
-    {lapply(clust, function(cluster_type) {
-      
-      rep_data <-  lapply(homes_all, function(x_home) {
-        
-        start_date <- pick.start(x_home, cluster_type)
-        end_date <- pick.end(x_home, cluster_type)
-        sample_min <- pick.sample.min(met)
-        sample_max <- if_else(
-          as.numeric(as.Date(end_date) - as.Date(start_date))>=28,
-          28,
-          as.numeric(as.Date(end_date) - as.Date(start_date))
-          )
-        
-        scaled.entropy.table.time(
-          x_home, metric = met,
-          date_ranges_entire = list(c(start_date,
-                                      end_date)),
-          tested_sample_sequence =
-            seq(sample_min,sample_max,4),
-          sample_days_min = sample_min,
-          location_type = loc,
-          all_time = all_time_choice) %>%
-          mutate(energy_cluster = cluster_type) 
-      }
-      ) %>%
-        bind_rows()
-      
-      # give a variable name to the created data
-      assign(paste(met, loc, cluster_type, 'rep_data_time', sep = '_'),
-             rep_data,
-             envir = .GlobalEnv)
-    }
-    )
-    }
 
   entropy_time_df <- bind_rows(
-    pm25_bedroom_heat_rep_data_time,
+    # pm25_bedroom_heat_rep_data_time,
     pm25_living_heat_rep_data_time,
     pm25_kitchen_heat_rep_data_time,
-    pm25_bedroom_shoulder_rep_data_time,
+    # pm25_bedroom_shoulder_rep_data_time,
     pm25_living_shoulder_rep_data_time,
     pm25_kitchen_shoulder_rep_data_time,
-    pm25_bedroom_ac_rep_data_time,
+    # pm25_bedroom_ac_rep_data_time,
     pm25_living_ac_rep_data_time,
-    pm25_kitchen_ac_rep_data_time,
+    pm25_kitchen_ac_rep_data_time
     # voc_bedroom_heat_rep_data_time,
     # voc_living_heat_rep_data_time,
     # voc_kitchen_heat_rep_data_time,
