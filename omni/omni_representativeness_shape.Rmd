@@ -1910,14 +1910,12 @@ kldtest <- function(x) {
 0.5*(e0/e1-1-log(e0/e1)+((m0-m1)^2)/e1)
 
 
-
 # test specifitiy formula
 
 pctest <- function(x) dnorm(x, mean=mc, sd=sqrt(ec)) 
 
 kldtest2 <- function(x) {
-        
-    
+
   # make sure R does not convert to 0 if result is very small number
   p_pc <- ptest(x)*pctest(x)
   
