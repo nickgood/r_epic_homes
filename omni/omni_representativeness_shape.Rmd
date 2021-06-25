@@ -1486,6 +1486,67 @@ all_time <- TRUE
 
 ```
 
+## test alternative method of kld assuming normal distribution
+```{r}
+m0 <- 30
+e0 <- 2^2
+
+m1 <- 90
+e1 <- 4^2
+
+mc <- 34
+ec <- 2^2.3
+
+
+ptest <- function(x) dnorm(x, mean=m0, sd=sqrt(e0)) 
+qtest <- function(x) dnorm(x, mean=m1, sd=sqrt(e1)) 
+
+
+kldtest <- function(x) {
+          
+          fit_ratio_value <- (ptest(x))/(qtest(x))
+          
+          # make sure R does not convert to 0 if result is very small number
+          fit_ratio_value <- ifelse( abs(fit_ratio_value) > .Machine$double.xmin,
+                                     fit_ratio_value,
+                                     .Machine$double.xmin)
+          
+          ptest(x)*log(fit_ratio_value)
+}
+# result from intergration
+(integrate(kldtest, 0,200))$value
+
+# rrsult from formula from Osses paper
+0.5*(e0/e1-1-log(e0/e1)+((m0-m1)^2)/e2)
+
+
+
+# test specifitiy formula
+
+pctest <- function(x) dnorm(x, mean=mc, sd=sqrt(ec)) 
+
+kldtest2 <- function(x) {
+          
+          fit_ratio_value <- qtest(x)/(ptest(x)*pctest(x))
+          
+          # make sure R does not convert to 0 if result is very small number
+          fit_ratio_value <- ifelse( abs(fit_ratio_value) > .Machine$double.xmin,
+                                     fit_ratio_value,
+                                     .Machine$double.xmin)
+          
+          qtest(x)*log(fit_ratio_value)
+}
+
+# reult from integration
+(integrate(kldtest2, -1,20))$value
+
+# result from Osses formula
+-0.5*log(e1/(ec*e0))
+
+
+
+```
+
 
 ## old function when rooms were only pooled for entire monitoring period
 
