@@ -1486,6 +1486,102 @@ all_time <- TRUE
 
 ```
 
+## test alternative method of kld assuming normal distribution
+```{r}
+m0 <- 30
+e0 <- 2^2
+
+m1 <- 32
+e1 <- 4^2
+
+mc <- 34
+ec <- 2^2.3
+
+
+ptest <- function(x) dnorm(x, mean=m0, sd=sqrt(e0)) 
+qtest <- function(x) dnorm(x, mean=m1, sd=sqrt(e1)) 
+
+
+kldtest <- function(x) {
+          
+          fit_ratio_value <- (ptest(x))/(qtest(x))
+          
+          # make sure R does not convert to 0 if result is very small number
+          fit_ratio_value <- ifelse( abs(fit_ratio_value) > .Machine$double.xmin,
+                                     fit_ratio_value,
+                                     .Machine$double.xmin)
+          
+          ptest(x)*log(fit_ratio_value)
+}
+# result from intergration
+(integrate(kldtest, 0,100))$value
+
+# rrsult from formula from Osses paper
+0.5*(e0/e1-1-log(e0/e1)+((m0-m1)^2)/e1)
+
+
+
+# test specifitiy formula
+
+pctest <- function(x) dnorm(x, mean=mc, sd=sqrt(ec)) 
+
+kldtest2 <- function(x) {
+        
+    
+  # make sure R does not convert to 0 if result is very small number
+  p_pc <- ptest(x)*pctest(x)
+  
+  p_pc <- ifelse( abs(p_pc) > .Machine$double.xmin,
+                  p_pc,
+                             .Machine$double.xmin)
+  
+  
+          fit_ratio_value <- qtest(x)/p_pc
+          
+          # make sure R does not convert to 0 if result is very small number
+          fit_ratio_value <- ifelse( abs(fit_ratio_value) > .Machine$double.xmin,
+                                     fit_ratio_value,
+                                     .Machine$double.xmin)
+          
+          qtest(x)*log(fit_ratio_value)
+}
+
+x_vals <- seq(1, 100)
+
+ggplot(data = NULL, aes(x_vals))+
+  geom_line(aes(y = ptest(x_vals)))+
+  geom_line(aes(y= qtest(x_vals)))+
+  geom_line(aes(y= pctest(x_vals)))+
+  geom_line(aes(y= pctest(x_vals)*ptest(x_vals)))
+  
+
+
+ggplot(data = NULL, aes(x_vals))+
+  geom_line(aes(y = integrate.func(kldtest2, x_vals)))
+
+integrate.func <- function(func, x) {
+
+        sapply(x, function(y) {
+          temp <- integrate(f = func, lower = 0,
+                            upper = y)
+          temp$value
+        }
+        )
+        # ) %>% as.data.frame() %>% rename('integral' = '.') %>%
+        #   bind_cols('sample' = x) %>%
+        #   pull(integral)
+      }
+  
+# reult from integration
+(integrate(kldtest2, 0,200))$value
+
+# result from Osses formula
+-0.5*log(e1/(ec*e0))
+
+
+
+```
+
 
 ## old function when rooms were only pooled for entire monitoring period
 
