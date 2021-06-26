@@ -50,7 +50,7 @@ zero_test <- omni_data %>%
 
 ```{r import_energy_cluster_homes}
 # import energy cluster dataframe for all homes
-energy_cluster_df <- read_csv('../sense/csv_created_sense/energy_cluster_df.csv')
+energy_cluster_df <- read_csv('./csv_created/from_sense/energy_cluster_df.csv')
 ```
 
 ```{r import_acf_lags}
@@ -113,7 +113,24 @@ rep_threshold_seq <- c(0.4, 0.5, 0.6)
 
 ```{r function_max_kld}
 
+date_ranges_entire <- list(c('2020-11-01','2020-11-30'))
+home_num <- '004'
+location_type <- 'living'
+monitor_season <- date_ranges_entire[1]
+metric <- 'pm25'
+sample_length <- 1
+all_time = TRUE
 
+
+rm(
+  date_ranges_entire,
+home_num,
+location_type,
+monitor_season,
+metric,
+sample_length,
+all_time
+)
 
 # function to calculate scaled entropy for a house
 # during multiple different time periods
@@ -318,10 +335,10 @@ kld.max <- function(
       a <-
         runner(
           all_dates_season,
-          k = sampe_length*24*12, # number of 5-min periods in short sampling period
+          k = sample_length*24*12, # number of 5-min periods in short sampling period
           # only evaluate windows that start at 12AM
           # and windows that are full (ignore partial windows at start)
-          at = seq(sampe_length*24*12, length(all_dates_season), 24*12),
+          at = seq(sample_length*24*12, length(all_dates_season), 24*12),
           f = function(y) { # y = window, vector (length = k) of specified days per iteration
             
             # filter out only given room
@@ -331,7 +348,7 @@ kld.max <- function(
             
             # omit sampling period if missing more than
             # 25 % of sampling period
-            if(nrow(sample) < 0.75 * sampe_length*24*12) {
+            if(nrow(sample) < 0.75 * sample_length*24*12) {
               
               a <- rep(NA, 2) %>% as.integer()
               
@@ -349,7 +366,7 @@ kld.max <- function(
                   error = function(e)   {
                     output <<- na.result( 'no_fit_lnorm_sample',
                                           period_label,
-                                          sampe_length)
+                                          sample_length)
                     stop()
                   }
                 )
@@ -365,8 +382,8 @@ kld.max <- function(
             a
           }
         )
-      
-      # bind all elements of list into a dataframe
+
+            # bind all elements of list into a dataframe
       a <- bind_cols(a)
       
       
@@ -458,13 +475,13 @@ kld.max <- function(
 
            'n_samp_avail' = n_samp_avail,
            
-          'sample_length' = sampke_length,
+          'sample_length' = sample_length,
           'monitor_season' = period_label,
           'error' = 'none'
         )
 
 a # return the above list
-      } %>%
+      }  %>%
     # if season results in an error, return the error message in a df
     tryCatch(error = function(e) output)
 
@@ -487,16 +504,52 @@ a # return the above list
 }
 
 
-hm1 <- '009'
-met1 <- 'pm25'
+hm1 <- '004'
+met1 <- 'voc'
 clust1 <- 'heat'
-loc1 <- 'kitchen'
+loc1 <- 'living'
 
 # test for one home, met, cluster combo
-kld_test <- kld.max(hm1, met1, list(c(pick.start(hm1, clust1)), pick.end(hm1, clust1)),
-        loc1)
+kld_test <- kld.max(hm1, met1, list(c(pick.start(hm1, clust1), pick.end(hm1, clust1))),
+        loc1, all_time = TRUE)
 
 
+
+clusters_all <- c('heat','shoulder', 'ac')
+locations_indoor <- c('living', 'kitchen', 'bedroom')
+
+# calculate one-day kld values for all possible cust/home/location combos for one metric
+kld_max <- map(clusters_all, function(x_cluster) {
+  map(locations_indoor, function(x_location) {
+    map(homes_all, function(x_home) {
+      
+      kld.max(x_home, met1, list(c(pick.start(x_home, x_cluster),
+                                   pick.end(x_home, x_cluster))),
+              location_type = x_location, all_time = TRUE)
+    }
+    )%>%
+  bind_rows()
+  }
+  )%>%
+  bind_rows()
+}
+)%>%
+  bind_rows()
+
+
+max_kld_pm <- kld_max
+a <- flatten(kld_max)
+b <- flatten(a)
+c <- bind_rows(b)
+d <- c %>%select( -c(low_val, high_val, coeff)) %>%
+  select(-everything(), kld_avg, kld_sd, everything())
+
+e <- kld_max%>%select( -c(low_val, high_val, coeff)) %>%
+  select(-everything(), kld_avg, kld_sd, everything())
+f <- bind_rows(e,d)
+
+write_csv(f, paste0('./csv_created/representativeness_data/kld_max_',
+                    Sys.Date(), '.csv'))
 ```
 
 
