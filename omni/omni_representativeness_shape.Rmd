@@ -182,7 +182,7 @@ kld.max <- function(
   location_type, # sensor location (living, bedroom, or kitchen)
   sample_length = 1, # short sampling length
   
-  all_time = FALSE, # if TRUE, compare each short sampling period to entire monitoring year of home
+  all_time = TRUE, # if TRUE, compare each short sampling period to entire monitoring year of home
   
   data = omni_data) {
   
@@ -475,7 +475,7 @@ a # return the above list
            period_compare = ifelse(all_time == TRUE, 'year', 'season'))
 
 
-  entropy_data_season  # scaled_entropy for all specified date ranges
+  entropy_data_season  # entropy for all specified date ranges
 
 }
 # test function----------------
