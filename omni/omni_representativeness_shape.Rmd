@@ -907,8 +907,6 @@ scaled.entropy.table.shape <- function(
 }
 
 
-
-
 # test function--------------------------
 
 
@@ -1166,7 +1164,7 @@ entropy_shape_df <- read_csv(file = './csv_created/representativeness_data/rep_d
 
 # all_homes------------------------------------------------------
 entropy.plot <- function (
-  hm,
+  hm, loc,
   # omit a sampling period of given length
   # if this proportion of possible samples
   # were not availabel in data
@@ -1177,12 +1175,9 @@ entropy.plot <- function (
   
   # for one home:
   a <- data %>%
-    filter(home == hm &
+    filter(home == hm & location == loc &
              metric %in% metrics &
-             n_samp_avail >= sample_omit) %>%
-    group_by(sample_length, metric, energy_cluster) %>%
-    # average klds from all rooms
-    summarize(coeff = mean(coeff, na.rm = TRUE), .groups = 'drop') 
+             n_samp_avail >= sample_omit)
 
   if(nrow(a) == 0) {
     plot <- NULL # return NULL if no data for home/metric/cluster combo
@@ -1200,24 +1195,23 @@ entropy.plot <- function (
       coord_cartesian(ylim = c(0,1))+
       ggtitle(paste('Home',hm)) +
       facet_wrap(vars(metric)) +
-      scale_x_continuous(breaks=seq(0,28,7))
-    # geom_ribbon(aes(ymin = low_val, ymax = high_val, fill = monitor_period),
-    #             alpha = 0.3, color = NA)
+      scale_x_continuous(breaks=seq(0,28,7))+
+    geom_ribbon(aes(ymin = low_val, ymax = high_val, fill = energy_cluster),
+                alpha = 0.3, color = NA)
   }
   plot
 }
 
 
 
-# # test for one home
-# entropy.plot.metrics.seasons(a, '003', c('pm25_ihs'))
-
-
 # make plots for all homes
-lapply(homes_all,
-       entropy.plot)
+map(homes_all, function (x_home) {
+  map(locations_indoor, function (x_location) {
+    entropy.plot(hm = x_home, loc = x_location)
+    
+  })
 
-
+})
 
 ```
 
@@ -1227,116 +1221,23 @@ lapply(homes_all,
 
 ```{r threshold_plots_shape}
 
-# months--------------------------------------------------------------
-
-# # make dataframe of values for minimum sample length (in days) where entropy is less than 0.1
-# entropy_cutoffs <- entropy_all %>%
-#   filter(n_samp_avail >0.5 & method == 'shape') %>%
-#   filter(
-#     monitor_period %in% month.abb
-#     ) %>%
-#   filter(coeff <= threshold) %>% 
-#   group_by(home, metric, monitor_period) %>%
-#   summarise_at(vars(sample_length), min) %>%
-#   ungroup()
-# 
-# # fill in missing combinations so bar chart will have bars of constant width
-# a <- expand.grid(home=unique(entropy_cutoffs$home),
-#                  metric=unique(entropy_cutoffs$metric),
-#                  monitor_period=unique(entropy_cutoffs$monitor_period))%>%
-#   data.frame() %>%
-#   left_join(entropy_cutoffs)
-# 
-# 
-# 
-# # bar chart of when threshold was reached for each home
-# ggplot(aes(x = home, y = sample_length, fill = metric), data = a)+
-#   geom_col(position = 'dodge')+
-#   facet_wrap(vars(monitor_period), nrow = 2)
-# 
-# 
-# 
-# 
-# 
-# 
-# 
-# # make dataframe of values for minimum sample length (in days)
-# # where entropy is less than threshold value
-# threshold.freq.table <- function (threshold) {
-#   
-#   
-#   entropy_cutoffs <- entropy_all %>%
-#   filter(n_samp_avail >0.5 & method == 'shape') %>%
-#   filter(
-#     monitor_period %in% month.abb
-#     ) %>%
-#   filter(coeff <= threshold) %>% 
-#   group_by(home, metric, monitor_period) %>%
-#   summarise_at(vars(sample_length), min) %>%
-#   ungroup()
-#     
-# 
-#   # fill in missing combinations so bar chart will have bars of constant width
-# a <- expand.grid(home=unique(entropy_cutoffs$home),
-#                  metric=unique(entropy_cutoffs$metric),
-#                  monitor_period=unique(entropy_cutoffs$monitor_period))%>%
-#   data.frame() %>%
-#   left_join(entropy_cutoffs) %>%
-# # count frequency of home-month instances when threshold was reached for each sample length
-#   group_by(sample_length, metric) %>%
-#   summarise(freq = n()) %>%
-#   ungroup() %>%
-#   filter(!is.na(sample_length)) %>%
-#   mutate(thresh = as.factor(threshold))
-# }
-# 
-# 
-# # apply function to all thresholds in threshold_seq
-#  a <- lapply(threshold_seq, threshold.freq.table)
-#  a <- do.call(rbind, a)
-# 
-#  # ensure there weren't a significant amount of omissions for any metric type
-#  # (because the threshod may never have been reached)
-#  
-#  # test <- a %>%
-#  #   group_by(metric) %>%
-#  #   summarise(n = sum(freq)) %>%
-#  #   ungroup()
-# 
-#  # histogram of when threshold was reached for all home/month combos
-# ggplot(aes(x = sample_length, fill = thresh), data = a)+
-#   geom_density(alpha = 0.5)+
-#   facet_wrap(vars(metric))+
-#   xlab("Sample Length Required to Meet Representativeness Threshold, days")+
-#   scale_x_continuous(breaks = c(7,14,21,28))
-
-
-# maybe limit to Aug-Feb (7 months), 15 homes (4 metrics) for now?
-
-
-# seasons--------------------------------------------------------------
-
-
 # make dataframe of values for minimum sample length (in days)
 # where entropy is less than threshold value
-threshold.freq.table.seasons <- function (threshold) {
+threshold.freq.table <- function (threshold) {
   
   
-  a <- entropy_all %>%
+  a <- entropy_shape_df %>%
   filter(n_samp_avail >0.5 & method == 'shape') %>%
   filter(coeff <= threshold) %>% 
-  group_by(home, metric, monitor_period) %>%
+  group_by(home, metric, location, energy_cluster) %>%
   summarise_at(vars(sample_length), min) %>%
   ungroup() %>%
     mutate('thresh' = threshold)
-    
-
 }
 
-
 # apply function to all thresholds in threshold_seq
- a <- lapply(threshold_seq, threshold.freq.table.seasons)
- a <- do.call(rbind, a)
+ a <- lapply(rep_threshold_seq, threshold.freq.table)
+ a <- bind_rows(a)
 
  # ensure there weren't a significant amount of omissions for any metric type
  # (because the threshod may never have been reached)
@@ -1357,104 +1258,11 @@ ggplot(aes(x = sample_length, fill = as.factor(thresh)), data = a)+
   xlab("Sample Length Required to Meet Representativeness Threshold, days")+
   scale_x_continuous(breaks = c(7,14,21,28))+
   scale_fill_discrete(labels = labels)+
-  annotate('text', x = 14, y = 0.15, label = '*max n = 16 (number of homes)')
+  annotate('text', x = 14, y = 0.15, label = '*max n = 48 (homes*rooms)')
 
 
 
 ```
-
-### Effect on when average Scaled Entropy crosses below threshold
-
-
-```{r threshold_plots_time, eval = FALSE}
-
-# months--------------------------------------------------------------
-
-# make dataframe of values for minimum sample length (in days) where entropy is less than 0.1
-entropy_cutoffs <- entropy_all %>%
-  filter(n_samp_avail >0.5) %>%
-  filter(
-    monitor_period %in% month.abb
-    ) %>%
-  filter(coeff <= thershold) %>% 
-  group_by(home, metric, monitor_period) %>%
-  summarise_at(vars(sample_length), min) %>%
-  ungroup()
-
-# fill in missing combinations so bar chart will have bars of constant width
-a <- expand.grid(home=unique(entropy_cutoffs$home),
-                 metric=unique(entropy_cutoffs$metric),
-                 monitor_period=unique(entropy_cutoffs$monitor_period))%>%
-  data.frame() %>%
-  left_join(entropy_cutoffs)
-
-
-
-# bar chart of when threshold was reached for each home
-ggplot(aes(x = home, y = sample_length, fill = metric), data = a)+
-  geom_col(position = 'dodge')+
-  facet_wrap(vars(monitor_period), nrow = 2)
-
-
-
-
-
-
-
-# make dataframe of values for minimum sample length (in days)
-# where entropy is less than threshold value
-threshold.freq.table <- function (threshold) {
-  
-  
-  entropy_cutoffs <- entropy_all %>%
-  filter(n_samp_avail >0.5) %>%
-  filter(
-    monitor_period %in% month.abb
-    ) %>%
-  filter(coeff <= threshold) %>% 
-  group_by(home, metric, monitor_period) %>%
-  summarise_at(vars(sample_length), min) %>%
-  ungroup()
-    
-
-  # fill in missing combinations so bar chart will have bars of constant width
-a <- expand.grid(home=unique(entropy_cutoffs$home),
-                 metric=unique(entropy_cutoffs$metric),
-                 monitor_period=unique(entropy_cutoffs$monitor_period))%>%
-  data.frame() %>%
-  left_join(entropy_cutoffs) %>%
-# count frequency of home-month instances when threshold was reached for each sample length
-  group_by(sample_length, metric) %>%
-  summarise(freq = n()) %>%
-  ungroup() %>%
-  filter(!is.na(sample_length)) %>%
-  mutate(thresh = as.factor(threshold))
-}
-
-
-# apply function to all thresholds in threshold_seq
- a <- lapply(threshold_seq, threshold.freq.table.seasons)
-
- a <- do.call(rbind, a)
-
- # ensure there weren't a significant amount of omissions for any metric type
- # (because the threshod may never have been reached)
- 
- # test <- a %>%
- #   group_by(metric) %>%
- #   summarise(n = sum(freq)) %>%
- #   ungroup()
-
- # histogram of when threshold was reached for all home/month combos
-ggplot(aes(x = sample_length, fill = thresh), data = a)+
-  geom_density(alpha = 0.5)+
-  facet_wrap(vars(metric))+
-  xlab("Sample Length Required to Meet Representativeness Threshold, days")+
-  scale_x_continuous(breaks = c(7,14,21,28))
-
-
-```
-
 
 ---
 # Testing Functions
