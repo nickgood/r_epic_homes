@@ -512,13 +512,13 @@ scaled.entropy.table.time.pdf <- function(
    pull(end_date) %>% as.character()
   }
   
-  # fun to pick minimum sample length based on metric
-  pick.sample.min <- function(x_metric) {
-    lag_summary_df %>%
-      # use the pooled median of all clusters
-      filter(metric == x_metric, energy_cluster == 'total') %>%
-      pull(median)
-  }
+  # # fun to pick minimum sample length based on metric
+  # pick.sample.min <- function(x_metric) {
+  #   lag_summary_df %>%
+  #     # use the pooled median of all clusters
+  #     filter(metric == x_metric, energy_cluster == 'total') %>%
+  #     pull(median)
+  # }
   # # test functions
    # pick.start('006', 'heat')
   # pick.end('004', 'heat')
@@ -553,44 +553,125 @@ pdf_days <- c(3,7,10,14,21)
       # make csvs--------------------
 
 
-    all_time_choice <- TRUE
- 
-   met <- 'voc'
- 
-   loc <- 'bedroom'
+all_time_choice <- TRUE
+    clust <- c('heat', 'shoulder', 'ac') # can do multiple
    
-      clust <- 'ac'
+  
+            met <- 'pm25'
+        
+    loc <- 'living'
+    {lapply(clust, function(cluster_type) {
       
-{
-rep_data <- lapply(homes_all, function(x_home) {
-  
-  start_date <- pick.start(x_home, clust)
-  end_date <- pick.end(x_home, clust)
-  sample_min <- pick.sample.min(met)
-  sample_max <- if_else(as.numeric(as.Date(end_date) - as.Date(start_date))>=28,
-                        28, as.numeric(as.Date(end_date) - as.Date(start_date)))
-  
-    scaled.entropy.table.time.pdf(x_home, metric = met,
-                                           date_ranges_entire = list(c(start_date,
-                                                                       end_date)),
-                                           tested_sample_sequence =
-                                             seq(sample_min,sample_max,4),
-                                           location_type = loc,
-                                           sample_days_min = sample_min,
-                                           all_time = all_time_choice) %>%
-                  mutate(energy_cluster = clust) 
+      rep_data <-  lapply(homes_all, function(x_home) {
+        
+        start_date <- pick.start(x_home, cluster_type)
+        end_date <- pick.end(x_home, cluster_type)
+        sample_min <- pick.sample.min(met)
+        sample_max <- if_else(
+          as.numeric(as.Date(end_date) - as.Date(start_date))>=28,
+          28,
+          as.numeric(as.Date(end_date) - as.Date(start_date))
+          )
+        
+        scaled.entropy.table.shape(
+          x_home, metric = met,
+          date_ranges_entire = list(c(start_date,
+                                      end_date)),
+          tested_sample_sequence =
+            seq(sample_min,sample_max,4),
+          sample_days_min = sample_min,
+          location_type = loc,
+          all_time = all_time_choice) %>%
+          
+          # add in column for energy_cluster
+          mutate(energy_cluster = cluster_type) 
+      }
+      ) %>%
+        bind_rows()
+      
+      # give a variable name to the created data
+      assign(paste(met, loc, cluster_type, 'rep_data_time_pdf', sep = '_'),
+             rep_data,
+             envir = .GlobalEnv)
+    }
+    )
+    }
 
-}
-) %>%
-  bind_rows()
-
-  
-    # give a variable name to the created data
-    assign(paste(met, loc, clust, 'rep_data_time_pdf', sep = '_'),
-           rep_data,
-           envir = .GlobalEnv)
-
-}
+    loc <- 'kitchen'
+    {lapply(clust, function(cluster_type) {
+      
+      rep_data <-  lapply(homes_all, function(x_home) {
+        
+        start_date <- pick.start(x_home, cluster_type)
+        end_date <- pick.end(x_home, cluster_type)
+        sample_min <- pick.sample.min(met)
+        sample_max <- if_else(
+          as.numeric(as.Date(end_date) - as.Date(start_date))>=28,
+          28,
+          as.numeric(as.Date(end_date) - as.Date(start_date))
+          )
+        
+        scaled.entropy.table.shape(
+          x_home, metric = met,
+          date_ranges_entire = list(c(start_date,
+                                      end_date)),
+          tested_sample_sequence =
+            seq(sample_min,sample_max,4),
+          sample_days_min = sample_min,
+          location_type = loc,
+          all_time = all_time_choice) %>%
+          
+          # add in column for energy_cluster
+          mutate(energy_cluster = cluster_type) 
+      }
+      ) %>%
+        bind_rows()
+      
+      # give a variable name to the created data
+      assign(paste(met, loc, cluster_type, 'rep_data_time_pdf', sep = '_'),
+             rep_data,
+             envir = .GlobalEnv)
+    }
+    )
+    }
+    
+    loc <- 'bedroom'
+    {lapply(clust, function(cluster_type) {
+      
+      rep_data <-  lapply(homes_all, function(x_home) {
+        
+        start_date <- pick.start(x_home, cluster_type)
+        end_date <- pick.end(x_home, cluster_type)
+        sample_min <- pick.sample.min(met)
+        sample_max <- if_else(
+          as.numeric(as.Date(end_date) - as.Date(start_date))>=28,
+          28,
+          as.numeric(as.Date(end_date) - as.Date(start_date))
+          )
+        
+        scaled.entropy.table.shape(
+          x_home, metric = met,
+          date_ranges_entire = list(c(start_date,
+                                      end_date)),
+          tested_sample_sequence =
+            seq(sample_min,sample_max,4),
+          sample_days_min = sample_min,
+          location_type = loc,
+          all_time = all_time_choice) %>%
+          
+          # add in column for energy_cluster
+          mutate(energy_cluster = cluster_type) 
+      }
+      ) %>%
+        bind_rows()
+      
+      # give a variable name to the created data
+      assign(paste(met, loc, cluster_type, 'rep_data_time_pdf', sep = '_'),
+             rep_data,
+             envir = .GlobalEnv)
+    }
+    )
+    }
       
 
 entropy_time_pdf_df <- bind_rows(

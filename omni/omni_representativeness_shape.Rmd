@@ -1008,7 +1008,7 @@ kld_max <- kld_max_df %>% filter(n_samp_avail >= 0.5) %>% pull(kld_avg) %>% max(
 ```
 
 
-```{r shape_data_maker_range, eval = FALSE}
+```{r shape_data_maker, eval = FALSE}
 
 
 # test function for multiple homes --------------
@@ -1049,126 +1049,7 @@ kld_max <- kld_max_df %>% filter(n_samp_avail >= 0.5) %>% pull(kld_avg) %>% max(
   all_time_choice <- TRUE
     clust <- c('heat', 'shoulder', 'ac') # can do multiple
    
-        met <- 'pm25'
-        
-    loc <- 'living'
-    # apply function to all clusters if desired
-    {lapply(clust, function(cluster_type) {
-      
-      rep_data <-  lapply(homes_all, function(x_home) {
-        
-        start_date <- pick.start(x_home, cluster_type)
-        end_date <- pick.end(x_home, cluster_type)
-        sample_min <- pick.sample.min(met)
-        sample_max <- if_else(
-          as.numeric(as.Date(end_date) - as.Date(start_date))>=28,
-          28,
-          as.numeric(as.Date(end_date) - as.Date(start_date))
-          )
-        
-        scaled.entropy.table.shape(
-          x_home, metric = met,
-          date_ranges_entire = list(c(start_date,
-                                      end_date)),
-          tested_sample_sequence =
-            seq(sample_min,sample_max,4),
-          sample_days_min = sample_min,
-          location_type = loc,
-          all_time = all_time_choice) %>%
-          
-          # add in column for energy_cluster
-          mutate(energy_cluster = cluster_type) 
-      }
-      ) %>%
-        bind_rows()
-      
-      # give a variable name to the created data
-      assign(paste(met, loc, cluster_type, 'rep_data_shape', sep = '_'),
-             rep_data,
-             envir = .GlobalEnv)
-    }
-    )
-    }
-
-    loc <- 'kitchen'
-    # apply function to all clusters if desired
-    {lapply(clust, function(cluster_type) {
-      
-      rep_data <-  lapply(homes_all, function(x_home) {
-        
-        start_date <- pick.start(x_home, cluster_type)
-        end_date <- pick.end(x_home, cluster_type)
-        sample_min <- pick.sample.min(met)
-        sample_max <- if_else(
-          as.numeric(as.Date(end_date) - as.Date(start_date))>=28,
-          28,
-          as.numeric(as.Date(end_date) - as.Date(start_date))
-          )
-        
-        scaled.entropy.table.shape(
-          x_home, metric = met,
-          date_ranges_entire = list(c(start_date,
-                                      end_date)),
-          tested_sample_sequence =
-            seq(sample_min,sample_max,4),
-          sample_days_min = sample_min,
-          location_type = loc,
-          all_time = all_time_choice) %>%
-          
-          # add in column for energy_cluster
-          mutate(energy_cluster = cluster_type) 
-      }
-      ) %>%
-        bind_rows()
-      
-      # give a variable name to the created data
-      assign(paste(met, loc, cluster_type, 'rep_data_shape', sep = '_'),
-             rep_data,
-             envir = .GlobalEnv)
-    }
-    )
-    }
-    
-    loc <- 'bedroom'
-    # apply function to all clusters if desired
-    {lapply(clust, function(cluster_type) {
-      
-      rep_data <-  lapply(homes_all, function(x_home) {
-        
-        start_date <- pick.start(x_home, cluster_type)
-        end_date <- pick.end(x_home, cluster_type)
-        sample_min <- pick.sample.min(met)
-        sample_max <- if_else(
-          as.numeric(as.Date(end_date) - as.Date(start_date))>=28,
-          28,
-          as.numeric(as.Date(end_date) - as.Date(start_date))
-          )
-        
-        scaled.entropy.table.shape(
-          x_home, metric = met,
-          date_ranges_entire = list(c(start_date,
-                                      end_date)),
-          tested_sample_sequence =
-            seq(sample_min,sample_max,4),
-          sample_days_min = sample_min,
-          location_type = loc,
-          all_time = all_time_choice) %>%
-          
-          # add in column for energy_cluster
-          mutate(energy_cluster = cluster_type) 
-      }
-      ) %>%
-        bind_rows()
-      
-      # give a variable name to the created data
-      assign(paste(met, loc, cluster_type, 'rep_data_shape', sep = '_'),
-             rep_data,
-             envir = .GlobalEnv)
-    }
-    )
-    }
-
-    
+  
             met <- 'voc'
         
     loc <- 'living'
