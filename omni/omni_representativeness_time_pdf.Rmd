@@ -83,6 +83,18 @@ threedig <- function(x) {
 home.list <- function(x) sapply(x, threedig)
 
 
+# function to calculate Kullback-Liebler Distance between two vectors
+# of equal length
+kld <- function(p,q){
+  lapply(1:length(p), function(x){
+         p <- p[x]/sum(p)
+         q <- q[x]/sum(q)
+         
+         p*log(p/q)
+         }
+         ) %>% unlist() %>% sum()
+}
+
 # give a row of NA values with identifers to help with identifying
 # causes of errors in function
 na.result <- function(error, season = NA, sample_days = NA, samp_avail = NA) {
@@ -90,6 +102,7 @@ na.result <- function(error, season = NA, sample_days = NA, samp_avail = NA) {
   'coeff' = NA,
   'sample_length' = sample_days, # sample_length,
   'monitor_season' = season, # period_label,
+  'n_samp_avail' = samp_avail,
   'error' = error
 )
 }
@@ -102,39 +115,40 @@ na.result <- function(error, season = NA, sample_days = NA, samp_avail = NA) {
 # calculate kld for continuous probability distributions
 
 # define variables for testing-----------------------
-date_ranges_entire <- list(c('2020-12-02','2021-04-23'))
-tested_sample_sequence <- seq(3,28,4)
-sample_days_min <- 3
-home_num <- '010'
-location_type <- 'living'
-data <- omni_data
-monitor_season <- date_ranges_entire[1]
-metric <- 'pm25'
-days <- 16
-days2 <- 16
-all_time <- TRUE
 
-
-# remove variables after done testing
-rm(tested_sample_sequence,
-   date_ranges_entire,
-sample_days_min,
-home_num,
-monitor_season,
-monitor_period,
-metric,
-days,
-days2,
-all_time,
-data,
-data_season,
-data_year,
-entire,
-date_col_season,
-date_col_year,
-all_dates_season,
-all_dates_year
-)
+# date_ranges_entire <- list(c('2020-12-02','2021-04-23'))
+# tested_sample_sequence <- seq(3,28,4)
+# sample_days_min <- 3
+# home_num <- '010'
+# location_type <- 'living'
+# data <- omni_data
+# monitor_season <- date_ranges_entire[1]
+# metric <- 'pm25'
+# days <- 16
+# days2 <- 16
+# all_time <- TRUE
+# 
+# 
+# # remove variables after done testing
+# rm(tested_sample_sequence,
+#    date_ranges_entire,
+# sample_days_min,
+# home_num,
+# monitor_season,
+# monitor_period,
+# metric,
+# days,
+# days2,
+# all_time,
+# data,
+# data_season,
+# data_year,
+# entire,
+# date_col_season,
+# date_col_year,
+# all_dates_season,
+# all_dates_year
+# )
 
 # entropy function minutely data ----------------------------
 
@@ -380,13 +394,9 @@ scaled.entropy.table.time.pdf <- function(
       
       # bind all elements of list into a dataframe
       a <- bind_cols(a)
-      
-      
-      
+
       n_samples_possible <- ncol(a)
       # omit columns that have NA values (didn't have enough data)
-      # use if statement to avoid changing
-      # structure of single column to vector
       if(ncol(a)>1) a <- a[ , colSums(is.na(a)) == 0]
       
       # count number of sampling periods created (columns)
@@ -403,8 +413,9 @@ scaled.entropy.table.time.pdf <- function(
           kld(entire)
       })
       
-      a # return all calculated kld values
-      
+      # return all calculated kld values
+            list('kld' = unlist(a),
+           'n_samp_avail' = n_samp_avail)
       
     }
     # # test kld.period function
@@ -422,12 +433,13 @@ scaled.entropy.table.time.pdf <- function(
         
         # calculate  KLD for all
         # short sampling period of length "days2"
-        a <- kld.period(days2) %>% unlist()
+        a <- kld.period(days2)
         
         a <- tibble(
-          'coeff' = a, # entropy value
+          'coeff' = a[['kld']], # entropy value
           'sample_length' = days2,
           'monitor_season' = period_label,
+          'n_samp_avail' = a[['n_samp_avail']],
           'error' = 'none'
         )
         a
@@ -440,7 +452,7 @@ scaled.entropy.table.time.pdf <- function(
     
     a # scaled_entropy for one date range
     
-  } %>%
+  }  %>%
     # if season results in an error, return the error message in a df
     tryCatch(error = function(e) output)
   
@@ -466,6 +478,7 @@ scaled.entropy.table.time.pdf <- function(
 
 
 # test function--------------------------
+
 # start <- Sys.time()
 # 
 # test<- scaled.entropy.table.time.pdf('004', 'pm25',
@@ -476,11 +489,7 @@ scaled.entropy.table.time.pdf <- function(
 #                                                        '2020-11-30')),
 #                            tested_sample_sequence = c(4,5),
 #                            location_type = 'living',
-#                            sample_days_min = 3,
 #                            all_time = TRUE)
-# 
-# 
-# 
 # 
 # end <- Sys.time()
 # run2 <- end- start
