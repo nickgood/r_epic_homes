@@ -311,28 +311,9 @@ scaled.entropy.table.shape.pdf <- function(home_num, metric,
         }
       ) 
     
-    # function of continuous distribution from the parameters
-    # calculated in the fitted curve
-    # note that meanlog and sdlog in dlnorm correspond to the mean and sd,
-    # so you do not have to take log of them yourself
-    log_fit_entire <- function(x) {
-      
-      fit_value <- dlnorm(x, meanlog = entire_fit$estimate['meanlog'],
-                          sdlog = entire_fit$estimate['sdlog'])
-      
-      # make sure R does not convert to 0 if result is very small number
-      ifelse( abs(fit_value) > .Machine$double.xmin,
-              fit_value,
-              .Machine$double.xmin)
-    } %>%
-      tryCatch(
-        error = function(e)   {
-          output <<- na.result( 'lnorm_param_entire',
-                                period_label
-          )
-          stop()
-        }
-      )
+    # extract mean and variance of logarithmic fit
+    mean_entire <- entire_fit$estimate['meanlog']
+    variance_entire <- (entire_fit$estimate['sdlog'])^2
     
     # function to take a running window of all short sampling periods possible
     # within the longer montirong period
@@ -411,54 +392,13 @@ scaled.entropy.table.shape.pdf <- function(home_num, metric,
         
         a <- a %>% pull(x)
         
-        log_fit_sample <- function(x) {
-          
-          fit_value <- dlnorm(x, meanlog = a[1], sdlog = a[2])
-          
-          # make sure R does not convert to 0 if result is very small number
-          ifelse( abs(fit_value) > .Machine$double.xmin,
-                  fit_value,
-                  .Machine$double.xmin)
-        } %>%
-          tryCatch(
-            error = function(e)   {
-              output <<- na.result( 'lnorm_param_sample',
-                                    period_label,
-                                    days
-              )
-              stop()
-            }
-          )
-        
-        # find kld from two continuous functions
-        # bounded from 0 to Inf
-        kld_fit <- function(x) {
-          
-          fit_ratio_value <- (log_fit_sample(x))/(log_fit_entire(x))
-          
-          # make sure R does not convert to 0 if result is very small number
-          fit_ratio_value <- ifelse( abs(fit_ratio_value) > .Machine$double.xmin,
-                                     fit_ratio_value,
-                                     .Machine$double.xmin)
-          
-          log_fit_sample(x)*log(fit_ratio_value)
-        }
-          
-        
-        # find kld value
-        integrate(kld_fit, lower = 0,
-                  # increase tolerance to avoid "divergent" message
-                  rel.tol = .Machine$double.eps^0.5,  
-                  upper = Inf)$value %>%
-          tryCatch(
-            error = function(e)   {
-              output <<- na.result( 'integration_issue',
-                                    period_label,
-                                    days
-              )
-              stop()
-            }
-          )
+        mean_sample <- a[1]
+      variance_sample <- (a[2])^2
+      
+      # find kld value
+      # from formula from Osses paper
+      0.5*(variance_sample/variance_entire-1-log(variance_sample/variance_entire)+
+             ((mean_sample-mean_entire)^2)/variance_entire)
         
       })
       
@@ -467,10 +407,6 @@ a # return all calculated kld values
     }
     # # test kld.period function
     # test <- kld.period(16)
-    
-    # calculate "max KLD":
-    # average kld for smallest sampling length of interest
-    kld_avg_max <- mean(kld.period(sample_days_min) %>% unlist(), na.rm =TRUE)
     
     
 
@@ -490,7 +426,7 @@ a # return all calculated kld values
                                   
                                   
                                   a <- tibble(
-                                    'coeff' = a/kld_avg_max, # mean scaled entropy value
+                                    'coeff' = a, # mean entropy value
                                     'sample_length' = days2,
                                     'monitor_season' = period_label,
                                     'error' = 'none'

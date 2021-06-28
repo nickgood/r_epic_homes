@@ -555,8 +555,6 @@ scaled.entropy.table.shape <- function(
   tested_sample_sequence, # sequence of tested short sampling period lengths (in days)
   location_type, # sensor location (living, bedroom, or kitchen)
   all_time = FALSE, # if TRUE, compare each short sampling period to entire monitoring year of home
-  sample_days_min, # amount of days in shortest theoretical sample
-  
   data = omni_data) {
   
   output <<- na.result(NA) # clear error output in case it was triggered previously
@@ -1014,6 +1012,7 @@ kld_max <- kld_max_df %>% filter(n_samp_avail >= 0.5) %>% pull(kld_avg) %>% max(
 
 
 # test function for multiple homes --------------
+
 # test_kit <- lapply('009', function(x_home) {
 # 
 #   start_date <- pick.start(x_home, clust)
