@@ -430,20 +430,9 @@ list('kld_avg' = mean(unlist(a)),
      'n_samp_avail' = n_samp_avail)
 
     }
-
-
     # # test kld.avg function
     # test <- kld.avg(16)
 
-
-    # calculate "max KLD":
-    # average kld for short sampling periods
-    # of minimum length, "sample_days_min"
-    a <- kld.avg(sample_days_min)
-
-    kld_avg_max <- a[['kld_avg']]
-
-    kld_sd_max <- a[['kld_sd']]
 
     # apply function to find scaled_entropy dataframe for
     # sampling period of length "days2" to range of days in tested_sample_sequence
@@ -471,10 +460,10 @@ list('kld_avg' = mean(unlist(a)),
 
 
         a <- tibble(
-          'coeff' = kld_avg/kld_avg_max, # mean scaled entropy value
+          'coeff' = kld_avg, # mean scaled entropy value
           # # values for sd_int assuming kld_avg_min is a set number
-          'high_val' = (kld_avg+kld_sd)/kld_avg_max,
-          'low_val' = (kld_avg-kld_sd)/kld_avg_max,
+          'high_val' = (kld_avg+kld_sd),
+          'low_val' = (kld_avg-kld_sd),
           # # # values for sd_int assuming two independent samples
           # 'high_val2' = kld_avg/kld_avg_max+b,
           # 'low_val2' = kld_avg/kld_avg_max-b,
