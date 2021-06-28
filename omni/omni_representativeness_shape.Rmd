@@ -106,9 +106,41 @@ na.result <- function(error, season = NA, sample_days = NA, samp_avail = NA) {
 # list of all home numbers
 homes_all <- home.list(1:17)
 
+clusters_all <- c('heat','shoulder', 'ac')
+locations_indoor <- c('living', 'kitchen', 'bedroom')
+
 # thresholds for representativeness
 rep_threshold_seq <- c(0.4, 0.5, 0.6)
 
+```
+
+
+```{r functions_csv_creation}
+
+# make functions to look up starting and ending date of
+# energy cluster period based on home
+ pick.start <- function(x_home, x_cluster) {
+   energy_cluster_df %>%
+   filter(home == x_home & cluster_type == x_cluster) %>%
+   pull(start_date) %>% as.character()
+ }
+ 
+  pick.end <- function(x_home, x_cluster) {
+   energy_cluster_df %>%
+   filter(home == x_home & cluster_type == x_cluster) %>%
+   pull(end_date) %>% as.character()
+  }
+  
+  # fun to pick minimum sample length based on metric
+  pick.sample.min <- function(x_metric) {
+    lag_summary_df %>%
+      # use the pooled median of all clusters
+      filter(metric == x_metric, energy_cluster == 'total') %>%
+      pull(median)
+  }
+  # # test functions
+   # pick.start('006', 'heat')
+  # pick.end('004', 'heat')
 ```
 
 ```{r function_max_kld}
@@ -459,57 +491,6 @@ met2 <- 'pm25'
 kld_test <- kld.max(hm1, met1, list(c(pick.start(hm1, clust1), pick.end(hm1, clust1))),
         loc1, all_time = TRUE)
 
-
-
-
-clusters_all <- c('heat','shoulder', 'ac')
-locations_indoor <- c('living', 'kitchen', 'bedroom')
-
-# calculate one-day kld values for all possible cust/home/location combos for noth metrics
-kld_max <- map(clusters_all, function(x_cluster) {
-  map(locations_indoor, function(x_location) {
-    map(homes_all, function(x_home) {
-      
-      kld.max(x_home, met1, list(c(pick.start(x_home, x_cluster),
-                                   pick.end(x_home, x_cluster))),
-              location_type = x_location, all_time = TRUE)
-    }
-    )%>%
-  bind_rows()
-  }
-  )%>%
-  bind_rows() %>%
-    mutate( energy_cluster = x_cluster)
-}
-)%>%
-  bind_rows()%>% 
-  
-  bind_rows(
-
-    map(clusters_all, function(x_cluster) {
-  map(locations_indoor, function(x_location) {
-    map(homes_all, function(x_home) {
-      
-      kld.max(x_home, met2, list(c(pick.start(x_home, x_cluster),
-                                   pick.end(x_home, x_cluster))),
-              location_type = x_location, all_time = TRUE)
-    }
-    )%>%
-  bind_rows()
-  }
-  )%>%
-  bind_rows() %>%
-    mutate( energy_cluster = x_cluster)
-}
-)%>%
-  bind_rows()
-)
-
-
-
-
-write_csv(kld_max, paste0('./csv_created/representativeness_data/kld_max_',
-                    Sys.Date(), '.csv'))
 
 
 ```
@@ -1030,38 +1011,74 @@ scaled.entropy.table.shape <- function(
 
 ```
 
-```{r functions_csv_creation}
-
-# make functions to look up starting and ending date of
-# energy cluster period based on home
- pick.start <- function(x_home, x_cluster) {
-   energy_cluster_df %>%
-   filter(home == x_home & cluster_type == x_cluster) %>%
-   pull(start_date) %>% as.character()
- }
- 
-  pick.end <- function(x_home, x_cluster) {
-   energy_cluster_df %>%
-   filter(home == x_home & cluster_type == x_cluster) %>%
-   pull(end_date) %>% as.character()
-  }
-  
-  # fun to pick minimum sample length based on metric
-  pick.sample.min <- function(x_metric) {
-    lag_summary_df %>%
-      # use the pooled median of all clusters
-      filter(metric == x_metric, energy_cluster == 'total') %>%
-      pull(median)
-  }
-  # # test functions
-   # pick.start('006', 'heat')
-  # pick.end('004', 'heat')
-```
 
 
 
 ## Distribution Shape: Assume Log-normal distribution
 
+```{r create_csv_kld_max}
+
+# calculate one-day kld values for all possible cust/home/location combos for noth metrics
+kld_max_df <- map(clusters_all, function(x_cluster) {
+  map(locations_indoor, function(x_location) {
+    map(homes_all, function(x_home) {
+      
+      kld.max(x_home, met1, list(c(pick.start(x_home, x_cluster),
+                                   pick.end(x_home, x_cluster))),
+              location_type = x_location, all_time = TRUE)
+    }
+    )%>%
+  bind_rows()
+  }
+  )%>%
+  bind_rows() %>%
+    mutate( energy_cluster = x_cluster)
+}
+)%>%
+  bind_rows()%>% 
+  
+  bind_rows(
+
+    map(clusters_all, function(x_cluster) {
+  map(locations_indoor, function(x_location) {
+    map(homes_all, function(x_home) {
+      
+      kld.max(x_home, met2, list(c(pick.start(x_home, x_cluster),
+                                   pick.end(x_home, x_cluster))),
+              location_type = x_location, all_time = TRUE)
+    }
+    )%>%
+  bind_rows()
+  }
+  )%>%
+  bind_rows() %>%
+    mutate( energy_cluster = x_cluster)
+}
+)%>%
+  bind_rows()
+)
+
+
+
+
+write_csv(kld_max_df, paste0('./csv_created/representativeness_data/kld_max_',
+                    Sys.Date(), '.csv'))
+
+
+```
+
+```{r kld_max_determine}
+
+kld_max_df <- read_csv('./csv_created/representativeness_data/kld_max.csv')
+a <- kld_max_df %>% filter(!is.na(kld_avg))
+
+ggplot(a, aes(y = kld_avg))+
+  geom_point(aes(x = kld_sd))
+
+kld_max <- kld_max_df %>% filter(n_samp_avail >= 0.5) %>% pull(kld_avg) %>% max()
+
+
+```
 
 
 ```{r shape_data_maker_range, eval = FALSE}
@@ -1102,7 +1119,7 @@ test_kit <- lapply('009', function(x_home) {
 
 # make csvs--------------------
   all_time_choice <- TRUE
-    met <- 'voc'
+    met <- 'pm25'
     loc <- 'living'
     clust <- 'heat' # can do multiple
    
