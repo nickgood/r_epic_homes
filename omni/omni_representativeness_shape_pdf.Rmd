@@ -37,8 +37,8 @@ library(ggpubr) # for tesing log-normality
 ```{r import_omni_minute_data}
 # omni_data<- read_csv('./csv_created/omni_all_locations.csv')
 
-# # remove all variables but omni_data
-# rm(list=setdiff(ls(), "omni_data"))
+# remove all variables but omni_data
+rm(list=setdiff(ls(), "omni_data"))
 
 # zero_test <- omni_data %>%
 #   group_by(home, location) %>%
@@ -89,7 +89,7 @@ home.list <- function(x) sapply(x, threedig)
 # causes of errors in function
 na.result <- function(error, season = NA, sample_days = NA, samp_avail = NA) {
   tibble(
-  'coeff' = NA,
+  'kld' = NA,
   'sample_length' = sample_days, # sample_length,
   'monitor_season' = season, # period_label,
   'n_samp_avail' = samp_avail,
@@ -428,7 +428,7 @@ entropy.table.shape <- function(home_num, metric,
         a <- kld.period(days2)
         
         a <- tibble(
-          'coeff' = a[['kld']], # entropy value
+          'kld' = a[['kld']], # entropy value
           'sample_length' = days2,
           'monitor_season' = period_label,
           'n_samp_avail' = a[['n_samp_avail']],
@@ -827,12 +827,16 @@ a # return the above list
 # list of all home numbers
 homes_all <- home.list(1:17)
 
+clusters_all <- c('heat','shoulder', 'ac')
+locations_indoor <- c('living', 'kitchen', 'bedroom')
+
 # sequence of representative thresholds to test
 threshold_seq <- c(0.1, 0.2, 0.3)
 
 # sequence of days to test thresholds for shape entropy values
 
 pdf_days <- c(3,7,10,14,21)
+
 
 
 ```
@@ -853,8 +857,9 @@ all_time_choice <- TRUE
     clust <- c('heat', 'shoulder', 'ac') # can do multiple
    
   
-            met <- 'pm25'
-    loc <- 'living'
+                met <- 'voc'
+
+     loc <- 'bedroom'
     {lapply(clust, function(cluster_type) {
       
       rep_data <-  lapply(homes_all, function(x_home) {
@@ -890,78 +895,9 @@ all_time_choice <- TRUE
     }
     )
     }
-    loc <- 'kitchen'
-    {lapply(clust, function(cluster_type) {
-      
-      rep_data <-  lapply(homes_all, function(x_home) {
-        
-        start_date <- pick.start(x_home, cluster_type)
-        end_date <- pick.end(x_home, cluster_type)
-        sample_min <- pick.sample.min(met)
-        sample_max <- if_else(
-          as.numeric(as.Date(end_date) - as.Date(start_date))>=28,
-          28,
-          as.numeric(as.Date(end_date) - as.Date(start_date))
-          )
-        
-        entropy.table.shape(
-          x_home, metric = met,
-          date_ranges_entire = list(c(start_date,
-                                      end_date)),
-          tested_sample_sequence =
-            seq(sample_min,sample_max,4),
-          location_type = loc,
-          all_time = all_time_choice) %>%
-          
-          # add in column for energy_cluster
-          mutate(energy_cluster = cluster_type) 
-      }
-      ) %>%
-        bind_rows()
-      
-      # give a variable name to the created data
-      assign(paste(met, loc, cluster_type, 'rep_data_shape_pdf', sep = '_'),
-             rep_data,
-             envir = .GlobalEnv)
-    }
-    )
-    } 
-    loc <- 'bedroom'
-    {lapply(clust, function(cluster_type) {
-      
-      rep_data <-  lapply(homes_all, function(x_home) {
-        
-        start_date <- pick.start(x_home, cluster_type)
-        end_date <- pick.end(x_home, cluster_type)
-        sample_min <- pick.sample.min(met)
-        sample_max <- if_else(
-          as.numeric(as.Date(end_date) - as.Date(start_date))>=28,
-          28,
-          as.numeric(as.Date(end_date) - as.Date(start_date))
-          )
-        
-        entropy.table.shape(
-          x_home, metric = met,
-          date_ranges_entire = list(c(start_date,
-                                      end_date)),
-          tested_sample_sequence =
-            seq(sample_min,sample_max,4),
-          location_type = loc,
-          all_time = all_time_choice) %>%
-          
-          # add in column for energy_cluster
-          mutate(energy_cluster = cluster_type) 
-      }
-      ) %>%
-        bind_rows()
-      
-      # give a variable name to the created data
-      assign(paste(met, loc, cluster_type, 'rep_data_shape_pdf', sep = '_'),
-             rep_data,
-             envir = .GlobalEnv)
-    }
-    )
-    }
+
+
+
       
 
 entropy_shape_pdf_df <- bind_rows(
@@ -989,7 +925,8 @@ entropy_shape_pdf_df <- bind_rows(
 
 # make csv of all data
 write_csv(entropy_shape_pdf_df, file =
-            paste0('./csv_created/representativeness_data/rep_data_shape_pdf_', Sys.Date(), '.csv'))
+            paste0('./csv_created/representativeness_data/rep_data_shape_pdf_',
+                   Sys.Date(), '.csv'))
 
 
 
@@ -999,11 +936,16 @@ write_csv(entropy_shape_pdf_df, file =
 
 ```{r create_csv_kld_max}
 # run function --------------
+
+
+# met1 <- 'pm25'
+# met2 <- 'voc'
+# 
 # # calculate one-day kld values for all possible cust/home/location combos for noth metrics
 # kld_max_df <- map(clusters_all, function(x_cluster) {
 #   map(locations_indoor, function(x_location) {
 #     map(homes_all, function(x_home) {
-#       
+# 
 #       kld.max(x_home, met1, list(c(pick.start(x_home, x_cluster),
 #                                    pick.end(x_home, x_cluster))),
 #               location_type = x_location, all_time = TRUE)
@@ -1016,14 +958,14 @@ write_csv(entropy_shape_pdf_df, file =
 #     mutate( energy_cluster = x_cluster)
 # }
 # )%>%
-#   bind_rows()%>% 
-#   
+#   bind_rows()%>%
+# 
 #   bind_rows(
 # 
 #     map(clusters_all, function(x_cluster) {
 #   map(locations_indoor, function(x_location) {
 #     map(homes_all, function(x_home) {
-#       
+# 
 #       kld.max(x_home, met2, list(c(pick.start(x_home, x_cluster),
 #                                    pick.end(x_home, x_cluster))),
 #               location_type = x_location, all_time = TRUE)
@@ -1040,9 +982,9 @@ write_csv(entropy_shape_pdf_df, file =
 # )
 
 
-
 # write csv ----------------
-# write_csv(kld_max_df, paste0('./csv_created/representativeness_data/kld_max_shape_',
+
+# write_csv(kld_max_df, paste0('./csv_created/representativeness_data/kld_max_shape_pdf_',
 #                     Sys.Date(), '.csv'))
 
 
@@ -1093,7 +1035,7 @@ a <- entropy_shape_pdf_df %>%
 
 # # count the fraction of 3-day samples that have a scaled entropy > 1
 # (entropy_all_pdf_shape %>%
-#   filter(sample_length == 3, coeff >1) %>%
+#   filter(sample_length == 3, kld >1) %>%
 #   nrow())/
 #   (entropy_all_pdf_shape %>%
 #   filter(sample_length == 3) %>%
@@ -1101,8 +1043,8 @@ a <- entropy_shape_pdf_df %>%
 
 
 lvls <- levels(as.factor(a$sample_length))
-non_na <- by(a, a$sample_length, function(x) sum(!is.na(x$coeff)))
-above1 <- by(a, a$sample_length, function(x) sum(x$coeff >1, na.rm = TRUE))
+non_na <- by(a, a$sample_length, function(x) sum(!is.na(x$kld)))
+above1 <- by(a, a$sample_length, function(x) sum(x$kld >1, na.rm = TRUE))
 labels <- paste(lvls,", n=",as.integer(non_na),", ", above1, " values > 1",sep="")
 
 
@@ -1110,7 +1052,7 @@ labels <- paste(lvls,", n=",as.integer(non_na),", ", above1, " values > 1",sep="
 
 thresh_vector <- c(0.1, 0.2, 0.3)
 
-ggplot(a, aes(x = coeff, fill = as.factor(sample_length)))+
+ggplot(a, aes(x = kld, fill = as.factor(sample_length)))+
     geom_density(alpha = 0.5)+
   xlab("Scaled Entropy")+
     ggtitle(label = 'Scaled Entropy at multiple Sample Lengths, days')+
