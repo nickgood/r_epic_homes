@@ -121,7 +121,14 @@ pdf_days_pm <- c(3,7,19,27)
 pdf_days_voc <- c(6,10,18,26)
 
 
+# make cluster color scale
+cluster_colors <- c('red', 'blue', 'darkgreen')
 
+# for labeling purposes
+xsmall <- 2
+small <- 6
+medium <- 10
+large <- 16
 
 ```
 
@@ -377,18 +384,33 @@ pooled_scaled_entropy_df <- scaled_entropy_df %>%
 
 ```{r function_avg_entropy_plotter}
 
+#make function to define color based on cluster
+color.find <- function(x)  {
+  case_when(x == 'heat'~ cluster_colors[1],
+            x == 'ac' ~ cluster_colors[2],
+            x == 'shoulder' ~ cluster_colors[3],
+            TRUE ~ 'black')}
+
 entropy.plot <- function (
   hm,
   # omit a sampling period of given length
   # if this proportion of possible samples
   # were not availabel in data
   metrics = c('pm25', 'voc'),
-  data = scaled_entropy_df
+  data = pooled_scaled_entropy_df
 ) {
   
   # for one home:
   a <- data %>%
-    filter(home == hm & metric %in% metrics)
+    filter(home == hm & metric %in% metrics)%>%
+  mutate(clust_color = color.find(energy_cluster)) %>% # add column for color based on cluster
+  #convert cluster col to factor
+  mutate(energy_cluster = as.factor(energy_cluster))
+  
+  
+  col <- as.character(a$clust_color)
+names(col) <- as.character(a$energy_cluster)
+
 
   if(nrow(a) == 0) {
     plot <- NULL # return NULL if no data for home/metric/cluster combo
@@ -405,21 +427,31 @@ entropy.plot <- function (
                  color = "black", size=0.5)+
       coord_cartesian(ylim = c(0,1))+
       ggtitle(paste('Home',hm)) +
-      facet_wrap(vars(metric)) +
       scale_x_continuous(breaks=seq(0,28,7))+
     geom_ribbon(aes(ymin = low_val, ymax = high_val, fill = energy_cluster),
-                alpha = 0.15, color = NA)
-  }
+                alpha = 0.15, color = NA)+
+  scale_fill_manual(values = col)+
+        scale_color_manual(values = col)+
+      theme(legend.position = 'none',
+            axis.title = element_blank(),
+            axis.text = element_text(size = small),
+            title = element_text(size = small))+
+            facet_wrap(vars(metric))
+
+
+  
+   }
   plot
 }
 
 #function to put plots in a grid
 grid.plots <- function(plots, title,
-                     y_val, ncol = 4, nrow = 4) {
+                     y_val = 'Scaled Relative Entropy',
+                     x_val = 'Sample Length, days', ncol = 4, nrow = 4) {
   ##omit NULL values (from homes or rooms without valid data)
   plots <- plots[!sapply(plots, is.null)]
   
-  do.call('grid.arrange', c(plots, top = title, left = y_val,
+  do.call('grid.arrange', c(plots, top = title, left = y_val, bottom = x_val,
                             ncol = ncol, nrow = nrow))
   
 }
@@ -448,19 +480,33 @@ ggplot(aes(x = sample_length, y = avg_scaled_kld, color = energy_cluster),
 
 ```
 
-```{r grid_plot_avg_entropy, fig.height=8, fig. width = 10.5}
+```{r grid_plot_avg_entropy, fig.height=8, fig.width = 10.5}
 # time ----------------
 meth <- 'time'
 
-## pm25
-{met <- 'pm25'
-a <- pooled_scaled_entropy_df %>% filter(metric == met, method == meth)
+{
+a <- pooled_scaled_entropy_df %>% filter(method == meth)
 # make plots for all homes
 map(homes_all, function (x_home) {
     entropy.plot(hm = x_home, data = a)
 }) %>%
-  grid.plots(title = 'Time-Structured Scaled Relative Entropy', y_val = NULL)
+  grid.plots(title = 'Time-Structured Scaled Relative Entropy')
 }
+
+# shape ----------------
+meth <- 'shape'
+
+{
+a <- pooled_scaled_entropy_df %>% filter(method == meth)
+# make plots for all homes
+map(homes_all, function (x_home) {
+    entropy.plot(hm = x_home, data = a)
+}) %>%
+  grid.plots(title = 'Magnitiude-Based Scaled Relative Entropy')
+}
+
+
+
 ```
 
 ### Testing Different Entropy Thresholds
