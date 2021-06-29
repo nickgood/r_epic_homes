@@ -37,8 +37,8 @@ library(ggpubr) # for tesing log-normality
 ```{r import_omni_minute_data}
 # omni_data<- read_csv('./csv_created/omni_all_locations.csv')
 
-# remove all variables but omni_data
-rm(list=setdiff(ls(), "omni_data"))
+# # remove all variables but omni_data
+# rm(list=setdiff(ls(), "omni_data"))
 
 # zero_test <- omni_data %>%
 #   group_by(home, location) %>%
@@ -984,97 +984,10 @@ write_csv(entropy_shape_pdf_df, file =
 
 # write csv ----------------
 
-# write_csv(kld_max_df, paste0('./csv_created/representativeness_data/kld_max_shape_pdf_',
+# write_csv(kld_max_df, paste0('./csv_created/representativeness_data/kld_max_shape_',
 #                     Sys.Date(), '.csv'))
 
 
 ```
-
-```{r kld_max_determine}
-
-kld_max_df <- read_csv('./csv_created/representativeness_data/kld_max_shape.csv')
-a <- kld_max_df %>% filter(!is.na(kld_avg))
-
-ggplot(a, aes(y = kld_avg))+
-  geom_boxplot(outlier.shape = NA)+
-  geom_jitter(aes(x = 0))
-
-kld_max <- kld_max_df %>% filter(n_samp_avail >= 0.5) %>% pull(kld_avg) %>% max()
-
-
-```
-
-### Testing Different Entropy Thresholds
-
-```{r import_pdf_data}
-
-# read in csv file
-entropy_shape_pdf_df <- read_csv(file = './csv_created/representativeness_data/rep_data_shape_pdf.csv')
-
-entropy_shape_test2 <- read_csv(file = './csv_created/representativeness_data/rep_data_shape.csv')
-  # # for binding new rows to old rows
-# a <- read_csv(file = './csv_created/representativeness_data/rep_data_shape_pdf.csv')
-# 
-# a <- rbind(a, entropy_shape_pdf_df)
-# 
-# write_csv(a, file =
-#             paste0('./csv_created/representativeness_data/rep_data_shape_pdf', Sys.Date(), '.csv'))
-
-```
-
-### Effect on when individual sample Scaled Entropy crosses below threshold
-
-```{r pdf_plots_shape}
-
-
-# seasons pdf---------------------------------------------------------------
-
-
-a <- entropy_shape_pdf_df %>%
-  filter(sample_length %in% pdf_days)
-
-# # count the fraction of 3-day samples that have a scaled entropy > 1
-# (entropy_all_pdf_shape %>%
-#   filter(sample_length == 3, kld >1) %>%
-#   nrow())/
-#   (entropy_all_pdf_shape %>%
-#   filter(sample_length == 3) %>%
-#   nrow())
-
-
-lvls <- levels(as.factor(a$sample_length))
-non_na <- by(a, a$sample_length, function(x) sum(!is.na(x$kld)))
-above1 <- by(a, a$sample_length, function(x) sum(x$kld >1, na.rm = TRUE))
-labels <- paste(lvls,", n=",as.integer(non_na),", ", above1, " values > 1",sep="")
-
-
-
-
-thresh_vector <- c(0.1, 0.2, 0.3)
-
-ggplot(a, aes(x = kld, fill = as.factor(sample_length)))+
-    geom_density(alpha = 0.5)+
-  xlab("Scaled Entropy")+
-    ggtitle(label = 'Scaled Entropy at multiple Sample Lengths, days')+
-  coord_cartesian(xlim = c(0,1))+ # limit scaled entropy from 0 to 1
-  labs(fill = 'Length of Sample, days')+
-  geom_vline(xintercept = thresh_vector, linetype = 'dashed', color = 'red')+
-  annotate('text', x=thresh_vector[1]-0.02, y = -0.1,
-                label=thresh_vector[1],
-            angle=90, size=3, color = 'red') +
-   annotate('text', x=thresh_vector[2]-0.02, y = -0.1,
-                label=thresh_vector[2],
-            angle=90, size=3, color = 'red') +
-    annotate('text', x=thresh_vector[3]-0.02, y = -0.1,
-                label=thresh_vector[3],
-            angle=90, size=3, color = 'red')+
-     scale_fill_discrete( labels=labels)
-
-
-
-
-
-```
-
 
 

@@ -1,0 +1,360 @@
+---
+title: "Representativeness"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: paper
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.path = 'figures/',
+  warning = FALSE,
+  message = FALSE,
+  echo = FALSE,
+  fig.width = 10, fig.height = 3,
+  cache = FALSE)
+```
+
+```{r libraries, include=FALSE}
+library(dplyr)
+library(purrr)
+library(tidyr)
+library(openair)
+library(ggplot2)
+library(readr)
+library(googlesheets4)
+library(lubridate)
+library(gridExtra)
+library(runner) # for moving window functions
+library(ggpubr) # for tesing log-normality
+# library(cubature) # for alternative method of integrating kld function
+# library(entropy) # for KLD function
+# library(fitdistrplus) # for fitting distribution to data NOTE, MASS::select CONFLICTS WITH dplyr::select
+
+```
+
+```{r import_omni_minute_data}
+# omni_data<- read_csv('./csv_created/omni_all_locations.csv')
+
+# # remove all variables but omni_data
+# rm(list=setdiff(ls(), "omni_data"))
+
+# zero_test <- omni_data %>%
+#   group_by(home, location) %>%
+#   summarize(pm25_zeros = sum(pm25 == 0), pm25_n = n()) %>%
+#   mutate(pm25_zero_pct = pm25_zeros/pm25_n*100) %>%
+#   ungroup()
+
+```
+
+
+```{r import_energy_cluster_homes}
+# import energy cluster dataframe for all homes
+energy_cluster_df <- read_csv('./csv_created/from_sense/energy_cluster_df.csv')
+```
+
+```{r import_acf_lags}
+# import summary df of how many lags required
+# before autocorrelation was insignificant
+lag_summary_df <- read_csv('./csv_created/lag_summary.csv')
+```
+
+
+
+```{r functions_misc}
+
+#Function to only display 3 significant figures (for tables)
+signif3 <- function(x){
+  signif(x, digits = 3)
+}
+
+##Define a char vector of home numbers using a number vector,
+##ex: x <- home.list(c(1:15)) for homes 1-15
+threedig <- function(x) {
+  if (nchar(x) == 1) {a <- paste0('00', x)
+  return(a)
+  }
+  
+  if (nchar(x) == 2) {a<- paste0('0', x)
+  return(a)
+  }
+  else return(a)
+}
+
+home.list <- function(x) sapply(x, threedig)
+
+
+# give a row of NA values with identifers to help with identifying
+# causes of errors in function
+na.result <- function(error, season = NA, sample_days = NA, samp_avail = NA) {
+  tibble(
+  'kld' = NA,
+  'sample_length' = sample_days, # sample_length,
+  'monitor_season' = season, # period_label,
+  'n_samp_avail' = samp_avail,
+  'error' = error
+)
+}
+
+```
+
+
+
+```{r define_variables}
+
+# list of all home numbers
+homes_all <- home.list(1:17)
+
+clusters_all <- c('heat','shoulder', 'ac')
+locations_indoor <- c('living', 'kitchen', 'bedroom')
+
+# sequence of representative thresholds to test
+threshold_seq <- c(0.1, 0.2, 0.3)
+
+# sequence of days to test thresholds for shape entropy values
+
+pdf_days <- c(3,7,10,14,21)
+
+
+
+```
+
+
+
+```{r create_csv_kld_max}
+# run function --------------
+
+
+# met1 <- 'pm25'
+# met2 <- 'voc'
+# 
+# # calculate one-day kld values for all possible cust/home/location combos for noth metrics
+# kld_max_df <- map(clusters_all, function(x_cluster) {
+#   map(locations_indoor, function(x_location) {
+#     map(homes_all, function(x_home) {
+# 
+#       kld.max(x_home, met1, list(c(pick.start(x_home, x_cluster),
+#                                    pick.end(x_home, x_cluster))),
+#               location_type = x_location, all_time = TRUE)
+#     }
+#     )%>%
+#   bind_rows()
+#   }
+#   )%>%
+#   bind_rows() %>%
+#     mutate( energy_cluster = x_cluster)
+# }
+# )%>%
+#   bind_rows()%>%
+# 
+#   bind_rows(
+# 
+#     map(clusters_all, function(x_cluster) {
+#   map(locations_indoor, function(x_location) {
+#     map(homes_all, function(x_home) {
+# 
+#       kld.max(x_home, met2, list(c(pick.start(x_home, x_cluster),
+#                                    pick.end(x_home, x_cluster))),
+#               location_type = x_location, all_time = TRUE)
+#     }
+#     )%>%
+#   bind_rows()
+#   }
+#   )%>%
+#   bind_rows() %>%
+#     mutate( energy_cluster = x_cluster)
+# }
+# )%>%
+#   bind_rows()
+# )
+
+
+# write csv ----------------
+
+# write_csv(kld_max_df, paste0('./csv_created/representativeness_data/kld_max_shape_',
+#                     Sys.Date(), '.csv'))
+
+
+```
+
+```{r kld_max_determine}
+
+# read in data
+shape_max <- read_csv('./csv_created/representativeness_data/kld_max_shape.csv')
+time_max <- read_csv('./csv_created/representativeness_data/kld_max_time.csv')
+
+kld_max_df <- bind_rows(shape_max, time_max)
+
+# remove na kld values from runs with insufficient data
+kld_max_df_clean <- kld_max_df%>% filter(!is.na(kld))
+
+
+# make box plots of values in each group
+ggplot(kld_max_df_clean, aes(y = kld,
+                       group = interaction(home, location, energy_cluster)))+
+  geom_boxplot()
+
+
+kld_max_shape <- kld_max_df_clean %>%
+  group_by(home, location, energy_cluster) %>%
+  summarise(iqr_1.5 = median(kld)+1.5*IQR(kld), .groups = 'drop') %>%
+  pull(iqr_1.5)
+
+ggplot(kld_max_df, aes(y = kld))+
+  geom_boxplot(outlier.shape = NA)+
+  geom_jitter(aes(x = 0))
+
+kld_max <- kld_max_df %>% filter(n_samp_avail >= 0.5) %>% pull(kld_avg) %>% max()
+
+
+```
+
+### Testing Different Entropy Thresholds
+
+```{r import_pdf_data}
+
+# read in csv file
+entropy_shape_pdf_df <- read_csv(file = './csv_created/representativeness_data/rep_data_shape_pdf.csv')
+
+entropy_shape_test2 <- read_csv(file = './csv_created/representativeness_data/rep_data_shape.csv')
+  # # for binding new rows to old rows
+# a <- read_csv(file = './csv_created/representativeness_data/rep_data_shape_pdf.csv')
+# 
+# a <- rbind(a, entropy_shape_pdf_df)
+# 
+# write_csv(a, file =
+#             paste0('./csv_created/representativeness_data/rep_data_shape_pdf', Sys.Date(), '.csv'))
+
+```
+
+### Effect on when individual sample Scaled Entropy crosses below threshold
+
+```{r pdf_plots_shape}
+
+
+# seasons pdf---------------------------------------------------------------
+
+
+a <- entropy_shape_pdf_df %>%
+  filter(sample_length %in% pdf_days)
+
+# # count the fraction of 3-day samples that have a scaled entropy > 1
+# (entropy_all_pdf_shape %>%
+#   filter(sample_length == 3, kld >1) %>%
+#   nrow())/
+#   (entropy_all_pdf_shape %>%
+#   filter(sample_length == 3) %>%
+#   nrow())
+
+
+lvls <- levels(as.factor(a$sample_length))
+non_na <- by(a, a$sample_length, function(x) sum(!is.na(x$kld)))
+above1 <- by(a, a$sample_length, function(x) sum(x$kld >1, na.rm = TRUE))
+labels <- paste(lvls,", n=",as.integer(non_na),", ", above1, " values > 1",sep="")
+
+
+
+
+thresh_vector <- c(0.1, 0.2, 0.3)
+
+ggplot(a, aes(x = kld, fill = as.factor(sample_length)))+
+    geom_density(alpha = 0.5)+
+  xlab("Scaled Entropy")+
+    ggtitle(label = 'Scaled Entropy at multiple Sample Lengths, days')+
+  coord_cartesian(xlim = c(0,1))+ # limit scaled entropy from 0 to 1
+  labs(fill = 'Length of Sample, days')+
+  geom_vline(xintercept = thresh_vector, linetype = 'dashed', color = 'red')+
+  annotate('text', x=thresh_vector[1]-0.02, y = -0.1,
+                label=thresh_vector[1],
+            angle=90, size=3, color = 'red') +
+   annotate('text', x=thresh_vector[2]-0.02, y = -0.1,
+                label=thresh_vector[2],
+            angle=90, size=3, color = 'red') +
+    annotate('text', x=thresh_vector[3]-0.02, y = -0.1,
+                label=thresh_vector[3],
+            angle=90, size=3, color = 'red')+
+     scale_fill_discrete( labels=labels)
+
+
+
+
+
+```
+
+
+
+### Testing Different Entropy Thresholds
+
+```{r import_pdf_data}
+
+# read in csv file
+entropy_time_pdf_df <- read_csv(file = './csv_created/representativeness_data/rep_data_time_pdf.csv')
+
+
+  # # for binding new rows to old rows
+# a <- read_csv(file = './csv_created/representativeness_data/rep_data_time_pdf.csv')
+# 
+# a <- rbind(a, entropy_time_pdf_df)
+# 
+# write_csv(a, file =
+#             paste0('./csv_created/representativeness_data/rep_data_time_pdf', Sys.Date(), '.csv'))
+
+```
+
+### Effect on when individual sample Scaled Entropy crosses below threshold
+
+```{r pdf_plots_time}
+
+
+# seasons pdf---------------------------------------------------------------
+
+
+a <- entropy_time_pdf_df
+
+# # count the fraction of 3-day samples that have a scaled entropy > 1
+# (entropy_all_pdf_time %>%
+#   filter(sample_length == 3, kld >1) %>%
+#   nrow())/
+#   (entropy_all_pdf_time %>%
+#   filter(sample_length == 3) %>%
+#   nrow())
+
+
+lvls <- levels(as.factor(a$sample_length))
+non_na <- by(a, a$sample_length, function(x) sum(!is.na(x$kld)))
+above1 <- by(a, a$sample_length, function(x) sum(x$kld >1, na.rm = TRUE))
+labels <- paste(lvls,", n=",as.integer(non_na),", ", above1, " values > 1",sep="")
+
+
+
+
+thresh_vector <- c(0.1, 0.2, 0.3)
+
+ggplot(a, aes(x = kld, fill = as.factor(sample_length)))+
+    geom_density(alpha = 0.5)+
+  xlab("Scaled Entropy")+
+    ggtitle(label = 'Scaled Entropy at multiple Sample Lengths, days')+
+  coord_cartesian(xlim = c(0,1))+ # limit scaled entropy from 0 to 1
+  labs(fill = 'Length of Sample, days')+
+  geom_vline(xintercept = thresh_vector, linetype = 'dashed', color = 'red')+
+  annotate('text', x=thresh_vector[1]-0.02, y = -0.1,
+                label=thresh_vector[1],
+            angle=90, size=3, color = 'red') +
+   annotate('text', x=thresh_vector[2]-0.02, y = -0.1,
+                label=thresh_vector[2],
+            angle=90, size=3, color = 'red') +
+    annotate('text', x=thresh_vector[3]-0.02, y = -0.1,
+                label=thresh_vector[3],
+            angle=90, size=3, color = 'red')+
+     scale_fill_discrete( labels=labels)+
+  facet_wrap(vars(metric))
+
+
+
+
+
+```
+
+
+
