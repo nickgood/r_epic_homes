@@ -187,7 +187,7 @@ kld_max_time <-  kld_max_df_clean %>%
 
 ```
 
-```{r scaled_entropy_df}
+```{r create_scaled_entropy_df}
 scaled_entropy_df <- entropy_df_clean %>%
   mutate(scaled_kld = case_when(
     method == 'time' ~ 1- kld/kld_max_time,
@@ -364,6 +364,141 @@ ggplot(a, aes(x = scaled_kld, fill = as.factor(sample_length)))+
 
 
 ```
+
+```{r create_avg_scaled_kld_df}
+avg_scaled_entropy_df <- scaled_entropy_df %>%
+  group_by(metric, home, location, energy_cluster, sample_length) %>%
+  summarise(avg_scaled_kld = mean(scaled_kld),
+            high_val = avg_scaled_kld+ sd(scaled_kld),
+                      low_val = avg_scaled_kld- sd(scaled_kld),
+            .groups = 'drop')
+  
+```
+
+
+
+```{r function_shape_plotter}
+
+# # plot results for one home
+# 
+# a <- entropy_shape_df %>% filter(home == '009' & period_compare == 'year' )%>%
+#   group_by(sample_length, metric, energy_cluster) %>%
+#   summarize(coeff = mean(coeff, na.rm = TRUE)) %>% # average klds from all rooms
+#   ungroup()
+# 
+# 
+# ggplot(aes(x = sample_length, y = coeff, color = energy_cluster),
+#        data = a)+
+#   geom_line()+
+#   geom_point(size = 1)+
+#   xlab('Sample Length, days')+
+#   ylab('Scaled Relative Entropy')+
+#   geom_hline(yintercept=0.1, linetype="dashed", 
+#                 color = "black", size=0.5)+
+#   coord_cartesian(ylim = c(0,1)) +
+#   facet_wrap(vars(metric))
+
+
+# all_homes------------------------------------------------------
+entropy.plot <- function (
+  hm, loc,
+  # omit a sampling period of given length
+  # if this proportion of possible samples
+  # were not availabel in data
+  metrics = c('pm25', 'voc'),
+  data = entropy_shape_df
+) {
+  
+  # for one home:
+  a <- data %>%
+    filter(home == hm & location == loc &
+             metric %in% metrics)
+
+  if(nrow(a) == 0) {
+    plot <- NULL # return NULL if no data for home/metric/cluster combo
+  }else {
+    
+    # plot results
+    plot <- ggplot(aes(x = sample_length, y = coeff,
+                       color = energy_cluster), data = a)+
+      geom_line()+
+      geom_point(size = 1)+
+      xlab('Sample Length, days')+
+      ylab('Scaled Relative Entropy')+
+      geom_hline(yintercept=rep_threshold_seq, linetype="dashed", 
+                 color = "black", size=0.5)+
+      coord_cartesian(ylim = c(0,1))+
+      ggtitle(paste('Home',hm)) +
+      facet_wrap(vars(metric)) +
+      scale_x_continuous(breaks=seq(0,28,7))+
+    geom_ribbon(aes(ymin = low_val, ymax = high_val, fill = energy_cluster),
+                alpha = 0.3, color = NA)
+  }
+  plot
+}
+
+
+
+# make plots for all homes
+map(homes_all, function (x_home) {
+  map(locations_indoor, function (x_location) {
+    entropy.plot(hm = x_home, loc = x_location)
+    
+  })
+
+})
+
+```
+
+### Testing Different Entropy Thresholds
+
+### Effect on when average Scaled Entropy crosses below threshold
+
+```{r threshold_plots_shape}
+
+# make dataframe of values for minimum sample length (in days)
+# where entropy is less than threshold value
+threshold.freq.table <- function (threshold) {
+  
+  
+  a <- entropy_shape_df %>%
+  filter(n_samp_avail >0.5 & method == 'shape') %>%
+  filter(coeff <= threshold) %>% 
+  group_by(home, metric, location, energy_cluster) %>%
+  summarise_at(vars(sample_length), min) %>%
+  ungroup() %>%
+    mutate('thresh' = threshold)
+}
+
+# apply function to all thresholds in threshold_seq
+ a <- lapply(rep_threshold_seq, threshold.freq.table)
+ a <- bind_rows(a)
+
+ # ensure there weren't a significant amount of omissions for any metric type
+ # (because the threshod may never have been reached)
+ 
+ # test <- a %>%
+ #   group_by(metric) %>%
+ #   summarise(n = sum(freq)) %>%
+ #   ungroup()
+ 
+   lvls <- levels(as.factor(a$thresh))
+rows <- by(a, a$thresh, function(x) nrow(x))
+labels <- paste(lvls,", n=",as.integer(rows),sep="")
+
+ # histogram of when threshold was reached for all home/month combos
+ggplot(aes(x = sample_length, fill = as.factor(thresh)), data = a)+
+  geom_density(alpha = 0.5)+
+  facet_wrap(vars(metric))+
+  xlab("Sample Length Required to Meet Representativeness Threshold, days")+
+  scale_x_continuous(breaks = c(7,14,21,28))+
+  scale_fill_discrete(labels = labels)+
+  annotate('text', x = 14, y = 0.15, label = '*max n = 48 (homes*rooms)')
+
+
+
+```
+
 
 
 
