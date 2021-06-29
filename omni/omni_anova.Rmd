@@ -290,6 +290,16 @@ map(homes_all, function(x) qqplotter(hm = x, met = 'co2',
   plot.grid(title = '')
 
 
+# testing individual homes and/or 5-min resolution data ------------------------
+
+# met <- 'pm25'
+# a <- omni_data %>% select(home, location, all_of(met)) %>%
+#   # reorganize just to allow input to func
+#   pivot_longer(cols = all_of(met), names_to = 'metric', values_to = 'mean')
+# 
+# map(homes_all, function(x) qqplotter(data = a, hm = x, met = met,
+#                                         log.trans = TRUE))
+
 ```
 
 ## Homogeneous Variances  
