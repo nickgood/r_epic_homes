@@ -1725,93 +1725,145 @@ all_time <- TRUE
 
 ## test Osses method of kld assuming normal distribution
 ```{r}
-m0 <- 30
-e0 <- 2^2
+# test KLD of p to q  (representativeness)-----------------
 
-m1 <- 32
-e1 <- 4^2
+# # p mean and variance
+# m0 <- 30
+# e0 <- 2^2
+# # q mean and variance
+# m1 <- 32
+# e1 <- 3^2
+# 
+# 
+# ptest <- function(x) dnorm(x, mean=m0, sd=sqrt(e0))
+# qtest <- function(x) dnorm(x, mean=m1, sd=sqrt(e1))
+# 
+# 
+# kldtest <- function(x) {
+# 
+#           fit_ratio_value <- (ptest(x))/(qtest(x))
+# 
+#           # make sure R does not convert to 0 if result is very small number
+#           fit_ratio_value <- ifelse( abs(fit_ratio_value) > .Machine$double.xmin,
+#                                      fit_ratio_value,
+#                                      .Machine$double.xmin)
+# 
+#           ptest(x)*log(fit_ratio_value)
+# }
+# # result from intergration
+# (integrate(kldtest, 0,100))$value
+# 
+# # rrsult from formula from Osses paper
+# 0.5*(e0/e1-1-log(e0/e1)+((m0-m1)^2)/e1)
 
-mc <- 34
-ec <- 2^2.3
+# pxi mean and variance
+m1 <- 30
+e1 <- 2^2
+# pxic mean and variance
+mc <- 36
+ec <- 2.2^2
+
+xi <- rnorm(10000, m1, sqrt(e1))
+xic <- rnorm(10000, mc, sqrt(ec))
+x <- c(xi, xic)
 
 
-ptest <- function(x) dnorm(x, mean=m0, sd=sqrt(e0)) 
-qtest <- function(x) dnorm(x, mean=m1, sd=sqrt(e1)) 
+pxi <- function(x) dnorm(x, mean=m1, sd=sqrt(e1))
+pxic <- function(x) dnorm(x, mean=mc, sd=sqrt(ec))
 
 
-kldtest <- function(x) {
-          
-          fit_ratio_value <- (ptest(x))/(qtest(x))
-          
-          # make sure R does not convert to 0 if result is very small number
-          fit_ratio_value <- ifelse( abs(fit_ratio_value) > .Machine$double.xmin,
-                                     fit_ratio_value,
-                                     .Machine$double.xmin)
-          
-          ptest(x)*log(fit_ratio_value)
-}
-# result from intergration
-(integrate(kldtest, 0,100))$value
+x_fit <- fitdistrplus::fitdist(x, "norm", method = 'mle')
 
-# rrsult from formula from Osses paper
-0.5*(e0/e1-1-log(e0/e1)+((m0-m1)^2)/e1)
+x_mean <- x_fit$estimate[['mean']]
+x_sd <- x_fit$estimate[['sd']]
 
-
-# test specifitiy formula
-
-pctest <- function(x) dnorm(x, mean=mc, sd=sqrt(ec)) 
+px <- function(x) dnorm(x, mean=x_mean,
+                        sd = x_sd)
 
 kldtest2 <- function(x) {
 
   # make sure R does not convert to 0 if result is very small number
-  p_pc <- ptest(x)*pctest(x)
+  pxi_pxic <- pxi(x)*pxic(x)
   
-  p_pc <- ifelse( abs(p_pc) > .Machine$double.xmin,
-                  p_pc,
+  pxi_pxic <- ifelse( abs(pxi_pxic) > .Machine$double.xmin,
+                  pxi_pxic,
                              .Machine$double.xmin)
   
   
-          fit_ratio_value <- qtest(x)/p_pc
+          fit_ratio_value <- px(x)/pxi_pxic
           
           # make sure R does not convert to 0 if result is very small number
           fit_ratio_value <- ifelse( abs(fit_ratio_value) > .Machine$double.xmin,
                                      fit_ratio_value,
                                      .Machine$double.xmin)
           
-          qtest(x)*log(fit_ratio_value)
+          px(x)*log(fit_ratio_value)
 }
 
+
+# reult from integration
+(integrate(kldtest2, 0,300))$value
+
+# result from Osses formula
+-0.5*log((x_sd^2)/(e1*ec))
+
+# plot the distributions and the integration of the integral
+# to gain some understanding
 x_vals <- seq(1, 100)
 
 ggplot(data = NULL, aes(x_vals))+
-  geom_line(aes(y = ptest(x_vals)))+
-  geom_line(aes(y= qtest(x_vals)))+
-  geom_line(aes(y= pctest(x_vals)))+
-  geom_line(aes(y= pctest(x_vals)*ptest(x_vals)))
+  geom_line(aes(y = pxi(x_vals)))+
+  geom_line(aes(y= px(x_vals)), color = 'red')+
+  geom_line(aes(y= pxic(x_vals)))+
+  # geom_line(aes(y= pxic(x_vals)*pxi(x_vals)), linetype = 'dashed')+
+  # geom_line(aes(y= log(px(x_vals)/(pxic(x_vals)*pxi(x_vals)))), linetype = 'dashed')+
+  geom_line(aes(y= px(x_vals)*log(px(x_vals)/(pxic(x_vals)*pxi(x_vals)))), linetype = 'dashed')
   
+kldtest3 <- function(x,y) {
+  
+  # make sure R does not convert to 0 if result is very small number
+  pxi_pxic <- pxi(x)*pxic(y)
+  
+  pxi_pxic <- ifelse( abs(pxi_pxic) > .Machine$double.xmin,
+                      pxi_pxic,
+                      .Machine$double.xmin)
+  
+  
+  fit_ratio_value <- px(x)/pxi_pxic
+  
+  # make sure R does not convert to 0 if result is very small number
+  fit_ratio_value <- ifelse( abs(fit_ratio_value) > .Machine$double.xmin,
+                             fit_ratio_value,
+                             .Machine$double.xmin)
+  
+  px(x)*log(fit_ratio_value)
+}
 
+
+integrate.func <- function(func, x) {
+  
+  sapply(x, function(y) {
+    temp <- integrate(f = func, lower = 0,
+                      upper = y)
+    temp$value
+  }
+  )
+  
+}
 
 ggplot(data = NULL, aes(x_vals))+
   geom_line(aes(y = integrate.func(kldtest2, x_vals)))
 
-integrate.func <- function(func, x) {
 
-        sapply(x, function(y) {
-          temp <- integrate(f = func, lower = 0,
-                            upper = y)
-          temp$value
-        }
-        )
-        # ) %>% as.data.frame() %>% rename('integral' = '.') %>%
-        #   bind_cols('sample' = x) %>%
-        #   pull(integral)
-      }
-  
-# reult from integration
-(integrate(kldtest2, 0,200))$value
+# try double integral -----------------------
 
-# result from Osses formula
--0.5*log(e1/(ec*e0))
+
+
+inner.integral = Vectorize(function(x) { integrate(kldtest2, 0, x)$value})
+integrate(inner.integral , 0, 75)
+
+integral1 <- function(x) (integrate(kldtest2, 0,x))$value
+integral1(300)
 
 
 
