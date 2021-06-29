@@ -412,7 +412,7 @@ entropy.table.shape <- function(home_num, metric,
     # # test kld.period function
     # test <- kld.period(16)
     
-    
+
     
     # apply function to find scaled_entropy dataframe for
     # sampling period of length "days2" to range of days in tested_sample_sequence
@@ -438,6 +438,7 @@ entropy.table.shape <- function(home_num, metric,
         
       }
     )  
+
     # bind all into a dataframe
     a <- bind_rows(entropy_data_list)
     
