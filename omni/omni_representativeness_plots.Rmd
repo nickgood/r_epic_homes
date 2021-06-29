@@ -112,13 +112,14 @@ clusters_all <- c('heat','shoulder', 'ac')
 locations_indoor <- c('living', 'kitchen', 'bedroom')
 
 # sequence of representative thresholds to test
-threshold_seq <- c(0.1, 0.2, 0.3)
+thresh_vector <- c(0.8, 0.90, 0.95)
 
 # sequence of days to test thresholds for shape entropy values
 
 pdf_days_pm <- c(3,7,19,27)
 
 pdf_days_voc <- c(6,10,18,26)
+
 
 
 
@@ -140,7 +141,8 @@ pm_time_no_cluster <- kld_max_df%>%
 # max kld
 # remove na kld values from runs
 kld_max_df_clean <- kld_max_df%>% 
-  filter(!is.na(kld), # with insufficient data in cluster/year/no cluster
+  filter(period_compare == 'year', # only comparing sample to whole mon. period
+         !is.na(kld), # with insufficient data in cluster/year/no cluster
   n_samp_avail >= frac_samp_required)# with less than certain percentage of available samples
   
 
@@ -151,7 +153,8 @@ test <- kld_max_df_clean %>%
 # kld values
 # remove na kld values from runs with insufficient data
 entropy_df_clean <- entropy_df%>% 
-  filter(!is.na(kld), # with insufficient data in cluster/year/no cluster
+  filter(period_compare == 'year', # only comparing sample to whole mon. period
+    !is.na(kld), # with insufficient data in cluster/year/no cluster
   n_samp_avail >= frac_samp_required)# with less than certain percentage of available samples
 
 test <- kld_max_df_clean %>%
@@ -195,9 +198,6 @@ scaled_entropy_df <- entropy_df_clean %>%
     TRUE ~ NA_real_
   ))
 
-scaled_entropy_df_time <- scaled_entropy_df %>% filter(method == 'time')
-scaled_entropy_df_shape <- scaled_entropy_df %>% filter(method == 'shape')
-
 
 unwanted_scaled_na <- scaled_entropy_df %>%
   filter(scaled_kld %>% is.na())
@@ -223,16 +223,15 @@ unwanted_scaled_na <- scaled_entropy_df %>%
 
 # time -------------------
 
-
-thresh_vector <- c(0.8, 0.90, 0.95)
-
+meth <- 'time'
 ## pm25 
 
 
 {
   met <- 'pm25'
 
-a <- scaled_entropy_df_time %>% filter(metric == met, sample_length %in% pdf_days_pm)
+a <- scaled_entropy_df %>% filter(metric == met, method == meth,
+                                       sample_length %in% pdf_days_pm)
 
 lvls <- levels(as.factor(a$sample_length))
 values <- by(a, a$sample_length, function(x) sum(!is.na(x$scaled_kld)))
@@ -264,8 +263,8 @@ ggplot(a, aes(x = scaled_kld, fill = as.factor(sample_length)))+
 {
   met <- 'voc'
 
-  a <- scaled_entropy_df_time %>% filter(metric == met, sample_length %in% pdf_days_voc)
-
+a <- scaled_entropy_df %>% filter(metric == met, method == meth,
+                                       sample_length %in% pdf_days_pm)
 lvls <- levels(as.factor(a$sample_length))
 values <- by(a, a$sample_length, function(x) sum(!is.na(x$scaled_kld)))
 below0 <- by(a, a$sample_length, function(x) sum(x$scaled_kld <0))
@@ -293,16 +292,14 @@ ggplot(a, aes(x = scaled_kld, fill = as.factor(sample_length)))+
 
 # shape -------------------
 
-thresh_vector <- c(0.80, 0.90, 0.95)
+meth <- 'shape'
 
 ## pm25 
-
-
 {
   met <- 'pm25'
 
-a <- scaled_entropy_df_shape %>% filter(metric == met, sample_length %in% pdf_days_pm)
-
+a <- scaled_entropy_df %>% filter(metric == met, method == meth,
+                                       sample_length %in% pdf_days_pm)
 lvls <- levels(as.factor(a$sample_length))
 values <- by(a, a$sample_length, function(x) sum(!is.na(x$scaled_kld)))
 below0 <- by(a, a$sample_length, function(x) sum(x$scaled_kld <0))
@@ -333,7 +330,8 @@ ggplot(a, aes(x = scaled_kld, fill = as.factor(sample_length)))+
 {
   met <- 'voc'
 
-  a <- scaled_entropy_df_shape %>% filter(metric == met, sample_length %in% pdf_days_voc)
+a <- scaled_entropy_df %>% filter(metric == met, method == meth,
+                                       sample_length %in% pdf_days_pm)
 
 lvls <- levels(as.factor(a$sample_length))
 values <- by(a, a$sample_length, function(x) sum(!is.na(x$scaled_kld)))
@@ -365,9 +363,9 @@ ggplot(a, aes(x = scaled_kld, fill = as.factor(sample_length)))+
 
 ```
 
-```{r create_avg_scaled_kld_df}
-avg_scaled_entropy_df <- scaled_entropy_df %>%
-  group_by(metric, home, location, energy_cluster, sample_length) %>%
+```{r create_pooled_avg_scaled_kld_df}
+pooled_scaled_entropy_df <- scaled_entropy_df %>%
+  group_by(metric, home, energy_cluster, sample_length, method) %>%
   summarise(avg_scaled_kld = mean(scaled_kld),
             high_val = avg_scaled_kld+ sd(scaled_kld),
                       low_val = avg_scaled_kld- sd(scaled_kld),
@@ -377,77 +375,92 @@ avg_scaled_entropy_df <- scaled_entropy_df %>%
 
 
 
-```{r function_shape_plotter}
+```{r function_avg_entropy_plotter}
 
-# # plot results for one home
-# 
-# a <- entropy_shape_df %>% filter(home == '009' & period_compare == 'year' )%>%
-#   group_by(sample_length, metric, energy_cluster) %>%
-#   summarize(coeff = mean(coeff, na.rm = TRUE)) %>% # average klds from all rooms
-#   ungroup()
-# 
-# 
-# ggplot(aes(x = sample_length, y = coeff, color = energy_cluster),
-#        data = a)+
-#   geom_line()+
-#   geom_point(size = 1)+
-#   xlab('Sample Length, days')+
-#   ylab('Scaled Relative Entropy')+
-#   geom_hline(yintercept=0.1, linetype="dashed", 
-#                 color = "black", size=0.5)+
-#   coord_cartesian(ylim = c(0,1)) +
-#   facet_wrap(vars(metric))
-
-
-# all_homes------------------------------------------------------
 entropy.plot <- function (
-  hm, loc,
+  hm,
   # omit a sampling period of given length
   # if this proportion of possible samples
   # were not availabel in data
   metrics = c('pm25', 'voc'),
-  data = entropy_shape_df
+  data = scaled_entropy_df
 ) {
   
   # for one home:
   a <- data %>%
-    filter(home == hm & location == loc &
-             metric %in% metrics)
+    filter(home == hm & metric %in% metrics)
 
   if(nrow(a) == 0) {
     plot <- NULL # return NULL if no data for home/metric/cluster combo
   }else {
     
     # plot results
-    plot <- ggplot(aes(x = sample_length, y = coeff,
+    plot <- ggplot(aes(x = sample_length, y = avg_scaled_kld,
                        color = energy_cluster), data = a)+
       geom_line()+
       geom_point(size = 1)+
       xlab('Sample Length, days')+
       ylab('Scaled Relative Entropy')+
-      geom_hline(yintercept=rep_threshold_seq, linetype="dashed", 
+      geom_hline(yintercept=thresh_vector, linetype="dashed", 
                  color = "black", size=0.5)+
       coord_cartesian(ylim = c(0,1))+
       ggtitle(paste('Home',hm)) +
       facet_wrap(vars(metric)) +
       scale_x_continuous(breaks=seq(0,28,7))+
     geom_ribbon(aes(ymin = low_val, ymax = high_val, fill = energy_cluster),
-                alpha = 0.3, color = NA)
+                alpha = 0.15, color = NA)
   }
   plot
 }
 
+#function to put plots in a grid
+grid.plots <- function(plots, title,
+                     y_val, ncol = 4, nrow = 4) {
+  ##omit NULL values (from homes or rooms without valid data)
+  plots <- plots[!sapply(plots, is.null)]
+  
+  do.call('grid.arrange', c(plots, top = title, left = y_val,
+                            ncol = ncol, nrow = nrow))
+  
+}
+
+```
+
+```{r plot_single_sensor_avg_entropy}
+
+# plot results for one home
+
+a <- pooled_scaled_entropy_df %>% filter(home == '009')
 
 
+ggplot(aes(x = sample_length, y = avg_scaled_kld, color = energy_cluster),
+       data = a)+
+  geom_line()+
+  geom_point(size = 1)+
+  xlab('Sample Length, days')+
+  ylab('Scaled Relative Entropy')+
+  geom_hline(yintercept=thresh_vector, linetype="dashed",
+                color = "black", size=0.5)+
+  coord_cartesian(ylim = c(0,1)) +
+      geom_ribbon(aes(ymin = low_val, ymax = high_val, fill = energy_cluster),
+                alpha = 0.15, color = NA)+
+  facet_wrap(vars(metric))
+
+```
+
+```{r grid_plot_avg_entropy, fig.height=8, fig. width = 10.5}
+# time ----------------
+meth <- 'time'
+
+## pm25
+{met <- 'pm25'
+a <- pooled_scaled_entropy_df %>% filter(metric == met, method == meth)
 # make plots for all homes
 map(homes_all, function (x_home) {
-  map(locations_indoor, function (x_location) {
-    entropy.plot(hm = x_home, loc = x_location)
-    
-  })
-
-})
-
+    entropy.plot(hm = x_home, data = a)
+}) %>%
+  grid.plots(title = 'Time-Structured Scaled Relative Entropy', y_val = NULL)
+}
 ```
 
 ### Testing Different Entropy Thresholds
