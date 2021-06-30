@@ -189,11 +189,12 @@ omni_daily_data_complete <- omni_data %>%
 ```
 
 ```{r add_clusters, eval = FALSE}
+# add home types ------------------
 
 # classify homes into "types" based on cluster pattern
 # and add home types to data
 
-home_type_df <- read_csv('../sense/csv_created_sense/home_type_df.csv')
+home_type_df <- read_csv('./csv_created/from_sense/home_type_df.csv')
 
 homes_tier3<-home_type_df %>% filter(home_type == 'tier3') %>%
   pull(home) # ac-shoulder-heat
@@ -214,9 +215,9 @@ omni_daily_data_complete<- omni_daily_data_complete %>%
 
 
 
-# add date range clusters to data
+# add date range clusters to data -------------------------
 
-energy_cluster_df <- read_csv('../sense/csv_created_sense/energy_cluster_df.csv')
+energy_cluster_df <- read_csv('./csv_created/from_sense/energy_cluster_df.csv')
 
 ############# using for loop
 
