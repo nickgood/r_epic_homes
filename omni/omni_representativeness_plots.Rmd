@@ -105,6 +105,11 @@ home.list <- function(x) sapply(x, threedig)
 # fraction of sample needed to use sample of certain length
 frac_samp_required <- 0.5
 
+# method of scaling relative entropy to scaled entropy
+# 'universal' or 'conditional'
+max_method <- 'conditional'
+
+
 # list of all home numbers
 homes_all <- home.list(1:17)
 
@@ -172,33 +177,48 @@ entropy_df_clean <- entropy_df%>%
 ```
 
 
-```{r kld_max_determine}
+```{r kld_max_determine, fig.height=10.5, fig.width = 8}
 
 # make box plots of values in each group
 ggplot(kld_max_df_clean, aes(y = kld,
                        group = interaction(home, location, energy_cluster)))+
   geom_boxplot()+
-  facet_wrap(vars(method, metric))
+  facet_wrap(vars(method, metric, energy_cluster))
 
+# one max per kld method-----------------
 
 kld_max_shape <-  kld_max_df_clean %>%
-  filter(method== 'shape', n_samp_avail >= 0.5) %>%
+  filter(method== 'shape') %>%
   group_by(home, location, energy_cluster, metric) %>%
-    summarise(cutoff = median(kld), .groups = 'drop') %>%
+    summarise(cutoff = mean(kld), .groups = 'drop') %>%
   # summarise(cutoff = median(kld)+1.5*IQR(kld), .groups = 'drop') %>%
   pull(cutoff) %>%max()
 
 
 kld_max_time <-  kld_max_df_clean %>%
-  filter(method== 'time', n_samp_avail >= 0.5) %>%
+  filter(method== 'time') %>%
   group_by(home, location, energy_cluster, metric) %>%
-    summarise(cutoff = median(kld), .groups = 'drop') %>%
+    summarise(cutoff = mean(kld), .groups = 'drop') %>%
   # summarise(cutoff = median(kld)+1.5*IQR(kld), .groups = 'drop') %>%
   pull(cutoff) %>%max()
 
+# one max per sensor per time period per kld method -----------------
+
+kld_max_cutoff_df <- kld_max_df_clean %>%
+  group_by(sample_length, home, location, energy_cluster, metric, method) %>%
+      summarise(max_kld_cutoff = mean(kld), .groups = 'drop') %>%
+  # summarise(max_kld_cutoff = median(kld), .groups = 'drop') %>%
+  rename(sample_min = sample_length)
+
 ```
 
+ * If universal maximum relative entropy is used to scale, the mean of the maximum of the average relative entropy values for sample length of 1 day **between all sensors, energy clusters, and metrics** was chosen as the "zero" point in the scale.
+ * If conditional maximum relative entropy is used to scale, the mean of the maximum of the average relative entropy values for sample length of 1 day **for each metric recorded by each sensor during each energy cluster separately** was chosen as the "zero" point in the scale, so in this case there were about 50+ different maximum values. 
+ 
 ```{r create_scaled_entropy_df}
+
+if( max_method == 'universal'){
+
 scaled_entropy_df <- entropy_df_clean %>%
   mutate(scaled_kld = case_when(
     method == 'time' ~ 1- kld/kld_max_time,
@@ -206,12 +226,26 @@ scaled_entropy_df <- entropy_df_clean %>%
     TRUE ~ NA_real_
   ))
 
+}else if (max_method == 'conditional'){
+
+scaled_entropy_df <- entropy_df_clean %>%
+  # join a and b, keep all rows in a
+  left_join(kld_max_cutoff_df,
+            by = c('home', 'location', 'energy_cluster',
+                   'metric', 'method')) %>%
+  mutate(scaled_kld = 1-kld/max_kld_cutoff)
+}
+
+# insert column telling which method was used
+scaled_entropy_df <- scaled_entropy_df %>%
+  mutate(max_method = max_method)
 
 unwanted_scaled_na <- scaled_entropy_df %>%
   filter(scaled_kld %>% is.na())
+
 ```
 
-###  unexpected missing values in scaled entropy data
+### `r unwanted_scaled_na %>% nrow()` unexpected missing values in scaled entropy data
 
 ## Testing Different Entropy Thresholds
 
@@ -221,81 +255,89 @@ unwanted_scaled_na <- scaled_entropy_df %>%
 ```{r pdf_plots}
 
 
-# # count the fraction of 3-day samples that have a scaled entropy > 1
-# (entropy_all_pdf_shape %>%
-#   filter(sample_length == 3, kld >1) %>%
-#   nrow())/
-#   (entropy_all_pdf_shape %>%
-#   filter(sample_length == 3) %>%
-#   nrow())
-
 # time -------------------
 
 meth <- 'time'
-## pm25 
-
+## pm25
 
 {
   met <- 'pm25'
-
-a <- scaled_entropy_df %>% filter(metric == met, method == meth,
-                                       sample_length %in% pdf_days_pm)
-
-lvls <- levels(as.factor(a$sample_length))
-values <- by(a, a$sample_length, function(x) sum(!is.na(x$scaled_kld)))
-below0 <- by(a, a$sample_length, function(x) sum(x$scaled_kld <0))
-labels <- paste(lvls,", n=",as.integer(values),", ", below0, " values < 0",sep="")
-
-ggplot(a, aes(x = scaled_kld, fill = as.factor(sample_length)))+
+  
+  a <- scaled_entropy_df %>% filter(metric == met, method == meth,
+                                    sample_length %in% (
+                                      if(met == 'pm25') pdf_days_pm else
+                                        if(met == 'voc') pdf_days_voc else
+                                          stop('met not correct')
+                                    )
+  )
+  
+  lvls <- levels(as.factor(a$sample_length))
+  values <- by(a, a$sample_length, function(x) sum(!is.na(x$scaled_kld)))
+  below0 <- by(a, a$sample_length, function(x) sum(x$scaled_kld <0))
+  labels <- paste(lvls,", n=",as.integer(values),", ", below0, " values < 0",sep="")
+  
+  ggplot(a, aes(x = scaled_kld, fill = as.factor(sample_length)))+
     geom_density(alpha = 0.5)+
-  xlab("Scaled Entropy")+
-    ggtitle(label = paste('Time-Structured Scaled Entropy of', met))+
-  coord_cartesian(xlim = c(0,1))+ # limit scaled entropy from 0 to 1
-  labs(fill = 'Length of Sample, days')+
-  geom_vline(xintercept = thresh_vector, linetype = 'dashed', color = 'red')+
-  annotate('text', x=thresh_vector[1]-0.02, y = -0.1,
-                label=thresh_vector[1],
-            angle=90, size=3, color = 'red') +
-   annotate('text', x=thresh_vector[2]-0.02, y = -0.1,
-                label=thresh_vector[2],
-            angle=90, size=3, color = 'red') +
+    xlab("Scaled Entropy")+
+    ggtitle(label = paste(
+      if(meth == 'time') 'Time-Structured Scaled Entropy of' else
+        if(meth == 'shape') 'Magnitude-Based Scaled Entropy of', met))+
+    coord_cartesian(xlim = c(0,1))+ # limit scaled entropy from 0 to 1
+    labs(fill = 'Length of Sample, days')+
+    geom_vline(xintercept = thresh_vector, linetype = 'dashed', color = 'red')+
+    annotate('text', x=thresh_vector[1]-0.02, y = -0.1,
+             label=thresh_vector[1],
+             angle=90, size=xsmall+1, color = 'red') +
+    annotate('text', x=thresh_vector[2]-0.02, y = -0.1,
+             label=thresh_vector[2],
+             angle=90, size=xsmall+1, color = 'red') +
     annotate('text', x=thresh_vector[3]-0.02, y = -0.1,
-                label=thresh_vector[3],
-            angle=90, size=3, color = 'red')+
-     scale_fill_discrete( labels=labels)
+             label=thresh_vector[3],
+             angle=90, size=xsmall+1, color = 'red')+
+    scale_fill_discrete( labels=labels) +
+    annotate('text', x = -Inf, y = Inf, hjust = 0, vjust = 1,
+             label = paste0('Scale Method:\n', unique(scaled_entropy_df$max_method)))
 }
 
 ##  voc
 
-
 {
   met <- 'voc'
-
-a <- scaled_entropy_df %>% filter(metric == met, method == meth,
-                                       sample_length %in% pdf_days_voc)
-lvls <- levels(as.factor(a$sample_length))
-values <- by(a, a$sample_length, function(x) sum(!is.na(x$scaled_kld)))
-below0 <- by(a, a$sample_length, function(x) sum(x$scaled_kld <0))
-labels <- paste(lvls,", n=",as.integer(values),", ", below0, " values < 0",sep="")
-
-ggplot(a, aes(x = scaled_kld, fill = as.factor(sample_length)))+
+  
+  a <- scaled_entropy_df %>% filter(metric == met, method == meth,
+                                    sample_length %in% (
+                                      if(met == 'pm25') pdf_days_pm else
+                                        if(met == 'voc') pdf_days_voc else
+                                          stop('met not correct')
+                                    )
+  )
+  
+  lvls <- levels(as.factor(a$sample_length))
+  values <- by(a, a$sample_length, function(x) sum(!is.na(x$scaled_kld)))
+  below0 <- by(a, a$sample_length, function(x) sum(x$scaled_kld <0))
+  labels <- paste(lvls,", n=",as.integer(values),", ", below0, " values < 0",sep="")
+  
+  ggplot(a, aes(x = scaled_kld, fill = as.factor(sample_length)))+
     geom_density(alpha = 0.5)+
-  xlab("Scaled Entropy")+
-    ggtitle(label = paste('Time-Structured Scaled Entropy of', met))+
-  coord_cartesian(xlim = c(0,1))+ # limit scaled entropy from 0 to 1
-  labs(fill = 'Length of Sample, days')+
-  geom_vline(xintercept = thresh_vector, linetype = 'dashed', color = 'red')+
-  annotate('text', x=thresh_vector[1]-0.02, y = -0.1,
-                label=thresh_vector[1],
-            angle=90, size=3, color = 'red') +
-   annotate('text', x=thresh_vector[2]-0.02, y = -0.1,
-                label=thresh_vector[2],
-            angle=90, size=3, color = 'red') +
+    xlab("Scaled Entropy")+
+    ggtitle(label = paste(
+      if(meth == 'time') 'Time-Structured Scaled Entropy of' else
+        if(meth == 'shape') 'Magnitude-Based Scaled Entropy of', met))+
+    coord_cartesian(xlim = c(0,1))+ # limit scaled entropy from 0 to 1
+    labs(fill = 'Length of Sample, days')+
+    geom_vline(xintercept = thresh_vector, linetype = 'dashed', color = 'red')+
+    annotate('text', x=thresh_vector[1]-0.02, y = -0.1,
+             label=thresh_vector[1],
+             angle=90, size=xsmall+1, color = 'red') +
+    annotate('text', x=thresh_vector[2]-0.02, y = -0.1,
+             label=thresh_vector[2],
+             angle=90, size=xsmall+1, color = 'red') +
     annotate('text', x=thresh_vector[3]-0.02, y = -0.1,
-                label=thresh_vector[3],
-            angle=90, size=3, color = 'red')+
-     scale_fill_discrete( labels=labels)
-
+             label=thresh_vector[3],
+             angle=90, size=xsmall+1, color = 'red')+
+    scale_fill_discrete( labels=labels) +
+    annotate('text', x = -Inf, y = Inf, hjust = 0, vjust = 1,
+             label = paste0('Scale Method:\n', unique(scaled_entropy_df$max_method)))
 }
 
 # shape -------------------
@@ -303,68 +345,87 @@ ggplot(a, aes(x = scaled_kld, fill = as.factor(sample_length)))+
 meth <- 'shape'
 
 ## pm25 
+
 {
   met <- 'pm25'
-
-a <- scaled_entropy_df %>% filter(metric == met, method == meth,
-                                       sample_length %in% pdf_days_pm)
-lvls <- levels(as.factor(a$sample_length))
-values <- by(a, a$sample_length, function(x) sum(!is.na(x$scaled_kld)))
-below0 <- by(a, a$sample_length, function(x) sum(x$scaled_kld <0))
-labels <- paste(lvls,", n=",as.integer(values),", ", below0, " values < 0",sep="")
-
-ggplot(a, aes(x = scaled_kld, fill = as.factor(sample_length)))+
+  
+  a <- scaled_entropy_df %>% filter(metric == met, method == meth,
+                                    sample_length %in% (
+                                      if(met == 'pm25') pdf_days_pm else
+                                        if(met == 'voc') pdf_days_voc else
+                                          stop('met not correct')
+                                    )
+  )
+  
+  lvls <- levels(as.factor(a$sample_length))
+  values <- by(a, a$sample_length, function(x) sum(!is.na(x$scaled_kld)))
+  below0 <- by(a, a$sample_length, function(x) sum(x$scaled_kld <0))
+  labels <- paste(lvls,", n=",as.integer(values),", ", below0, " values < 0",sep="")
+  
+  ggplot(a, aes(x = scaled_kld, fill = as.factor(sample_length)))+
     geom_density(alpha = 0.5)+
-  xlab("Scaled Entropy")+
-    ggtitle(label = paste('Magnitude-Based Scaled Entropy of', met))+
-  coord_cartesian(xlim = c(0,1))+ # limit scaled entropy from 0 to 1
-  labs(fill = 'Length of Sample, days')+
-  geom_vline(xintercept = thresh_vector, linetype = 'dashed', color = 'red')+
-  annotate('text', x=thresh_vector[1]-0.02, y = -0.1,
-                label=thresh_vector[1],
-            angle=90, size=3, color = 'red') +
-   annotate('text', x=thresh_vector[2]-0.02, y = -0.1,
-                label=thresh_vector[2],
-            angle=90, size=3, color = 'red') +
+    xlab("Scaled Entropy")+
+    ggtitle(label = paste(
+      if(meth == 'time') 'Time-Structured Scaled Entropy of' else
+      if(meth == 'shape') 'Magnitude-Based Scaled Entropy of', met))+
+    coord_cartesian(xlim = c(0,1))+ # limit scaled entropy from 0 to 1
+    labs(fill = 'Length of Sample, days')+
+    geom_vline(xintercept = thresh_vector, linetype = 'dashed', color = 'red')+
+    annotate('text', x=thresh_vector[1]-0.02, y = -0.1,
+             label=thresh_vector[1],
+             angle=90, size=xsmall+1, color = 'red') +
+    annotate('text', x=thresh_vector[2]-0.02, y = -0.1,
+             label=thresh_vector[2],
+             angle=90, size=xsmall+1, color = 'red') +
     annotate('text', x=thresh_vector[3]-0.02, y = -0.1,
-                label=thresh_vector[3],
-            angle=90, size=3, color = 'red')+
-     scale_fill_discrete( labels=labels)
+             label=thresh_vector[3],
+             angle=90, size=xsmall+1, color = 'red')+
+    scale_fill_discrete( labels=labels) +
+    annotate('text', x = -Inf, y = Inf, hjust = 0, vjust = 1,
+             label = paste0('Scale Method:\n', unique(scaled_entropy_df$max_method)))
 }
 
 ##  voc
 
-
 {
   met <- 'voc'
-
-a <- scaled_entropy_df %>% filter(metric == met, method == meth,
-                                       sample_length %in% pdf_days_voc)
-
-lvls <- levels(as.factor(a$sample_length))
-values <- by(a, a$sample_length, function(x) sum(!is.na(x$scaled_kld)))
-below0 <- by(a, a$sample_length, function(x) sum(x$scaled_kld <0))
-labels <- paste(lvls,", n=",as.integer(values),", ", below0, " values < 0",sep="")
-
-ggplot(a, aes(x = scaled_kld, fill = as.factor(sample_length)))+
+  
+  a <- scaled_entropy_df %>% filter(metric == met, method == meth,
+                                    sample_length %in% (
+                                      if(met == 'pm25') pdf_days_pm else
+                                        if(met == 'voc') pdf_days_voc else
+                                          stop('met not correct')
+                                    )
+  )
+  
+  lvls <- levels(as.factor(a$sample_length))
+  values <- by(a, a$sample_length, function(x) sum(!is.na(x$scaled_kld)))
+  below0 <- by(a, a$sample_length, function(x) sum(x$scaled_kld <0))
+  labels <- paste(lvls,", n=",as.integer(values),", ", below0, " values < 0",sep="")
+  
+  ggplot(a, aes(x = scaled_kld, fill = as.factor(sample_length)))+
     geom_density(alpha = 0.5)+
-  xlab("Scaled Entropy")+
-    ggtitle(label = paste('Magnitude-Based Scaled Entropy of', met))+
-  coord_cartesian(xlim = c(0,1))+ # limit scaled entropy from 0 to 1
-  labs(fill = 'Length of Sample, days')+
-  geom_vline(xintercept = thresh_vector, linetype = 'dashed', color = 'red')+
-  annotate('text', x=thresh_vector[1]-0.02, y = -0.1,
-                label=thresh_vector[1],
-            angle=90, size=3, color = 'red') +
-   annotate('text', x=thresh_vector[2]-0.02, y = -0.1,
-                label=thresh_vector[2],
-            angle=90, size=3, color = 'red') +
+    xlab("Scaled Entropy")+
+    ggtitle(label = paste(
+      if(meth == 'time') 'Time-Structured Scaled Entropy of' else
+        if(meth == 'shape') 'Magnitude-Based Scaled Entropy of', met))+
+    coord_cartesian(xlim = c(0,1))+ # limit scaled entropy from 0 to 1
+    labs(fill = 'Length of Sample, days')+
+    geom_vline(xintercept = thresh_vector, linetype = 'dashed', color = 'red')+
+    annotate('text', x=thresh_vector[1]-0.02, y = -0.1,
+             label=thresh_vector[1],
+             angle=90, size=xsmall+1, color = 'red') +
+    annotate('text', x=thresh_vector[2]-0.02, y = -0.1,
+             label=thresh_vector[2],
+             angle=90, size=xsmall+1, color = 'red') +
     annotate('text', x=thresh_vector[3]-0.02, y = -0.1,
-                label=thresh_vector[3],
-            angle=90, size=3, color = 'red')+
-     scale_fill_discrete( labels=labels)
-
+             label=thresh_vector[3],
+             angle=90, size=xsmall+1, color = 'red')+
+    scale_fill_discrete( labels=labels) +
+    annotate('text', x = -Inf, y = Inf, hjust = 0, vjust = 1,
+             label = paste0('Scale Method:\n', unique(scaled_entropy_df$max_method)))
 }
+
 
 
 
@@ -491,7 +552,10 @@ a <- pooled_scaled_entropy_df %>% filter(method == meth)
 map(homes_all, function (x_home) {
     entropy.plot(hm = x_home, data = a)
 }) %>%
-  grid.plots(title = 'Time-Structured Scaled Relative Entropy')
+  grid.plots(title = 'Time-Structured Scaled Relative Entropy')%>%
+  annotate_figure(fig.lab = paste0('Scale Method: ',
+                                   unique(scaled_entropy_df$max_method)))
+
 }
 
 # shape ----------------
@@ -503,7 +567,10 @@ a <- pooled_scaled_entropy_df %>% filter(method == meth)
 map(homes_all, function (x_home) {
     entropy.plot(hm = x_home, data = a)
 }) %>%
-  grid.plots(title = 'Magnitiude-Based Scaled Relative Entropy')
+  grid.plots(title = 'Magnitiude-Based Scaled Relative Entropy') %>%
+  annotate_figure(fig.lab = paste0('Scale Method: ',
+                                   unique(scaled_entropy_df$max_method)))
+
 }
 
 
