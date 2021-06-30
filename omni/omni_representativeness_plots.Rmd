@@ -136,11 +136,11 @@ large <- 16
 # count omissions --------------
 
 # time
-pm_time_no_cluster <- kld_max_df%>% 
-  filter(method == 'time', metric == 'pm25',
-         grepl('likely_no_cluster', error)) %>%
-  group_by(home, location, energy_cluster) %>%
-  summarize(n = n(), .groups = 'drop')
+# pm_time_no_cluster <- kld_max_df%>% 
+#   filter(method == 'time', metric == 'pm25',
+#          grepl('likely_no_cluster', error)) %>%
+#   group_by(home, location, energy_cluster) %>%
+#   summarize(n = n(), .groups = 'drop')
 
 
 # clean dataframes ------------------------
@@ -153,20 +153,21 @@ kld_max_df_clean <- kld_max_df%>%
   n_samp_avail >= frac_samp_required)# with less than certain percentage of available samples
   
 
-test <- kld_max_df_clean %>%
-  group_by(home, location, energy_cluster) %>%
-  summarise(n = n(), .groups = 'drop')
+# test <- kld_max_df_clean %>%
+#   group_by(home, location, energy_cluster) %>%
+#   summarise(n = n(), .groups = 'drop')
 
 # kld values
 # remove na kld values from runs with insufficient data
 entropy_df_clean <- entropy_df%>% 
+  rename('kld' = coeff) %>%
   filter(period_compare == 'year', # only comparing sample to whole mon. period
     !is.na(kld), # with insufficient data in cluster/year/no cluster
   n_samp_avail >= frac_samp_required)# with less than certain percentage of available samples
 
-test <- kld_max_df_clean %>%
-  group_by(home, location, energy_cluster) %>%
-  summarise(n = n(), .groups = 'drop')
+# test <- kld_max_df_clean %>%
+#   group_by(home, location, energy_cluster) %>%
+#   summarise(n = n(), .groups = 'drop')
 
 ```
 
@@ -210,7 +211,7 @@ unwanted_scaled_na <- scaled_entropy_df %>%
   filter(scaled_kld %>% is.na())
 ```
 
-### `r unwanted_scaled_na` unexpected missing values in scaled entropy data
+###  unexpected missing values in scaled entropy data
 
 ## Testing Different Entropy Thresholds
 
@@ -271,7 +272,7 @@ ggplot(a, aes(x = scaled_kld, fill = as.factor(sample_length)))+
   met <- 'voc'
 
 a <- scaled_entropy_df %>% filter(metric == met, method == meth,
-                                       sample_length %in% pdf_days_pm)
+                                       sample_length %in% pdf_days_voc)
 lvls <- levels(as.factor(a$sample_length))
 values <- by(a, a$sample_length, function(x) sum(!is.na(x$scaled_kld)))
 below0 <- by(a, a$sample_length, function(x) sum(x$scaled_kld <0))
@@ -338,7 +339,7 @@ ggplot(a, aes(x = scaled_kld, fill = as.factor(sample_length)))+
   met <- 'voc'
 
 a <- scaled_entropy_df %>% filter(metric == met, method == meth,
-                                       sample_length %in% pdf_days_pm)
+                                       sample_length %in% pdf_days_voc)
 
 lvls <- levels(as.factor(a$sample_length))
 values <- by(a, a$sample_length, function(x) sum(!is.na(x$scaled_kld)))
@@ -458,7 +459,7 @@ grid.plots <- function(plots, title,
 
 ```
 
-```{r plot_single_sensor_avg_entropy}
+```{r plot_single_sensor_avg_entropy, eval = FALSE}
 
 # plot results for one home
 
@@ -513,7 +514,7 @@ map(homes_all, function (x_home) {
 
 ### Effect on when average Scaled Entropy crosses below threshold
 
-```{r threshold_plots_shape}
+```{r threshold_plots_shape, eval = FALSE}
 
 # make dataframe of values for minimum sample length (in days)
 # where entropy is less than threshold value
