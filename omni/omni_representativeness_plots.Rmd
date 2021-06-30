@@ -178,7 +178,7 @@ entropy_df_clean <- entropy_df%>%
 ggplot(kld_max_df_clean, aes(y = kld,
                        group = interaction(home, location, energy_cluster)))+
   geom_boxplot()+
-  facet_wrap(vars(method))
+  facet_wrap(vars(method, metric))
 
 
 kld_max_shape <-  kld_max_df_clean %>%
