@@ -37,8 +37,8 @@ library(ggpubr) # for tesing log-normality
 ```{r import_omni_minute_data}
 # omni_data<- read_csv('./csv_created/omni_all_locations.csv')
 
-# remove all variables but omni_data
-rm(list=setdiff(ls(), "omni_data"))
+# # remove all variables but omni_data
+# rm(list=setdiff(ls(), "omni_data"))
 
 # zero_test <- omni_data %>%
 #   group_by(home, location) %>%
@@ -48,6 +48,10 @@ rm(list=setdiff(ls(), "omni_data"))
 
 ```
 
+```{r import_omni_hourly_data}
+omni_hourly_data<- read_csv('./csv_created/omni_hourly_data.csv')
+
+```
 
 ```{r import_energy_cluster_homes}
 # import energy cluster dataframe for all homes
