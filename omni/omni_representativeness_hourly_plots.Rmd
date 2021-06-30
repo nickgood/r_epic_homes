@@ -1,0 +1,618 @@
+---
+title: "Representativeness - Time-Structure with Hourly Data"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: paper
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.path = 'figures/',
+  warning = FALSE,
+  message = FALSE,
+  echo = FALSE,
+  fig.width = 10, fig.height = 3,
+  cache = FALSE)
+```
+
+```{r libraries, include=FALSE}
+library(dplyr)
+library(purrr)
+library(tidyr)
+library(openair)
+library(ggplot2)
+library(readr)
+library(googlesheets4)
+library(lubridate)
+library(gridExtra)
+library(runner) # for moving window functions
+library(ggpubr) # for tesing log-normality
+# library(cubature) # for alternative method of integrating kld function
+# library(entropy) # for KLD function
+# library(fitdistrplus) # for fitting distribution to data NOTE, MASS::select CONFLICTS WITH dplyr::select
+
+```
+
+
+```{r import_energy_cluster_homes}
+# import energy cluster dataframe for all homes
+energy_cluster_df <- read_csv('./csv_created/from_sense/energy_cluster_df.csv')
+```
+
+```{r import_pdf_data}
+
+# read in csv files
+entropy_df <- bind_rows(
+  read_csv(file = './csv_created/representativeness_data/rep_data_shape_pdf.csv'),
+  read_csv(file = './csv_created/representativeness_data/rep_data_time_hourly_pdf.csv'))
+
+
+```
+
+```{r import_max_kld_values}
+# read in data
+
+kld_max_df <- bind_rows(
+  read_csv('./csv_created/representativeness_data/kld_max_shape.csv'), 
+  read_csv('./csv_created/representativeness_data/kld_max_time_hourly.csv'))
+
+```
+
+
+```{r functions_misc}
+
+#Function to only display 3 significant figures (for tables)
+signif3 <- function(x){
+  signif(x, digits = 3)
+}
+
+##Define a char vector of home numbers using a number vector,
+##ex: x <- home.list(c(1:15)) for homes 1-15
+threedig <- function(x) {
+  if (nchar(x) == 1) {a <- paste0('00', x)
+  return(a)
+  }
+  
+  if (nchar(x) == 2) {a<- paste0('0', x)
+  return(a)
+  }
+  else return(a)
+}
+
+home.list <- function(x) sapply(x, threedig)
+
+
+```
+
+
+
+```{r define_variables}
+# fraction of sample needed to use sample of certain length
+frac_samp_required <- 0.5
+
+# method of scaling relative entropy to scaled entropy
+# 'universal' or 'conditional'
+max_method <- 'universal'
+
+
+# list of all home numbers
+homes_all <- home.list(1:17)
+
+clusters_all <- c('heat','shoulder', 'ac')
+locations_indoor <- c('living', 'kitchen', 'bedroom')
+
+# sequence of representative thresholds to test
+thresh_vector <- c(0.8, 0.90, 0.95)
+
+# sequence of days to test thresholds for shape entropy values
+
+pdf_days_pm <- c(3,7,19,27)
+
+pdf_days_voc <- c(6,10,18,26)
+
+
+# make cluster color scale
+cluster_colors <- c('red', 'blue', 'darkgreen')
+
+# for labeling purposes
+xsmall <- 2
+small <- 6
+medium <- 10
+large <- 16
+
+```
+
+```{r cleaning_omissions}
+# count omissions --------------
+
+# time
+# pm_time_no_cluster <- kld_max_df%>% 
+#   filter(method == 'time', metric == 'pm25',
+#          grepl('likely_no_cluster', error)) %>%
+#   group_by(home, location, energy_cluster) %>%
+#   summarize(n = n(), .groups = 'drop')
+
+
+# clean dataframes ------------------------
+
+# max kld
+# remove na kld values from runs
+kld_max_df_clean <- kld_max_df%>% 
+  filter(period_compare == 'year', # only comparing sample to whole mon. period
+         !is.na(kld), # with insufficient data in cluster/year/no cluster
+  n_samp_avail >= frac_samp_required)# with less than certain percentage of available samples
+  
+
+# test <- kld_max_df_clean %>%
+#   group_by(home, location, energy_cluster) %>%
+#   summarise(n = n(), .groups = 'drop')
+
+# kld values
+# remove na kld values from runs with insufficient data
+entropy_df_clean <- entropy_df%>% 
+  # rename('kld' = coeff) %>%
+  filter(period_compare == 'year', # only comparing sample to whole mon. period
+    !is.na(kld), # with insufficient data in cluster/year/no cluster
+  n_samp_avail >= frac_samp_required)# with less than certain percentage of available samples
+
+# test <- kld_max_df_clean %>%
+#   group_by(home, location, energy_cluster) %>%
+#   summarise(n = n(), .groups = 'drop')
+
+```
+
+
+```{r kld_max_determine, fig.height=10.5, fig.width = 8}
+
+# make box plots of values in each group
+ggplot(kld_max_df_clean, aes(y = kld,
+                       group = interaction(home, location, energy_cluster)))+
+  geom_boxplot()+
+  facet_wrap(vars(method, metric, energy_cluster))
+
+# one max per kld method-----------------
+
+kld_max_shape <-  kld_max_df_clean %>%
+  filter(method== 'shape') %>%
+  group_by(home, location, energy_cluster, metric) %>%
+    summarise(cutoff = mean(kld), .groups = 'drop') %>%
+  # summarise(cutoff = median(kld)+1.5*IQR(kld), .groups = 'drop') %>%
+  pull(cutoff) %>%max()
+
+
+kld_max_time <-  kld_max_df_clean %>%
+  filter(method== 'time') %>%
+  group_by(home, location, energy_cluster, metric) %>%
+    summarise(cutoff = mean(kld), .groups = 'drop') %>%
+  # summarise(cutoff = median(kld)+1.5*IQR(kld), .groups = 'drop') %>%
+  pull(cutoff) %>%max()
+
+# one max per sensor per time period per kld method -----------------
+
+kld_max_cutoff_df <- kld_max_df_clean %>%
+  group_by(sample_length, home, location, energy_cluster, metric, method) %>%
+      summarise(max_kld_cutoff = mean(kld), .groups = 'drop') %>%
+  # summarise(max_kld_cutoff = median(kld), .groups = 'drop') %>%
+  rename(sample_min = sample_length)
+
+```
+
+ * If universal maximum relative entropy is used to scale, the mean of the maximum of the average relative entropy values for sample length of 1 day **between all sensors, energy clusters, and metrics** was chosen as the "zero" point in the scale.
+ * If conditional maximum relative entropy is used to scale, the mean of the maximum of the average relative entropy values for sample length of 1 day **for each metric recorded by each sensor during each energy cluster separately** was chosen as the "zero" point in the scale, so in this case there were about 50+ different maximum values. 
+ 
+```{r create_scaled_entropy_df}
+
+if( max_method == 'universal'){
+
+scaled_entropy_df <- entropy_df_clean %>%
+  mutate(scaled_kld = case_when(
+    method == 'time' ~ 1- kld/kld_max_time,
+        method == 'shape' ~ 1 - kld/kld_max_shape,
+    TRUE ~ NA_real_
+  ))
+
+}else if (max_method == 'conditional'){
+
+scaled_entropy_df <- entropy_df_clean %>%
+  # join a and b, keep all rows in a
+  left_join(kld_max_cutoff_df,
+            by = c('home', 'location', 'energy_cluster',
+                   'metric', 'method')) %>%
+  mutate(scaled_kld = 1-kld/max_kld_cutoff)
+}
+
+# insert column telling which method was used
+scaled_entropy_df <- scaled_entropy_df %>%
+  mutate(max_method = max_method)
+
+unwanted_scaled_na <- scaled_entropy_df %>%
+  filter(scaled_kld %>% is.na())
+
+```
+
+### `r unwanted_scaled_na %>% nrow()` unexpected missing values in scaled entropy data
+
+## Testing Different Entropy Thresholds
+
+
+### Effect on when individual sample Scaled Entropy crosses below threshold
+
+```{r pdf_plots}
+
+
+# time -------------------
+
+meth <- 'time'
+## pm25
+
+{
+  met <- 'pm25'
+  
+  a <- scaled_entropy_df %>% filter(metric == met, method == meth,
+                                    sample_length %in% (
+                                      if(met == 'pm25') pdf_days_pm else
+                                        if(met == 'voc') pdf_days_voc else
+                                          stop('met not correct')
+                                    )
+  )
+  
+  lvls <- levels(as.factor(a$sample_length))
+  values <- by(a, a$sample_length, function(x) sum(!is.na(x$scaled_kld)))
+  below0 <- by(a, a$sample_length, function(x) sum(x$scaled_kld <0))
+  labels <- paste(lvls,", n=",as.integer(values),", ", below0, " values < 0",sep="")
+  
+  ggplot(a, aes(x = scaled_kld, fill = as.factor(sample_length)))+
+    geom_density(alpha = 0.5)+
+    xlab("Scaled Entropy")+
+    ggtitle(label = paste(
+      if(meth == 'time') 'Time-Structured Scaled Entropy of' else
+        if(meth == 'shape') 'Magnitude-Based Scaled Entropy of', met))+
+    coord_cartesian(xlim = c(0,1))+ # limit scaled entropy from 0 to 1
+    labs(fill = 'Length of Sample, days')+
+    geom_vline(xintercept = thresh_vector, linetype = 'dashed', color = 'red')+
+    annotate('text', x=thresh_vector[1]-0.02, y = -0.1,
+             label=thresh_vector[1],
+             angle=90, size=xsmall+1, color = 'red') +
+    annotate('text', x=thresh_vector[2]-0.02, y = -0.1,
+             label=thresh_vector[2],
+             angle=90, size=xsmall+1, color = 'red') +
+    annotate('text', x=thresh_vector[3]-0.02, y = -0.1,
+             label=thresh_vector[3],
+             angle=90, size=xsmall+1, color = 'red')+
+    scale_fill_discrete( labels=labels) +
+    annotate('text', x = -Inf, y = Inf, hjust = 0, vjust = 1,
+             label = paste0('Scale Method:\n', unique(scaled_entropy_df$max_method)))
+}
+
+##  voc
+
+{
+  met <- 'voc'
+  
+  a <- scaled_entropy_df %>% filter(metric == met, method == meth,
+                                    sample_length %in% (
+                                      if(met == 'pm25') pdf_days_pm else
+                                        if(met == 'voc') pdf_days_voc else
+                                          stop('met not correct')
+                                    )
+  )
+  
+  lvls <- levels(as.factor(a$sample_length))
+  values <- by(a, a$sample_length, function(x) sum(!is.na(x$scaled_kld)))
+  below0 <- by(a, a$sample_length, function(x) sum(x$scaled_kld <0))
+  labels <- paste(lvls,", n=",as.integer(values),", ", below0, " values < 0",sep="")
+  
+  ggplot(a, aes(x = scaled_kld, fill = as.factor(sample_length)))+
+    geom_density(alpha = 0.5)+
+    xlab("Scaled Entropy")+
+    ggtitle(label = paste(
+      if(meth == 'time') 'Time-Structured Scaled Entropy of' else
+        if(meth == 'shape') 'Magnitude-Based Scaled Entropy of', met))+
+    coord_cartesian(xlim = c(0,1))+ # limit scaled entropy from 0 to 1
+    labs(fill = 'Length of Sample, days')+
+    geom_vline(xintercept = thresh_vector, linetype = 'dashed', color = 'red')+
+    annotate('text', x=thresh_vector[1]-0.02, y = -0.1,
+             label=thresh_vector[1],
+             angle=90, size=xsmall+1, color = 'red') +
+    annotate('text', x=thresh_vector[2]-0.02, y = -0.1,
+             label=thresh_vector[2],
+             angle=90, size=xsmall+1, color = 'red') +
+    annotate('text', x=thresh_vector[3]-0.02, y = -0.1,
+             label=thresh_vector[3],
+             angle=90, size=xsmall+1, color = 'red')+
+    scale_fill_discrete( labels=labels) +
+    annotate('text', x = -Inf, y = Inf, hjust = 0, vjust = 1,
+             label = paste0('Scale Method:\n', unique(scaled_entropy_df$max_method)))
+}
+
+# shape -------------------
+
+meth <- 'shape'
+
+## pm25 
+
+{
+  met <- 'pm25'
+  
+  a <- scaled_entropy_df %>% filter(metric == met, method == meth,
+                                    sample_length %in% (
+                                      if(met == 'pm25') pdf_days_pm else
+                                        if(met == 'voc') pdf_days_voc else
+                                          stop('met not correct')
+                                    )
+  )
+  
+  lvls <- levels(as.factor(a$sample_length))
+  values <- by(a, a$sample_length, function(x) sum(!is.na(x$scaled_kld)))
+  below0 <- by(a, a$sample_length, function(x) sum(x$scaled_kld <0))
+  labels <- paste(lvls,", n=",as.integer(values),", ", below0, " values < 0",sep="")
+  
+  ggplot(a, aes(x = scaled_kld, fill = as.factor(sample_length)))+
+    geom_density(alpha = 0.5)+
+    xlab("Scaled Entropy")+
+    ggtitle(label = paste(
+      if(meth == 'time') 'Time-Structured Scaled Entropy of' else
+      if(meth == 'shape') 'Magnitude-Based Scaled Entropy of', met))+
+    coord_cartesian(xlim = c(0,1))+ # limit scaled entropy from 0 to 1
+    labs(fill = 'Length of Sample, days')+
+    geom_vline(xintercept = thresh_vector, linetype = 'dashed', color = 'red')+
+    annotate('text', x=thresh_vector[1]-0.02, y = -0.1,
+             label=thresh_vector[1],
+             angle=90, size=xsmall+1, color = 'red') +
+    annotate('text', x=thresh_vector[2]-0.02, y = -0.1,
+             label=thresh_vector[2],
+             angle=90, size=xsmall+1, color = 'red') +
+    annotate('text', x=thresh_vector[3]-0.02, y = -0.1,
+             label=thresh_vector[3],
+             angle=90, size=xsmall+1, color = 'red')+
+    scale_fill_discrete( labels=labels) +
+    annotate('text', x = -Inf, y = Inf, hjust = 0, vjust = 1,
+             label = paste0('Scale Method:\n', unique(scaled_entropy_df$max_method)))
+}
+
+##  voc
+
+{
+  met <- 'voc'
+  
+  a <- scaled_entropy_df %>% filter(metric == met, method == meth,
+                                    sample_length %in% (
+                                      if(met == 'pm25') pdf_days_pm else
+                                        if(met == 'voc') pdf_days_voc else
+                                          stop('met not correct')
+                                    )
+  )
+  
+  lvls <- levels(as.factor(a$sample_length))
+  values <- by(a, a$sample_length, function(x) sum(!is.na(x$scaled_kld)))
+  below0 <- by(a, a$sample_length, function(x) sum(x$scaled_kld <0))
+  labels <- paste(lvls,", n=",as.integer(values),", ", below0, " values < 0",sep="")
+  
+  ggplot(a, aes(x = scaled_kld, fill = as.factor(sample_length)))+
+    geom_density(alpha = 0.5)+
+    xlab("Scaled Entropy")+
+    ggtitle(label = paste(
+      if(meth == 'time') 'Time-Structured Scaled Entropy of' else
+        if(meth == 'shape') 'Magnitude-Based Scaled Entropy of', met))+
+    coord_cartesian(xlim = c(0,1))+ # limit scaled entropy from 0 to 1
+    labs(fill = 'Length of Sample, days')+
+    geom_vline(xintercept = thresh_vector, linetype = 'dashed', color = 'red')+
+    annotate('text', x=thresh_vector[1]-0.02, y = -0.1,
+             label=thresh_vector[1],
+             angle=90, size=xsmall+1, color = 'red') +
+    annotate('text', x=thresh_vector[2]-0.02, y = -0.1,
+             label=thresh_vector[2],
+             angle=90, size=xsmall+1, color = 'red') +
+    annotate('text', x=thresh_vector[3]-0.02, y = -0.1,
+             label=thresh_vector[3],
+             angle=90, size=xsmall+1, color = 'red')+
+    scale_fill_discrete( labels=labels) +
+    annotate('text', x = -Inf, y = Inf, hjust = 0, vjust = 1,
+             label = paste0('Scale Method:\n', unique(scaled_entropy_df$max_method)))
+}
+
+
+
+
+
+```
+
+```{r create_pooled_avg_scaled_kld_df}
+pooled_scaled_entropy_df <- scaled_entropy_df %>%
+  group_by(metric, home, energy_cluster, sample_length, method) %>%
+  summarise(avg_scaled_kld = mean(scaled_kld),
+            high_val = avg_scaled_kld+ sd(scaled_kld),
+                      low_val = avg_scaled_kld- sd(scaled_kld),
+            .groups = 'drop')
+  
+```
+
+
+
+```{r function_avg_entropy_plotter}
+
+#make function to define color based on cluster
+color.find <- function(x)  {
+  case_when(x == 'heat'~ cluster_colors[1],
+            x == 'ac' ~ cluster_colors[2],
+            x == 'shoulder' ~ cluster_colors[3],
+            TRUE ~ 'black')}
+
+entropy.plot <- function (
+  hm,
+  # omit a sampling period of given length
+  # if this proportion of possible samples
+  # were not availabel in data
+  metrics = c('pm25', 'voc'),
+  data = pooled_scaled_entropy_df
+) {
+  
+  # for one home:
+  a <- data %>%
+    filter(home == hm & metric %in% metrics)%>%
+  mutate(clust_color = color.find(energy_cluster)) %>% # add column for color based on cluster
+  #convert cluster col to factor
+  mutate(energy_cluster = as.factor(energy_cluster))
+  
+  
+  col <- as.character(a$clust_color)
+names(col) <- as.character(a$energy_cluster)
+
+
+  if(nrow(a) == 0) {
+    plot <- NULL # return NULL if no data for home/metric/cluster combo
+  }else {
+    
+    # plot results
+    plot <- ggplot(aes(x = sample_length, y = avg_scaled_kld,
+                       color = energy_cluster), data = a)+
+      geom_line()+
+      geom_point(size = 1)+
+      xlab('Sample Length, days')+
+      ylab('Scaled Relative Entropy')+
+      geom_hline(yintercept=thresh_vector, linetype="dashed", 
+                 color = "black", size=0.5)+
+      coord_cartesian(ylim = c(0,1))+
+      ggtitle(paste('Home',hm)) +
+      scale_x_continuous(breaks=seq(0,28,7))+
+    geom_ribbon(aes(ymin = low_val, ymax = high_val, fill = energy_cluster),
+                alpha = 0.15, color = NA)+
+  scale_fill_manual(values = col)+
+        scale_color_manual(values = col)+
+      theme(legend.position = 'none',
+            axis.title = element_blank(),
+            axis.text = element_text(size = small),
+            title = element_text(size = small))+
+            facet_wrap(vars(metric))
+
+
+  
+   }
+  plot
+}
+
+#function to put plots in a grid
+grid.plots <- function(plots, title,
+                     y_val = 'Scaled Relative Entropy',
+                     x_val = 'Sample Length, days', ncol = 4, nrow = 4) {
+  ##omit NULL values (from homes or rooms without valid data)
+  plots <- plots[!sapply(plots, is.null)]
+  
+  do.call('grid.arrange', c(plots, top = title, left = y_val, bottom = x_val,
+                            ncol = ncol, nrow = nrow))
+  
+}
+
+```
+
+```{r plot_single_sensor_avg_entropy, eval = FALSE}
+
+# plot results for one home
+
+a <- pooled_scaled_entropy_df %>% filter(home == '009')
+
+
+ggplot(aes(x = sample_length, y = avg_scaled_kld, color = energy_cluster),
+       data = a)+
+  geom_line()+
+  geom_point(size = 1)+
+  xlab('Sample Length, days')+
+  ylab('Scaled Relative Entropy')+
+  geom_hline(yintercept=thresh_vector, linetype="dashed",
+                color = "black", size=0.5)+
+  coord_cartesian(ylim = c(0,1)) +
+      geom_ribbon(aes(ymin = low_val, ymax = high_val, fill = energy_cluster),
+                alpha = 0.15, color = NA)+
+  facet_wrap(vars(metric))
+
+```
+
+```{r grid_plot_avg_entropy, fig.height=8, fig.width = 10.5}
+# time ----------------
+meth <- 'time'
+
+{
+a <- pooled_scaled_entropy_df %>% filter(method == meth)
+# make plots for all homes
+map(homes_all, function (x_home) {
+    entropy.plot(hm = x_home, data = a)
+}) %>%
+  grid.plots(title = 'Time-Structured Scaled Relative Entropy')%>%
+  annotate_figure(fig.lab = paste0('Scale Method: ',
+                                   unique(scaled_entropy_df$max_method)))
+
+}
+
+# shape ----------------
+meth <- 'shape'
+
+{
+a <- pooled_scaled_entropy_df %>% filter(method == meth)
+# make plots for all homes
+map(homes_all, function (x_home) {
+    entropy.plot(hm = x_home, data = a)
+}) %>%
+  grid.plots(title = 'Magnitiude-Based Scaled Relative Entropy') %>%
+  annotate_figure(fig.lab = paste0('Scale Method: ',
+                                   unique(scaled_entropy_df$max_method)))
+
+}
+
+
+
+```
+
+### Testing Different Entropy Thresholds
+
+### Effect on when average Scaled Entropy crosses below threshold
+
+```{r threshold_plots_shape, eval = FALSE}
+
+# make dataframe of values for minimum sample length (in days)
+# where entropy is less than threshold value
+threshold.freq.table <- function (threshold) {
+  
+  
+  a <- entropy_shape_df %>%
+  filter(n_samp_avail >0.5 & method == 'shape') %>%
+  filter(coeff <= threshold) %>% 
+  group_by(home, metric, location, energy_cluster) %>%
+  summarise_at(vars(sample_length), min) %>%
+  ungroup() %>%
+    mutate('thresh' = threshold)
+}
+
+# apply function to all thresholds in threshold_seq
+ a <- lapply(rep_threshold_seq, threshold.freq.table)
+ a <- bind_rows(a)
+
+ # ensure there weren't a significant amount of omissions for any metric type
+ # (because the threshod may never have been reached)
+ 
+ # test <- a %>%
+ #   group_by(metric) %>%
+ #   summarise(n = sum(freq)) %>%
+ #   ungroup()
+ 
+   lvls <- levels(as.factor(a$thresh))
+rows <- by(a, a$thresh, function(x) nrow(x))
+labels <- paste(lvls,", n=",as.integer(rows),sep="")
+
+ # histogram of when threshold was reached for all home/month combos
+ggplot(aes(x = sample_length, fill = as.factor(thresh)), data = a)+
+  geom_density(alpha = 0.5)+
+  facet_wrap(vars(metric))+
+  xlab("Sample Length Required to Meet Representativeness Threshold, days")+
+  scale_x_continuous(breaks = c(7,14,21,28))+
+  scale_fill_discrete(labels = labels)+
+  annotate('text', x = 14, y = 0.15, label = '*max n = 48 (homes*rooms)')
+
+
+
+```
+
+
+
+
+
