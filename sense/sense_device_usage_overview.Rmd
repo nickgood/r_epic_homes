@@ -24,7 +24,11 @@ library('factoextra')
 ```
 
 ```{r data_import, eval = TRUE}
-data <- read_rds("../output/sense_all.rds")
+data <- read_rds("../drive_sync/epic_homes/r_epic_homes/output/sense/sense_all.rds")
+
+# # find how many homes have data after given date
+# test <- data %>% filter(datetime > ymd('2021-04-14')) %>% select(job_id) %>%
+#   as.factor() %>% levels()
 ```
 
 # Daily Device Overviews  
@@ -70,6 +74,10 @@ coord_cartesian(ylim = c(0,100))+
 ```
 
 ```{r plot_daily_frac_overview}
+
+# # for one home
+# daily.fraction('013')
+
 
 # apply above function to all homes
 lapply(levels(as.factor(data$job_id)), daily.fraction)

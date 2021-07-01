@@ -24,7 +24,7 @@ library('factoextra')
 ```
 
 ```{r data_import, eval = TRUE}
-data <- read_rds("../output/sense_all.rds")
+data <- read_rds("../drive_sync/epic_homes/r_epic_homes/output/sense/sense_all.rds")
 ```
 
 # Cluster days based on heating and ac behaviours using PAM 
