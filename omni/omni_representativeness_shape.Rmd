@@ -1756,6 +1756,8 @@ all_time <- TRUE
 # # rrsult from formula from Osses paper
 # 0.5*(e0/e1-1-log(e0/e1)+((m0-m1)^2)/e1)
 
+# test specificity----------------------
+
 # pxi mean and variance
 m1 <- 30
 e1 <- 2^2
@@ -1763,15 +1765,14 @@ e1 <- 2^2
 mc <- 36
 ec <- 2.2^2
 
+# make data sets representing the two samples assuming normal dist
 xi <- rnorm(10000, m1, sqrt(e1))
 xic <- rnorm(10000, mc, sqrt(ec))
-x <- c(xi, xic)
-
-
 pxi <- function(x) dnorm(x, mean=m1, sd=sqrt(e1))
 pxic <- function(x) dnorm(x, mean=mc, sd=sqrt(ec))
 
-
+# make a data set of the combined data and approximate it with a norm dist
+x <- c(xi, xic)
 x_fit <- fitdistrplus::fitdist(x, "norm", method = 'mle')
 
 x_mean <- x_fit$estimate[['mean']]
@@ -1780,50 +1781,11 @@ x_sd <- x_fit$estimate[['sd']]
 px <- function(x) dnorm(x, mean=x_mean,
                         sd = x_sd)
 
+
 kldtest2 <- function(x) {
-
-  # make sure R does not convert to 0 if result is very small number
+  
   pxi_pxic <- pxi(x)*pxic(x)
-  
-  pxi_pxic <- ifelse( abs(pxi_pxic) > .Machine$double.xmin,
-                  pxi_pxic,
-                             .Machine$double.xmin)
-  
-  
-          fit_ratio_value <- px(x)/pxi_pxic
-          
-          # make sure R does not convert to 0 if result is very small number
-          fit_ratio_value <- ifelse( abs(fit_ratio_value) > .Machine$double.xmin,
-                                     fit_ratio_value,
-                                     .Machine$double.xmin)
-          
-          px(x)*log(fit_ratio_value)
-}
-
-
-# reult from integration
-(integrate(kldtest2, 0,300))$value
-
-# result from Osses formula
--0.5*log((x_sd^2)/(e1*ec))
-
-# plot the distributions and the integration of the integral
-# to gain some understanding
-x_vals <- seq(1, 100)
-
-ggplot(data = NULL, aes(x_vals))+
-  geom_line(aes(y = pxi(x_vals)))+
-  geom_line(aes(y= px(x_vals)), color = 'red')+
-  geom_line(aes(y= pxic(x_vals)))+
-  # geom_line(aes(y= pxic(x_vals)*pxi(x_vals)), linetype = 'dashed')+
-  # geom_line(aes(y= log(px(x_vals)/(pxic(x_vals)*pxi(x_vals)))), linetype = 'dashed')+
-  geom_line(aes(y= px(x_vals)*log(px(x_vals)/(pxic(x_vals)*pxi(x_vals)))), linetype = 'dashed')
-  
-kldtest3 <- function(x,y) {
-  
   # make sure R does not convert to 0 if result is very small number
-  pxi_pxic <- pxi(x)*pxic(y)
-  
   pxi_pxic <- ifelse( abs(pxi_pxic) > .Machine$double.xmin,
                       pxi_pxic,
                       .Machine$double.xmin)
@@ -1839,6 +1801,21 @@ kldtest3 <- function(x,y) {
   px(x)*log(fit_ratio_value)
 }
 
+# try double integral 
+
+inner.integral = Vectorize(function(x) { integrate(kldtest2, 0, x)$value})
+integrate(inner.integral , 21, 45)
+
+
+
+r_value <- cor.test(pxi(x_vals), pxic(x_vals))$estimate
+
+# result from Osses formula
+log(sqrt(1/(1-(r_value^2))))
+
+
+
+# plot first integral to see problem
 
 integrate.func <- function(func, x) {
   
@@ -1851,22 +1828,22 @@ integrate.func <- function(func, x) {
   
 }
 
+
+x_vals <- seq(21,45)
+
 ggplot(data = NULL, aes(x_vals))+
   geom_line(aes(y = integrate.func(kldtest2, x_vals)))
 
 
-# try double integral -----------------------
-
-
-
-inner.integral = Vectorize(function(x) { integrate(kldtest2, 0, x)$value})
-integrate(inner.integral , 0, 75)
-
-integral1 <- function(x) (integrate(kldtest2, 0,x))$value
-integral1(300)
-
-
-
+ggplot(data = NULL, aes(x_vals))+
+  geom_line(aes(y = pxi(x_vals)))+
+  geom_line(aes(y= px(x_vals)), color = 'red')+
+  geom_line(aes(y= pxic(x_vals)))+
+  # geom_line(aes(y= pxic(x_vals)*pxi(x_vals)), linetype = 'dashed')+
+  # geom_line(aes(y= log(px(x_vals)/(pxic(x_vals)*pxi(x_vals)))), linetype = 'dashed')+
+  geom_line(aes(y= px(x_vals)*log(px(x_vals)/(pxic(x_vals)*pxi(x_vals)))),
+            linetype = 'dashed')
+  
 ```
 
 
