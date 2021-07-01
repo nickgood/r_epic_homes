@@ -36,7 +36,7 @@ library(ggpubr) # for tesing log-normality
 
 
 ```{r import_omni_minute_data}
-omni_data<- read_csv('./csv_created/omni_all_locations.csv')
+# omni_data<- read_csv('./csv_created/omni_all_locations.csv')
 
 
 zero_test <- omni_data %>%
@@ -1771,78 +1771,76 @@ xic <- rnorm(10000, mc, sqrt(ec))
 pxi <- function(x) dnorm(x, mean=m1, sd=sqrt(e1))
 pxic <- function(x) dnorm(x, mean=mc, sd=sqrt(ec))
 
-# make a data set of the combined data and approximate it with a norm dist
-x <- c(xi, xic)
-x_fit <- fitdistrplus::fitdist(x, "norm", method = 'mle')
+# # make a data set of the combined data and approximate it with a norm dist
+# # not correct, this is assuming joint dist is just combo in one variable...
+# x <- c(xi, xic)
+# x_fit <- fitdistrplus::fitdist(x, "norm", method = 'mle')
+# 
+# x_mean <- x_fit$estimate[['mean']]
+# x_sd <- x_fit$estimate[['sd']]
+# 
+# px <- function(x) dnorm(x, mean=x_mean,
+#                         sd = x_sd)
+# 
+# 
+# kldtest2 <- function(x) {
+#   
+#   pxi_pxic <- pxi(x)*pxic(x)
+#   # make sure R does not convert to 0 if result is very small number
+#   pxi_pxic <- ifelse( abs(pxi_pxic) > .Machine$double.xmin,
+#                       pxi_pxic,
+#                       .Machine$double.xmin)
+#   
+#   
+#   fit_ratio_value <- px(x)/pxi_pxic
+#   
+#   # make sure R does not convert to 0 if result is very small number
+#   fit_ratio_value <- ifelse( abs(fit_ratio_value) > .Machine$double.xmin,
+#                              fit_ratio_value,
+#                              .Machine$double.xmin)
+#   
+#   px(x)*log(fit_ratio_value)
+# }
+# 
+# # try double integral
+# 
+# inner.integral = Vectorize(function(x) { integrate(kldtest2, 0, x)$value})
+# integrate(inner.integral , 21, 45)
+# 
+# # plot first integral to see problem
+# 
+# integrate.func <- function(func, x) {
+#   
+#   sapply(x, function(y) {
+#     temp <- integrate(f = func, lower = 0,
+#                       upper = y)
+#     temp$value
+#   }
+#   )
+# }
+# 
+# ggplot(data = NULL, aes(x_vals))+
+#   geom_line(aes(y = integrate.func(kldtest2, x_vals)))
 
-x_mean <- x_fit$estimate[['mean']]
-x_sd <- x_fit$estimate[['sd']]
+# try correlation method -----------------------
 
-px <- function(x) dnorm(x, mean=x_mean,
-                        sd = x_sd)
-
-
-kldtest2 <- function(x) {
-  
-  pxi_pxic <- pxi(x)*pxic(x)
-  # make sure R does not convert to 0 if result is very small number
-  pxi_pxic <- ifelse( abs(pxi_pxic) > .Machine$double.xmin,
-                      pxi_pxic,
-                      .Machine$double.xmin)
-  
-  
-  fit_ratio_value <- px(x)/pxi_pxic
-  
-  # make sure R does not convert to 0 if result is very small number
-  fit_ratio_value <- ifelse( abs(fit_ratio_value) > .Machine$double.xmin,
-                             fit_ratio_value,
-                             .Machine$double.xmin)
-  
-  px(x)*log(fit_ratio_value)
-}
-
-# try double integral 
-
-inner.integral = Vectorize(function(x) { integrate(kldtest2, 0, x)$value})
-integrate(inner.integral , 21, 45)
-
-
+x_vals <- seq(23,44, 1)
 
 r_value <- cor.test(pxi(x_vals), pxic(x_vals))$estimate
 
 # result from Osses formula
 log(sqrt(1/(1-(r_value^2))))
 
-
-
-# plot first integral to see problem
-
-integrate.func <- function(func, x) {
-  
-  sapply(x, function(y) {
-    temp <- integrate(f = func, lower = 0,
-                      upper = y)
-    temp$value
-  }
-  )
-  
-}
-
-
-x_vals <- seq(21,45)
-
-ggplot(data = NULL, aes(x_vals))+
-  geom_line(aes(y = integrate.func(kldtest2, x_vals)))
-
-
+# plot distributions
 ggplot(data = NULL, aes(x_vals))+
   geom_line(aes(y = pxi(x_vals)))+
-  geom_line(aes(y= px(x_vals)), color = 'red')+
-  geom_line(aes(y= pxic(x_vals)))+
+  # geom_line(aes(y= px(x_vals)), color = 'red')+
+  geom_line(aes(y= pxic(x_vals)))
   # geom_line(aes(y= pxic(x_vals)*pxi(x_vals)), linetype = 'dashed')+
   # geom_line(aes(y= log(px(x_vals)/(pxic(x_vals)*pxi(x_vals)))), linetype = 'dashed')+
-  geom_line(aes(y= px(x_vals)*log(px(x_vals)/(pxic(x_vals)*pxi(x_vals)))),
-            linetype = 'dashed')
+  # geom_line(aes(y= px(x_vals)*log(px(x_vals)/(pxic(x_vals)*pxi(x_vals)))),
+  #           linetype = 'dashed')
+
   
 ```
 
