@@ -140,12 +140,31 @@ large <- 16
 ```{r cleaning_omissions}
 # count omissions --------------
 
-# time
-# pm_time_no_cluster <- kld_max_df%>% 
-#   filter(method == 'time', metric == 'pm25',
-#          grepl('likely_no_cluster', error)) %>%
-#   group_by(home, location, energy_cluster) %>%
-#   summarize(n = n(), .groups = 'drop')
+n_homes_enrolled <- 17 # n of homes enrolled
+n_indoor_sensors <- 16*3+2 # Home 002 never had kitchen installed
+n_all_data_omitted <- 3 # Home 005 had less than 2 weeks of data
+n_homes_data <-16 # n of homes with data used at least partially
+n_indoor_sensors_data <- 15*3+2 # n of indoor sensors with data used at least partially
+n_sensors_ac <- 5*3+2 # n of sensors in homes with ac detected
+n_sensors_ac_ignore <- 3 # Home 011 ac usage ignored because only detected 5 days 
+n_sensors_heat
+n_missing 
+# no cluster
+
+clustered <- entropy_df%>%
+  filter(home != '005') %>% # omit home 5 from count
+  filter(!(home == '002' & location == 'kitchen')) %>% # omit home 002 kitchen from count
+    filter(!(grepl('likely_no_cluster', error))) %>%
+  filter(grepl('missing', error)) %>%
+  group_by(method, metric, energy_cluster) %>%
+  summarize(n = n(), .groups = 'drop')
+
+
+pm_time_no_cluster <- entropy_df%>%
+  filter(method == 'time', metric == 'pm25',
+         grepl('likely_no_cluster', error)) %>%
+  group_by(home, location, energy_cluster) %>%
+  summarize(n = n(), .groups = 'drop')
 
 
 # clean dataframes ------------------------
@@ -165,7 +184,6 @@ kld_max_df_clean <- kld_max_df%>%
 # kld values
 # remove na kld values from runs with insufficient data
 entropy_df_clean <- entropy_df%>% 
-  rename('kld' = coeff) %>%
   filter(period_compare == 'year', # only comparing sample to whole mon. period
     !is.na(kld), # with insufficient data in cluster/year/no cluster
   n_samp_avail >= frac_samp_required)# with less than certain percentage of available samples
