@@ -73,6 +73,14 @@ kld_max_df <- bind_rows(
 
 ```
 
+```{r import_assessment_data}
+
+# assessment_data <- read_csv('../drive_sync/epic_homes/data/homes/home_assessment_data.csv')
+
+# using googlesheets4
+assessment_data <- read_sheet('https://docs.google.com/spreadsheets/d/12vWpqdmzIII0vEKH79xpmICUYGuzc8PjfBT2_3YjIHU/edit?usp=sharing', sheet = 'data')
+```
+
 
 ```{r functions_misc}
 
@@ -147,24 +155,23 @@ n_homes_data <-16 # n of homes with data used at least partially
 n_indoor_sensors_data <- 15*3+2 # n of indoor sensors with data used at least partially
 n_sensors_ac <- 5*3+2 # n of sensors in homes with ac detected
 n_sensors_ac_ignore <- 3 # Home 011 ac usage ignored because only detected 5 days 
-n_sensors_heat
-n_missing 
+
 # no cluster
 
-clustered <- entropy_df%>%
-  filter(home != '005') %>% # omit home 5 from count
-  filter(!(home == '002' & location == 'kitchen')) %>% # omit home 002 kitchen from count
-    filter(!(grepl('likely_no_cluster', error))) %>%
-  filter(grepl('missing', error)) %>%
-  group_by(method, metric, energy_cluster) %>%
-  summarize(n = n(), .groups = 'drop')
-
-
-pm_time_no_cluster <- entropy_df%>%
-  filter(method == 'time', metric == 'pm25',
-         grepl('likely_no_cluster', error)) %>%
-  group_by(home, location, energy_cluster) %>%
-  summarize(n = n(), .groups = 'drop')
+# clustered <- entropy_df%>%
+#   filter(home != '005') %>% # omit home 5 from count
+#   filter(!(home == '002' & location == 'kitchen')) %>% # omit home 002 kitchen from count
+#     filter(!(grepl('likely_no_cluster', error))) %>%
+#   filter(grepl('missing', error)) %>%
+#   group_by(method, metric, energy_cluster) %>%
+#   summarize(n = n(), .groups = 'drop')
+# 
+# 
+# pm_time_no_cluster <- entropy_df%>%
+#   filter(method == 'time', metric == 'pm25',
+#          grepl('likely_no_cluster', error)) %>%
+#   group_by(home, location, energy_cluster) %>%
+#   summarize(n = n(), .groups = 'drop')
 
 
 # clean dataframes ------------------------
@@ -491,6 +498,11 @@ entropy.plot <- function (
   col <- as.character(a$clust_color)
 names(col) <- as.character(a$energy_cluster)
 
+# add ach50 for home to plot
+ach50 <- assessment_data %>% filter( home == hm) %>%
+  pull(ach50)
+ach50 <- if(is_empty(ach50)) NA else if (is.na(ach50)) {
+  NA} else ach50
 
   if(nrow(a) == 0) {
     plot <- NULL # return NULL if no data for home/metric/cluster combo
@@ -516,10 +528,13 @@ names(col) <- as.character(a$energy_cluster)
             axis.title = element_blank(),
             axis.text = element_text(size = small),
             title = element_text(size = small))+
-            facet_wrap(vars(metric))
+            facet_wrap(vars(metric))+
+          annotate('text', x = 14, y = 0.25, hjust = 0.5, size = xsmall,
+             # label = bquote(ACH[50] ==  ~ .(ach50))
+             label = paste( 'ACH50 =', ach50)
+             ) # annotate with ach50
 
 
-  
    }
   plot
 }
@@ -542,21 +557,21 @@ grid.plots <- function(plots, title,
 
 # plot results for one home
 
-a <- pooled_scaled_entropy_df %>% filter(home == '009')
-
-
-ggplot(aes(x = sample_length, y = avg_scaled_kld, color = energy_cluster),
-       data = a)+
-  geom_line()+
-  geom_point(size = 1)+
-  xlab('Sample Length, days')+
-  ylab('Scaled Relative Entropy')+
-  geom_hline(yintercept=thresh_vector, linetype="dashed",
-                color = "black", size=0.5)+
-  coord_cartesian(ylim = c(0,1)) +
-      geom_ribbon(aes(ymin = low_val, ymax = high_val, fill = energy_cluster),
-                alpha = 0.15, color = NA)+
-  facet_wrap(vars(metric))
+# a <- pooled_scaled_entropy_df %>% filter(home == '009')
+# 
+# 
+# ggplot(aes(x = sample_length, y = avg_scaled_kld, color = energy_cluster),
+#        data = a)+
+#   geom_line()+
+#   geom_point(size = 1)+
+#   xlab('Sample Length, days')+
+#   ylab('Scaled Relative Entropy')+
+#   geom_hline(yintercept=thresh_vector, linetype="dashed",
+#                 color = "black", size=0.5)+
+#   coord_cartesian(ylim = c(0,1)) +
+#       geom_ribbon(aes(ymin = low_val, ymax = high_val, fill = energy_cluster),
+#                 alpha = 0.15, color = NA)+
+#   facet_wrap(vars(metric))
 
 ```
 
