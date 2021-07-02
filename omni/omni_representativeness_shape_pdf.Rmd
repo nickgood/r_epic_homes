@@ -574,7 +574,7 @@ all_time_choice <- TRUE
           date_ranges_entire = list(c(start_date,
                                       end_date)),
           tested_sample_sequence = 
-            seq(7,sample_max,4),
+            seq(sample_min,sample_max,4),
           location_type = loc,
           all_time = all_time_choice) %>%
           
@@ -643,63 +643,6 @@ entropy_shape_pdf_df <- bind_rows(
 #                    Sys.Date(), '.csv'))
 
 
-
-```
-
-
-
-```{r create_csv_kld_max}
-met1 <- 'pm25'
-met2 <- 'voc'
-sample_length_min <- 1
-
-# run time table function just at lowest sample----------------------
-
-# calculate one-day kld values for all possible cust/home/location combos for noth metrics
-kld_max_df <- map(clusters_all, function(x_cluster) {
-  map(locations_indoor, function(x_location) {
-    map(homes_all, function(x_home) {
-      
-      entropy.table.shape(x_home, met1, list(c(pick.start(x_home, x_cluster),
-                                                pick.end(x_home, x_cluster))),
-                           tested_sample_sequence = sample_length_min,
-                           location_type = x_location, all_time = TRUE)
-    }
-    )%>%
-      bind_rows()
-  }
-  )%>%
-    bind_rows() %>%
-    mutate( energy_cluster = x_cluster)
-}
-)%>%
-  bind_rows()%>%
-  
-  bind_rows(
-    
-    map(clusters_all, function(x_cluster) {
-      map(locations_indoor, function(x_location) {
-        map(homes_all, function(x_home) {
-          
-          entropy.table.shape(x_home, met2, list(c(pick.start(x_home, x_cluster),
-                                                    pick.end(x_home, x_cluster))),
-                               tested_sample_sequence = sample_length_min,
-                               location_type = x_location, all_time = TRUE)
-        }
-        )%>%
-          bind_rows()
-      }
-      )%>%
-        bind_rows() %>%
-        mutate( energy_cluster = x_cluster)
-    }
-    )%>%
-      bind_rows()
-  )
-
-
-# write_csv(kld_max_df, paste0('./csv_created/representativeness_data/kld_max_shape_',
-#                     Sys.Date(), '.csv'))
 
 ```
 
