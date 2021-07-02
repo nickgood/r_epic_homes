@@ -61,24 +61,21 @@ entropy_df <- bind_rows(
   read_csv(file = './csv_created/representativeness_data/rep_data_shape_pdf.csv'),
   read_csv(file = './csv_created/representativeness_data/rep_data_time_pdf.csv'))
 
-
 ```
 
-```{r import_max_kld_values}
-# read in data
-
-kld_max_df <- bind_rows(
-  read_csv('./csv_created/representativeness_data/kld_max_shape.csv'), 
-  read_csv('./csv_created/representativeness_data/kld_max_time.csv'))
+```{r extract_max_kld_values}
+# take values from shortest sample length
+kld_max_df <- entropy_df %>%
+  filter(sample_length == 1)
 
 ```
 
 ```{r import_assessment_data}
 
-# assessment_data <- read_csv('../drive_sync/epic_homes/data/homes/home_assessment_data.csv')
+assessment_data <- read_csv('../drive_sync/epic_homes/data/homes/home_assessment_data.csv')
 
-# using googlesheets4
-assessment_data <- read_sheet('https://docs.google.com/spreadsheets/d/12vWpqdmzIII0vEKH79xpmICUYGuzc8PjfBT2_3YjIHU/edit?usp=sharing', sheet = 'data')
+# # using googlesheets4
+# assessment_data <- read_sheet('https://docs.google.com/spreadsheets/d/12vWpqdmzIII0vEKH79xpmICUYGuzc8PjfBT2_3YjIHU/edit?usp=sharing', sheet = 'data')
 ```
 
 
@@ -125,13 +122,15 @@ clusters_all <- c('heat','shoulder', 'ac')
 locations_indoor <- c('living', 'kitchen', 'bedroom')
 
 # sequence of representative thresholds to test
-thresh_vector <- c(0.8, 0.90, 0.95)
+thresh_vector <- c(0.7, 0.8, 0.90)
 
 # sequence of days to test thresholds for shape entropy values
+pdf_days <- c(3,7,19,27)
 
-pdf_days_pm <- c(3,7,19,27)
+pdf_days_pm <- pdf_days
+pdf_days_voc <- pdf_days
 
-pdf_days_voc <- c(6,10,18,26)
+
 
 
 # make cluster color scale
@@ -457,6 +456,37 @@ meth <- 'shape'
 
 ```
 
+```{r threshold_table}
+ 
+frac.above.threshold <- function(threshold) {
+
+  a <- scaled_entropy_df %>%
+      group_by(method, metric, sample_length) %>%
+    summarize(
+      n_condition = n(), # count total number in each group
+      n_greater = sum(scaled_kld>=threshold), # count number in each group > thresh
+      frac_greater = n_greater/n_condition, .groups = 'drop') %>%
+    mutate(thresh = threshold)
+}
+
+threshold_df <- map(thresh_vector, frac.above.threshold) %>% bind_rows()
+
+```
+
+```{r boxplot_threshold}
+
+a <- threshold_df %>% filter(sample_length %in% c(1,3,7,11, 15, 19))
+ # bar chart showing fraction that acieved representativeness by smaple_length
+# facet by metric and method
+ggplot(a, aes(x = as.factor(sample_length), y = frac_greater,
+                         fill = as.factor(thresh)))+
+  geom_col(position = 'dodge')+
+  facet_wrap(vars( method, metric))+
+  geom_text(aes(y = frac_greater+1), label = '5')
+  
+```
+
+
 ```{r create_pooled_avg_scaled_kld_df}
 pooled_scaled_entropy_df <- scaled_entropy_df %>%
   group_by(metric, home, energy_cluster, sample_length, method) %>%
@@ -621,26 +651,23 @@ map(homes_all, function (x_home) {
 threshold.freq.table <- function (threshold) {
   
   
-  a <- entropy_shape_df %>%
-  filter(n_samp_avail >0.5 & method == 'shape') %>%
-  filter(coeff <= threshold) %>% 
-  group_by(home, metric, location, energy_cluster) %>%
+  a <- pooled_scaled_entropy_df %>%
+  filter(avg_scaled_kld >= threshold) %>% 
+  group_by(home, metric, energy_cluster, method) %>%
   summarise_at(vars(sample_length), min) %>%
   ungroup() %>%
     mutate('thresh' = threshold)
 }
 
 # apply function to all thresholds in threshold_seq
- a <- lapply(rep_threshold_seq, threshold.freq.table)
+ a <- lapply(thresh_vector, threshold.freq.table)
  a <- bind_rows(a)
 
  # ensure there weren't a significant amount of omissions for any metric type
  # (because the threshod may never have been reached)
+
+ # NO FUNCTION YET
  
- # test <- a %>%
- #   group_by(metric) %>%
- #   summarise(n = sum(freq)) %>%
- #   ungroup()
  
    lvls <- levels(as.factor(a$thresh))
 rows <- by(a, a$thresh, function(x) nrow(x))
@@ -649,16 +676,15 @@ labels <- paste(lvls,", n=",as.integer(rows),sep="")
  # histogram of when threshold was reached for all home/month combos
 ggplot(aes(x = sample_length, fill = as.factor(thresh)), data = a)+
   geom_density(alpha = 0.5)+
-  facet_wrap(vars(metric))+
+  facet_wrap(vars(metric, method))+
   xlab("Sample Length Required to Meet Representativeness Threshold, days")+
   scale_x_continuous(breaks = c(7,14,21,28))+
   scale_fill_discrete(labels = labels)+
-  annotate('text', x = 14, y = 0.15, label = '*max n = 48 (homes*rooms)')
+  annotate('text', x = 14, y = 0.15, label = '*max n = 55 (sensor-cluster pairs)')
 
 
 
 ```
-
 
 
 
