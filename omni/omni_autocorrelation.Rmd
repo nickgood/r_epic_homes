@@ -30,7 +30,7 @@ library(ggpubr) # for making time series plot grids (with common legends)
 ```
 
 
-```{r data_import}
+```{r data_import, eval = FALSE}
 
 ##Import CSV with Real Time Data
 omni_data<- read_csv(paste0('./csv_created/',
@@ -85,7 +85,7 @@ metrics_all <- c('pm25', 'voc', 'co2', 'temp', 'humid')
 
 #define sizes for plot text
 xsmall <- 2
-small <- 4
+small <- 6
 medium <- 12
 large <- 16
 
@@ -144,12 +144,11 @@ count.missing <- function(data, hm, loc, metric,
 
 ```{r count_missing_values, include = FALSE, eval = FALSE}
 
-
-# see which homes/locations do not have missing daily average values
- sapply(homes_all, count.missing,
-        loc = 'living',
-        data = omni_data,
-       metric = 'pm25')
+# # see which homes/locations do not have missing daily average values
+#  sapply(homes_all, count.missing,
+#         loc = 'living',
+#         data = omni_data,
+#        metric = 'pm25')
 
 ```
 
@@ -291,8 +290,17 @@ write_csv(omni_daily_data_complete, paste0('./csv_created/omni_daily_data_comple
 
 ```
 
-```{r daily_data_import}
+```{r import_daily_data}
 omni_daily_data_complete <- read_csv('./csv_created/omni_daily_data_complete.csv')
+
+```
+
+```{r import_assessment_data}
+
+assessment_data <- read_csv('../drive_sync/epic_homes/data/homes/home_assessment_data.csv')
+
+# # using googlesheets4
+# assessment_data <- read_sheet('https://docs.google.com/spreadsheets/d/12vWpqdmzIII0vEKH79xpmICUYGuzc8PjfBT2_3YjIHU/edit?usp=sharing', sheet = 'data')
 ```
 
 
@@ -316,7 +324,7 @@ ts.grid <- function(plots, title,
 
 # Will stationarity be an issue?
 
-```{r stationarity, fig.width=8, fig.height=4.5, eval = FALSE}
+```{r stationarity, fig.width=10.5, fig.height=8}
 # check stationarity before doing acf calcs and plots
 
 # make time series plot for all available sensors
@@ -516,6 +524,10 @@ ggacf <- function(data,  hm, loc, metric,
       
     )
 
+  # add ach50 value for home on plot
+  ach50 <- assessment_data %>%
+    filter(home == hm) %>% pull(ach50)
+  
   #plot
   plot <- ggplot(df_acf, aes(x=lag, y=acf)) +
     geom_hline(yintercept=0) +
@@ -544,6 +556,8 @@ ggacf <- function(data,  hm, loc, metric,
                                breaks = c("black", "red"),
                                labels = c("yes", "no"),
                                guide = "legend")+
+    annotate('text', x = lag_max_plot/2, y = 0.75, hjust = 0.5,
+             label = bquote(ACH[50] ==  ~ .(ach50)))+ # annotate with ach50
     {if(simple == TRUE) {
       theme(axis.title = element_blank(),
           axis.text = element_text( size = small),
@@ -650,7 +664,7 @@ acf.grid <- function(plots, title,
 ## Plots of all homes without clusters
 
 
-```{r ggacf_grid_plots_no_clusters, fig.width=8, fig.height=4.5}
+```{r ggacf_grid_plots_no_clusters, fig.width=8, fig.height=4.5, eval = FALSE}
 
 # plots for all homes, locations, and metrics (no clusters)
 
@@ -756,7 +770,7 @@ acf.grid <- function(plots, title,
 ### for some homes, acf stops decreasing (especially pm25), likely due to non-stationarity of data  
 ### will shorter time periods avoid this?  
 
-```{r test_ggacf_n_sample, fig.width=8, fig.height=4.5}
+```{r test_ggacf_n_sample, fig.width=8, fig.height=4.5, eval = FALSE}
 # how does the total amount of days sampled affect the plot?
 
 # plot results for one location and metric at each home
@@ -809,7 +823,7 @@ metric <- 'pm25'
 
 ### shorter time periods due seem to avoid the slow decrease, see home 002 only has slight issue in one time period
 
-```{r ggacf_grid_plots_with_clusters, fig.width=8, fig.height=4.5}
+```{r ggacf_grid_plots_with_clusters, fig.width=8, fig.height=4.5, eval = TRUE}
 # plots for all homes, locations, and metrics (with clusters)
   lapply(metrics_all, function(x_metric) {
     
@@ -949,7 +963,7 @@ b <- a %>% filter(missing_pct > missing_pct_min)
 ### omitted `r b %>% nrow()/n_metrics_lags` additional monitoring periods for each metric
 ### because missing more than `r missing_pct_min`% of days within period
 
-```{r lag_plots}
+```{r lag_plots, eval = FALSE}
 
 ######## one metric
 met <- 'pm25'
