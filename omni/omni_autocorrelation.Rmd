@@ -525,8 +525,11 @@ ggacf <- function(data,  hm, loc, metric,
     )
 
   # add ach50 value for home on plot
-  ach50 <- assessment_data %>%
-    filter(home == hm) %>% pull(ach50)
+# add ach50 for home to plot
+ach50 <- assessment_data %>% filter( home == hm) %>%
+  pull(ach50)
+ach50 <- if(is_empty(ach50)) 'not measured' else if (is.na(ach50)) {
+  'not measured'} else ach50
   
   #plot
   plot <- ggplot(df_acf, aes(x=lag, y=acf)) +
@@ -557,7 +560,10 @@ ggacf <- function(data,  hm, loc, metric,
                                labels = c("yes", "no"),
                                guide = "legend")+
     annotate('text', x = lag_max_plot/2, y = 0.75, hjust = 0.5,
-             label = bquote(ACH[50] ==  ~ .(ach50)))+ # annotate with ach50
+             label =
+               # paste('ACH50 =', ach50)
+               bquote(ACH[50] ==  ~ .(ach50))
+             )+ # annotate with ach50
     {if(simple == TRUE) {
       theme(axis.title = element_blank(),
           axis.text = element_text( size = small),
@@ -588,10 +594,9 @@ ggacf <- function(data,  hm, loc, metric,
   
   return(list('lag_signif' = lag_signif, 'plot' = plot))
 }
-
 # test for one home, loc, metric
-lapply('002', ggacf,
-       data = omni_daily_data_complete %>% filter(date < ymd('2020-08-13')),
+lapply('009', ggacf,
+       data = omni_daily_data_complete,
        loc = 'living', lag_max_plot = 10,
        metric = 'pm25', simple= TRUE)
 ```
