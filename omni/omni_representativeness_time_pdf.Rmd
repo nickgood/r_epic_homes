@@ -951,7 +951,79 @@ all_time_choice <- TRUE
 clust <- c('heat', 'shoulder', 'ac') # can do multiple
 
 
-met <- 'voc'
+met <- 'pm25'
+
+loc <- 'living'
+lapply(clust, function(cluster_type) {
+  
+  rep_data <-  lapply(homes_all, function(x_home) {
+    
+    start_date <- pick.start(x_home, cluster_type)
+    end_date <- pick.end(x_home, cluster_type)
+    sample_min <- pick.sample.min(met)
+    sample_max <- if_else(
+      as.numeric(as.Date(end_date) - as.Date(start_date))>=28,
+      28,
+      as.numeric(as.Date(end_date) - as.Date(start_date))
+    )
+    
+    entropy.table.time(
+      x_home, metric = met,
+      date_ranges_entire = list(c(start_date,
+                                  end_date)),
+      tested_sample_sequence =
+        seq(3,sample_max,4),
+      location_type = loc,
+      all_time = all_time_choice) %>%
+      
+      # add in column for energy_cluster
+      mutate(energy_cluster = cluster_type) 
+  }
+  ) %>%
+    bind_rows()
+  
+  # give a variable name to the created data
+  assign(paste(met, loc, cluster_type, 'rep_data_time_pdf', sep = '_'),
+         rep_data,
+         envir = .GlobalEnv) 
+}
+)
+
+loc <- 'kitchen'
+lapply(clust, function(cluster_type) {
+  
+  rep_data <-  lapply(homes_all, function(x_home) {
+    
+    start_date <- pick.start(x_home, cluster_type)
+    end_date <- pick.end(x_home, cluster_type)
+    sample_min <- pick.sample.min(met)
+    sample_max <- if_else(
+      as.numeric(as.Date(end_date) - as.Date(start_date))>=28,
+      28,
+      as.numeric(as.Date(end_date) - as.Date(start_date))
+    )
+    
+    entropy.table.time(
+      x_home, metric = met,
+      date_ranges_entire = list(c(start_date,
+                                  end_date)),
+      tested_sample_sequence =
+        seq(3,sample_max,4),
+      location_type = loc,
+      all_time = all_time_choice) %>%
+      
+      # add in column for energy_cluster
+      mutate(energy_cluster = cluster_type) 
+  }
+  ) %>%
+    bind_rows()
+  
+  # give a variable name to the created data
+  assign(paste(met, loc, cluster_type, 'rep_data_time_pdf', sep = '_'),
+         rep_data,
+         envir = .GlobalEnv) 
+}
+)
 
 loc <- 'bedroom'
 lapply(clust, function(cluster_type) {
@@ -972,7 +1044,7 @@ lapply(clust, function(cluster_type) {
       date_ranges_entire = list(c(start_date,
                                   end_date)),
       tested_sample_sequence =
-        seq(sample_min,sample_max,4),
+        seq(3,sample_max,4),
       location_type = loc,
       all_time = all_time_choice) %>%
       
@@ -989,16 +1061,17 @@ lapply(clust, function(cluster_type) {
 }
 )
 
+
 entropy_time_pdf_df <- bind_rows(
-  pm25_bedroom_heat_rep_data_time_pdf,
-  pm25_living_heat_rep_data_time_pdf,
-  pm25_kitchen_heat_rep_data_time_pdf,
-  pm25_bedroom_shoulder_rep_data_time_pdf,
-  pm25_living_shoulder_rep_data_time_pdf,
-  pm25_kitchen_shoulder_rep_data_time_pdf,
-  pm25_bedroom_ac_rep_data_time_pdf,
-  pm25_living_ac_rep_data_time_pdf,
-  pm25_kitchen_ac_rep_data_time_pdf,
+  # pm25_bedroom_heat_rep_data_time_pdf,
+  # pm25_living_heat_rep_data_time_pdf,
+  # pm25_kitchen_heat_rep_data_time_pdf,
+  # pm25_bedroom_shoulder_rep_data_time_pdf,
+  # pm25_living_shoulder_rep_data_time_pdf,
+  # pm25_kitchen_shoulder_rep_data_time_pdf,
+  # pm25_bedroom_ac_rep_data_time_pdf,
+  # pm25_living_ac_rep_data_time_pdf,
+  # pm25_kitchen_ac_rep_data_time_pdf,
   voc_bedroom_heat_rep_data_time_pdf,
   voc_living_heat_rep_data_time_pdf,
   voc_kitchen_heat_rep_data_time_pdf,
@@ -1010,13 +1083,29 @@ entropy_time_pdf_df <- bind_rows(
   voc_kitchen_ac_rep_data_time_pdf
 )
 
+# rm(voc_bedroom_heat_rep_data_time_pdf,
+#   voc_living_heat_rep_data_time_pdf,
+#   voc_kitchen_heat_rep_data_time_pdf,
+#   voc_bedroom_shoulder_rep_data_time_pdf,
+#   voc_living_shoulder_rep_data_time_pdf,
+#   voc_kitchen_shoulder_rep_data_time_pdf,
+#   voc_bedroom_ac_rep_data_time_pdf,
+#   voc_living_ac_rep_data_time_pdf,
+#   voc_kitchen_ac_rep_data_time_pdf)
 
+# # to bind new to old data
+# a_old <- read_csv('./csv_created/representativeness_data/rep_data_time_pdf_2021-06-25.csv')
+# 
+# a <- bind_rows(a_old, entropy_time_pdf_df)
+# 
+# write_csv(a, file =
+#             paste0('./csv_created/representativeness_data/rep_data_time_pdf_',
+#                    Sys.Date(), '.csv'))
 
-# make csv of all data
-write_csv(entropy_time_pdf_df, file =
-            paste0('./csv_created/representativeness_data/rep_data_time_pdf_', Sys.Date(), '.csv'))
-
-
+# # make csv of all data
+# write_csv(entropy_time_pdf_df, file =
+#             paste0('./csv_created/representativeness_data/rep_data_time_pdf_', Sys.Date(), '.csv'))
+# 
 
 ```
 
