@@ -1,0 +1,367 @@
+---
+title: "Normality of Different Resolutions"
+author: "Andrew Purgiel"
+date: "7/4/2021"
+output: html_document
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(
+  fig.path = 'figures/',
+  warning = FALSE,
+  message = FALSE,
+  echo = FALSE,
+  fig.width = 10, fig.height = 3,
+  cache = FALSE)
+```
+
+```{r libraries}
+library(dplyr)
+library(purrr)
+library(tidyr)
+library(openair)
+library(ggplot2)
+library(readr)
+library(googlesheets4)
+library(lubridate)
+library(gridExtra) #for making ggplot autocorrelation plot grids
+library(ggpubr) # for normality test plots
+library(rstatix)
+
+
+```
+
+
+```{r import_minutely_data, eval = FALSE}
+##Import cleaned CSV with Real Time Data
+omni_data<- read_csv(paste0('./csv_created/',
+                         'omni_all_locations.csv'))
+```
+
+```{r import_hourly_data, eval = FALSE}
+##Import CSV with Real Time Data
+omni_hourly_data<- read_csv(paste0('./csv_created/',
+                         'omni_hourly_data.csv'))
+```
+
+```{r import_daily_data, eval = FALSE}
+##Import cleaned CSV with Real Time Data
+omni_daily_data<- read_csv(paste0('./csv_created/',
+                         'omni_daily_data.csv'))
+```
+
+
+
+```{r functions_misc}
+
+##Define a char vector of home numbers using a number vector,
+##ex: x <- home.list(c(1:15)) for homes 1-15
+threedig <- function(x) {
+  if (nchar(x) == 1) {a <- paste0('00', x)
+  return(a)
+  }
+  
+  if (nchar(x) == 2) {a<- paste0('0', x)
+  return(a)
+  }
+  else return(a)
+}
+
+home.list <- function(x) sapply(x, threedig)
+
+
+#function to make density plot of variable x (a column)
+dens.plot <- function(data, x) {
+  
+ggdensity(pull(data, all_of(x)), 
+          main = paste("Density plot of", x),
+          xlab = x)
+}
+
+```
+
+```{r define_variables}
+
+
+#define homes for analysis
+homes_all <- home.list(c(1:4, 7:16))
+
+# define indoor rooms
+locations_indoor <- c('living', 'bedroom', 'kitchen')
+
+# # define homes that have data for all indoor rooms (if needed)
+# homes_avail <- homes_all[-2]
+
+# define metrics for acf testing
+metrics_all <- c('pm25', 'voc', 'co2', 'temp', 'humid')
+
+#define sizes for plot text
+xsmall <- 2
+small <- 4
+medium <- 12
+large <- 16
+
+# define time spans needed for sample averages for different metrics
+# to avoid auto-correlation
+pm25_days <- 3
+voc_days <- 6
+co2_days <- 4
+temp_days <- 6
+humid_days <- 7
+
+```
+
+```{r function_grid_plotting}
+
+#function to put plots in a grid
+plot.grid <- function(plots, title,
+                     y_val = NULL, ncol = 4, nrow = 4) {
+  ##omit NULL values (from homes or rooms without valid data)
+  plots <- plots[!sapply(plots, is.null)]
+  
+  do.call('grid.arrange', c(plots, top = title, left = y_val,
+                            ncol = ncol, nrow = nrow))  
+  
+}
+```
+
+
+## Normality  
+
+```{r function_normality_test}
+
+# test for normality for each location in one home for one metric
+qqplotter <- function(hm, met, resolution, log.trans = TRUE){
+  
+  data <- if(resolution == '5min') omni_data else
+    if(resolution == 'hour') omni_hourly_data else
+    if(resolution == 'day') omni_daily_data
+  
+  if(met %in% c('pm25', 'voc')) {
+    # define LOD of metric to be 1/2 minimum detected (non-zero) value
+    LOD <- data %>%
+      filter(!!sym(metric)!=0) %>%
+      pull(all_of(metric))%>%
+      min()
+    
+    # change all zero values to LOD/2
+    data <- data %>%
+        mutate_at(all_of(metric), function(x) ifelse(x==0, LOD/2, x))
+  }
+  
+
+  
+  # create df of one metric for indoor rooms
+  data_metric <- data %>%
+  filter(home == hm & location %in% locations_indoor) %>%
+  select(metric == all_of(met)) %>%
+    filter(!is.na(met)) %>%
+    mutate(value = if(log.trans == TRUE) {log(get(met))} else get(met))
+
+
+# Create a QQ plot of values by location
+ggqqplot(data_metric, 'value', facet.by = 'location',
+                   title = paste('Home', hm, met,
+                                 if(log.trans == TRUE) {
+                     'log-transformed'} else 'raw data')
+)
+}
+
+  # test function
+a <- qqplotter( hm = '001', met = 'pm25', resolution = 'hour',log.trans = TRUE)
+
+
+```
+
+```{r plot_assumption_normality, fig.width=10.5, fig.height=8}
+# make qqplots for all homes/locations/metrics
+map(homes_all, function(x) qqplotter(hm = x, met = 'pm25',
+                                        log.trans = TRUE)) %>%
+  plot.grid(title = '')
+
+map(homes_all, function(x) qqplotter(hm = x, met = 'voc',
+                                        log.trans = TRUE)) %>%
+  plot.grid(title = '')
+
+map(homes_all, function(x) qqplotter(hm = x, met = 'co2',
+                                        log.trans = TRUE)) %>%
+  plot.grid(title = '')
+
+
+# testing individual homes and/or 5-min resolution data ------------------------
+
+# met <- 'pm25'
+# a <- omni_data %>% select(home, location, all_of(met)) %>%
+#   # reorganize just to allow input to func
+#   pivot_longer(cols = all_of(met), names_to = 'metric', values_to = 'mean')
+# 
+# map(homes_all, function(x) qqplotter(data = a, hm = x, met = met,
+#                                         log.trans = TRUE))
+
+```
+
+```{r plot_normality_diff_resolutions, fig.width=10.5, fig.height=8}
+# make qqplots for all homes/locations/metrics
+map(homes_all, function(x) qqplotter(hm = x, met = 'pm25',
+                                        log.trans = TRUE)) %>%
+  plot.grid(title = '')
+
+map(homes_all, function(x) qqplotter(hm = x, met = 'voc',
+                                        log.trans = TRUE)) %>%
+  plot.grid(title = '')
+
+map(homes_all, function(x) qqplotter(hm = x, met = 'co2',
+                                        log.trans = TRUE)) %>%
+  plot.grid(title = '')
+
+
+# testing individual homes and/or 5-min resolution data ------------------------
+
+# met <- 'pm25'
+# a <- omni_data %>% select(home, location, all_of(met)) %>%
+#   # reorganize just to allow input to func
+#   pivot_longer(cols = all_of(met), names_to = 'metric', values_to = 'mean')
+# 
+# map(homes_all, function(x) qqplotter(data = a, hm = x, met = met,
+#                                         log.trans = TRUE))
+
+```
+
+## Homogeneous Variances  
+
+```{r function_assumptions_variance}
+
+
+# test for equal variances across locations for one home, for one metric
+levene.tester <- function(data = omni_avg_data, hm, met, log.trans = FALSE){
+  
+  # create df of one metric for indoor rooms
+  data_metric <- data %>%
+  filter(home == hm & location %in% locations_indoor & metric == met) %>%
+    filter(!is.na(mean)) %>%
+    mutate(mean = if(log.trans == TRUE) {log(mean)} else mean)
+
+
+  levene_mean <- car::leveneTest(mean ~ as.factor(location),
+                                 data=data_metric, center="mean")
+  levene_median <- car::leveneTest(mean ~ as.factor(location),
+                                   data=data_metric, center="median")
+
+  tibble('home' = hm,
+         'p_val_mean' = levene_mean[['Pr(>F)']][[1]],
+         'p_val_median' = levene_median[['Pr(>F)']][[1]])
+
+}
+
+# # test function
+# levene.tester(hm = '001', met = 'pm25', log.trans = TRUE)
+
+
+```
+
+
+```{r df_assumption_variances}
+
+# test variances for all homes/locations/metrics
+map(homes_all, function(x) levene.tester(hm = x, met = 'pm25',
+                                        log.trans = TRUE)) %>%
+  bind_rows
+
+map(homes_all, function(x) levene.tester(hm = x, met = 'voc',
+                                        log.trans = TRUE)) %>%
+  bind_rows
+
+map(homes_all, function(x) levene.tester(hm = x, met = 'co2',
+                                        log.trans = TRUE)) %>%
+  bind_rows
+
+
+```
+
+
+# Sum of Squares  
+
+```{r function_sum_squares, eval = FALSE}
+
+sum.square<- function(data = omni_avg_data, hm, met,
+                              log.trans = FALSE) {
+  
+  # create df of one metric for indoor rooms
+  data_metric <- data %>%
+  filter(home == hm & location %in% locations_indoor & metric == met) %>%
+    filter(!is.na(mean))%>%
+        mutate(mean = if(log.trans == TRUE) {log(mean)} else mean)
+
+  # grand mean of all data
+  grand_mean <- data_metric %>%
+    pull(mean) %>%
+    mean()
+  
+  grand_n <- data_metric %>%
+    pull(mean) %>%
+    length()
+  
+  # sum of squares between each location mean and grand mean
+  ss_between <- data_metric %>%
+    group_by(location) %>%
+    summarise_at(vars(mean), list(ss.between = function(x) {
+      n()*(mean(x)-grand_mean)^2})) %>%
+    ungroup() %>%
+    # sum the between-location variances
+    pull(ss.between) %>%
+    sum()
+  
+
+   a <- data_metric %>%
+    group_by(location) %>%
+         # sum of squares between each data point at a location
+  # and that location's mean
+    summarise_at(vars(mean), list(ss.within = function(x) {sum((x-mean(x))^2)})) %>%
+    ungroup() %>%
+    t() %>% # transpose
+     as.data.frame()
+   
+   colnames(a) <- a[1,]
+   
+   a[-1,] %>%
+     rename_all(function(x) paste0('within_',x))%>%
+     mutate_all(as.numeric) %>%
+    mutate(between = ss_between, home = hm, metric = met)
+  
+
+  }
+
+# # test function
+# a <- sum.square(hm = '001', met = 'pm25', log.trans = TRUE)
+
+
+
+```
+
+```{r df_sum_squares, eval = FALSE}
+
+# test variances for all homes/locations/metrics
+ss_df2 <- map(metrics_all, function(x_metric) {
+  
+  map(homes_all, function(x_home) {
+    sum.square(hm = x_home, met = x_metric,
+               log.trans = TRUE)
+  }
+  )
+}
+) %>%
+  bind_rows()
+
+# write results into csv
+write_csv(ss_df, paste0('./csv_created/sum_squares_', Sys.Date(),'.csv'))
+
+# find when within-group ss is less than between group ss
+ss_test <- ss_df %>%
+  filter(within_bedroom<between |
+         within_kitchen<between | 
+           within_living<between )
+
+
+
+```
+
