@@ -493,7 +493,8 @@ ggplot(a, aes(x = as.factor(sample_length), y = frac_greater,
   ggtitle(label = paste(meth, 'Samples Greater than Representativeness Thresholds'))+
   ylab('Fraction Greater than Threshold')+
   xlab('Sample Length, days')+
-  coord_cartesian(ylim = c(0,1))
+  coord_cartesian(ylim = c(0,1))+
+  scale_fill_manual(values = c('gold', 'orange', 'darkred'))
 
 # Magnitude-Based--------------
 
@@ -510,7 +511,9 @@ ggplot(a, aes(x = as.factor(sample_length), y = frac_greater,
   ggtitle(label = paste(meth, 'Samples Greater than Representativeness Thresholds'))+
   ylab('Fraction Greater than Threshold')+
   xlab('Sample Length, days')+
-    coord_cartesian(ylim = c(0,1))
+    coord_cartesian(ylim = c(0,1))+
+    scale_fill_manual(values = c('gold', 'orange', 'darkred'))
+
 
   
 ```
@@ -664,52 +667,6 @@ map(homes_all, function (x_home) {
                                    unique(scaled_entropy_df$max_method)))
 
 }
-
-
-
-```
-
-### Testing Different Entropy Thresholds
-
-### Effect on when average Scaled Entropy crosses below threshold
-
-```{r threshold_plots, eval = FALSE}
-
-# make dataframe of values for minimum sample length (in days)
-# where entropy is less than threshold value
-threshold.freq.table <- function (threshold) {
-  
-  
-  a <- pooled_scaled_entropy_df %>%
-  filter(avg_scaled_kld >= threshold) %>% 
-  group_by(home, metric, energy_cluster, method) %>%
-  summarise_at(vars(sample_length), min) %>%
-  ungroup() %>%
-    mutate('thresh' = threshold)
-}
-
-# apply function to all thresholds in threshold_seq
- a <- lapply(thresh_vector, threshold.freq.table)
- a <- bind_rows(a)
-
- # ensure there weren't a significant amount of omissions for any metric type
- # (because the threshod may never have been reached)
-
- # NO FUNCTION YET
- 
- 
-   lvls <- levels(as.factor(a$thresh))
-rows <- by(a, a$thresh, function(x) nrow(x))
-labels <- paste(lvls,", n=",as.integer(rows),sep="")
-
- # histogram of when threshold was reached for all home/month combos
-ggplot(aes(x = sample_length, fill = as.factor(thresh)), data = a)+
-  geom_density(alpha = 0.5)+
-  facet_wrap(vars(metric, method))+
-  xlab("Sample Length Required to Meet Representativeness Threshold, days")+
-  scale_x_continuous(breaks = c(7,14,21,28))+
-  scale_fill_discrete(labels = labels)+
-  annotate('text', x = 14, y = 0.15, label = '*max n = 55 (sensor-cluster pairs)')
 
 
 
