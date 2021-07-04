@@ -32,19 +32,19 @@ library(rstatix)
 ```
 
 
-```{r import_minutely_data, eval = FALSE}
+```{r import_minutely_data}
 ##Import cleaned CSV with Real Time Data
 omni_data<- read_csv(paste0('./csv_created/',
                          'omni_all_locations.csv'))
 ```
 
-```{r import_hourly_data, eval = FALSE}
+```{r import_hourly_data}
 ##Import CSV with Real Time Data
 omni_hourly_data<- read_csv(paste0('./csv_created/',
                          'omni_hourly_data.csv'))
 ```
 
-```{r import_daily_data, eval = FALSE}
+```{r import_daily_data}
 ##Import cleaned CSV with Real Time Data
 omni_daily_data<- read_csv(paste0('./csv_created/',
                          'omni_daily_data.csv'))
@@ -173,30 +173,328 @@ ggqqplot(data_metric, 'value', facet.by = 'location',
 
 ```
 
-```{r plot_normality_diff_resolutions, fig.width=10.5, fig.height=8}
+```{r plot_normality_diff_resolutions, fig.width=10.5, fig.height=8, eval = FALSE}
 # make qqplots for all homes/locations/metrics
+res <- 'day'
 map(homes_all, function(x) qqplotter(hm = x, met = 'pm25',
-                                     resolution = 'hour',
+                                     resolution = res,
                                         log.trans = TRUE)) %>%
-  plot.grid(title = '')
+  plot.grid(title = paste('Resolution =', res))
 
+res <- 'hour'
 map(homes_all, function(x) qqplotter(hm = x, met = 'pm25',
-                                     resolution = 'day',
+                                     resolution = res,
                                         log.trans = TRUE)) %>%
-  plot.grid(title = '')
+  plot.grid(title = paste('Resolution =', res))
 
-
-
-# testing individual homes and/or 5-min resolution data ------------------------
-
-# met <- 'pm25'
-# a <- omni_data %>% select(home, location, all_of(met)) %>%
-#   # reorganize just to allow input to func
-#   pivot_longer(cols = all_of(met), names_to = 'metric', values_to = 'mean')
-# 
-# map(homes_all, function(x) qqplotter(data = a, hm = x, met = met,
-#                                         log.trans = TRUE))
+res <- '5min'
+map(homes_all, function(x) qqplotter(hm = x, met = 'pm25',
+                                     resolution = res,
+                                        log.trans = TRUE)) %>%
+  plot.grid(title = paste('Resolution =', res))
 
 ```
 
+## Test different distributions
+
+```{r plot_distribution_tests, fig.width=10.5, fig.height=8}
+ 
+# test for normality for each location in one home for one metric
+distribution.plotter <- function(hm, met, resolution){
+  
+  data <- if(resolution == '5min') omni_data else
+    if(resolution == 'hour') omni_hourly_data else
+    if(resolution == 'day') omni_daily_data
+  
+  if(met %in% c('pm25', 'voc')) {
+    # define LOD of metric to be 1/2 minimum detected (non-zero) value
+    LOD <- data %>%
+      filter(!!sym(met)!=0) %>%
+      pull(all_of(met))%>%
+      min()
+    
+    # change all zero values to LOD/2
+    data <- data %>%
+        mutate_at(all_of(met), function(x) ifelse(x==0, LOD/2, x))
+  }
+
+  
+  # create df of one metric for indoor rooms
+  data_metric <- data %>%
+      select(home, location, all_of(met)) %>%
+  filter(home == hm & location %in% locations_indoor) %>%
+    filter(!is.na(met))
+
+  rooms_avail <- levels(data_metric %>% pull(location) %>% as.factor())
+
+  
+  map(rooms_avail, function(room) {
+    
+  a <- data_metric %>% filter(location ==room)
+    
+   fit_log <- fitdistrplus::fitdist(pull(a, met),
+                                        "lnorm", method = 'mle')%>%
+                     suppressWarnings()
+
+    
+        fit_weib <- fitdistrplus::fitdist(pull(a, met),
+                                        "weibull", method = 'mle')%>%
+                     suppressWarnings()
+        
+    fit_gam <- fitdistrplus::fitdist(pull(a, met),
+                                        "gamma", method = 'mle')%>%
+                     suppressWarnings()
+    
+    plot.legend <- c("lnorm", "weib", "gam")
+
+        a <- fitdistrplus::denscomp(list(fit_log,
+                                fit_weib,
+                                fit_gam), legendtext = plot.legend,
+                           main = paste('dens', hm, met, room, resolution),
+                           plotstyle = 'ggplot')
+    
+    
+   b <-  fitdistrplus::qqcomp(list(fit_log,
+                              fit_weib,
+                              fit_gam), legendtext = plot.legend,
+                         main = paste('qq', hm, met, room, resolution),
+                           plotstyle = 'ggplot')
+
+    c <- fitdistrplus::cdfcomp(list(fit_log,
+                               fit_weib,
+                               fit_gam), legendtext = plot.legend,
+                          main = paste('cdf', hm, met, room, resolution),
+                           plotstyle = 'ggplot')
+
+   d<-  fitdistrplus::ppcomp(list(fit_log,
+                              fit_weib,
+                              fit_gam), legendtext = plot.legend,
+                         main = paste('pp', hm, met, room, resolution),
+                           plotstyle = 'ggplot')
+
+   list(a, b, c, d)
+   
+                }# end of map function
+) %>%
+  flatten() %>%
+  plot.grid(title = hm, ncol = 4,nrow = 3)
+}
+
+
+
+# testing----------------
+
+# test <- map(rooms_avail, function(room) {
+#     
+#   a <- data_metric %>% filter(location ==room)
+#     
+#    fit_log <- fitdistrplus::fitdist(pull(a, met),
+#                                         "lnorm", method = 'mle')
+# 
+#     
+#         fit_weib <- fitdistrplus::fitdist(pull(a, met),
+#                                         "weibull", method = 'mle')
+#         
+#     fit_gam <- fitdistrplus::fitdist(pull(a, met),
+#                                         "gamma", method = 'mle')
+#     
+#     plot.legend <- c("lnorm", "weib", "gam")
+# 
+#         a <- fitdistrplus::denscomp(list(fit_log,
+#                                 fit_weib,
+#                                 fit_gam), legendtext = plot.legend,
+#                            main = paste('dens', hm, met, room, resolution),
+#                            plotstyle = 'ggplot')
+#     
+#     
+#    b <-  fitdistrplus::qqcomp(list(fit_log,
+#                               fit_weib,
+#                               fit_gam), legendtext = plot.legend,
+#                          main = paste('qq', hm, met, room, resolution),
+#                            plotstyle = 'ggplot')
+# 
+#     c <- fitdistrplus::cdfcomp(list(fit_log,
+#                                fit_weib,
+#                                fit_gam), legendtext = plot.legend,
+#                           main = paste('cdf', hm, met, room, resolution),
+#                            plotstyle = 'ggplot')
+# 
+#    d<-  fitdistrplus::ppcomp(list(fit_log,
+#                               fit_weib,
+#                               fit_gam), legendtext = plot.legend,
+#                          main = paste('pp', hm, met, room, resolution),
+#                            plotstyle = 'ggplot')
+# 
+#    list(a, b, c, d)
+#    
+#                 }# end of function
+# ) %>%
+#   flatten() %>%
+#   plot.grid(hm, 4,3)
+
+
+# plotting-------------------
+
+distribution.plotter('004', 'pm25', 'day')
+
+```
+
+```{r df_distribution_tests, fig.width=10.5, fig.height=8}
+ 
+# test for normality for each location in one home for one metric
+distribution.compare <- function(hm, met, resolution){
+  
+  data <- if(resolution == '5min') omni_data else
+    if(resolution == 'hour') omni_hourly_data else
+    if(resolution == 'day') omni_daily_data
+  
+  if(met %in% c('pm25', 'voc')) {
+    # define LOD of metric to be 1/2 minimum detected (non-zero) value
+    LOD <- data %>%
+      filter(!!sym(met)!=0) %>%
+      pull(all_of(met))%>%
+      min()
+    
+    # change all zero values to LOD/2
+    data <- data %>%
+        mutate_at(all_of(met), function(x) ifelse(x==0, LOD/2, x))
+  }
+
+  
+  # create df of one metric for indoor rooms
+  data_metric <- data %>%
+      select(home, location, all_of(met)) %>%
+  filter(home == hm & location %in% locations_indoor) %>%
+    filter(!is.na(met))
+
+  rooms_avail <- levels(data_metric %>% pull(location) %>% as.factor())
+
+  
+  map(rooms_avail, function(room) {
+    
+  a <- data_metric %>% filter(location ==room)
+    
+   fit_log_aic <- (fitdistrplus::fitdist(pull(a, met),
+                                        "lnorm", method = 'mle') %>%
+                     suppressWarnings())$aic
+
+    
+        fit_weib_aic <- (fitdistrplus::fitdist(pull(a, met),
+                                        "weibull", method = 'mle')%>%
+                     suppressWarnings())$aic
+        
+    fit_gam_aic <- (fitdistrplus::fitdist(pull(a, met),
+                                        "gamma", method = 'mle')%>%
+                     suppressWarnings())$aic
+    
+    
+
+   list(
+     'log' = fit_log_aic,
+     'weib' = fit_weib_aic,
+     'gam' = fit_gam_aic,
+     'home' = hm,
+     'location' = room)
+   
+                }# end of map function
+) %>%
+  bind_rows()
+  }
+
+
+# plotting-------------------
+
+res <- 'day'
+{
+dist_compare_df <- map(homes_all, function (x_home){
+  distribution.compare(x_home, 'pm25', res)
+  }
+  ) %>% bind_rows() %>%
+  mutate( sensor = paste(location, home, sep = '_')) %>%
+  pivot_longer(cols = c(log, weib, gam), names_to = 'dist_type',
+               values_to = 'aic') %>%
+  group_by(sensor) %>%
+  mutate(max = max(aic)) %>%
+  mutate(max = ifelse(max ==aic, TRUE, FALSE)) %>%
+  ungroup()
+
+# plot the aic of different distribution fits for each sensor
+ggplot(dist_compare_df, aes(x = sensor, y = aic, fill = dist_type, color = max))+
+  geom_col(position = 'dodge')+
+  scale_color_manual(values = c('black', NA), breaks = c(TRUE, FALSE))+
+  ggtitle(paste('AIC Value, Resolution =', res))
+
+# calculate precentages
+
+a <- dist_compare_df %>%
+  filter(max == TRUE) %>%
+  group_by(dist_type) %>%
+  summarise(n_max = n()) %>%
+  mutate(pct_max = n_max/sum(n_max), resolution = res)
+}
+
+res <- 'hour'
+{
+dist_compare_df <- map(homes_all, function (x_home){
+  distribution.compare(x_home, 'pm25', res)
+  }
+  ) %>% bind_rows() %>%
+  mutate( sensor = paste(location, home, sep = '_')) %>%
+  pivot_longer(cols = c(log, weib, gam), names_to = 'dist_type',
+               values_to = 'aic') %>%
+  group_by(sensor) %>%
+  mutate(max = max(aic)) %>%
+  mutate(max = ifelse(max ==aic, TRUE, FALSE)) %>%
+  ungroup()
+
+# plot the aic of different distribution fits for each sensor
+ggplot(dist_compare_df, aes(x = sensor, y = aic, fill = dist_type, color = max))+
+  geom_col(position = 'dodge')+
+  scale_color_manual(values = c('black', NA), breaks = c(TRUE, FALSE))+
+  ggtitle(paste('AIC Value, Resolution =', res))
+
+# calculate precentages
+
+b <- dist_compare_df %>%
+  filter(max == TRUE) %>%
+  group_by(dist_type) %>%
+  summarise(n_max = n()) %>%
+  mutate(pct_max = n_max/sum(n_max), resolution = res)
+}
+
+res <- '5min'
+{
+dist_compare_df <- map(homes_all, function (x_home){
+  distribution.compare(x_home, 'pm25', res)
+  }
+  ) %>% bind_rows() %>%
+  mutate( sensor = paste(location, home, sep = '_')) %>%
+  pivot_longer(cols = c(log, weib, gam), names_to = 'dist_type',
+               values_to = 'aic') %>%
+  group_by(sensor) %>%
+  mutate(max = max(aic)) %>%
+  mutate(max = ifelse(max ==aic, TRUE, FALSE)) %>%
+  ungroup()
+
+# plot the aic of different distribution fits for each sensor
+ggplot(dist_compare_df, aes(x = sensor, y = aic, fill = dist_type, color = max))+
+  geom_col(position = 'dodge')+
+  scale_color_manual(values = c('black', NA), breaks = c(TRUE, FALSE))+
+  ggtitle(paste('AIC Value, Resolution =', res))
+
+# calculate precentages
+
+c <- dist_compare_df %>%
+  filter(max == TRUE) %>%
+  group_by(dist_type) %>%
+  summarise(n_max = n()) %>%
+  mutate(pct_max = n_max/sum(n_max), resolution = res)
+}
+
+# combine summary dataframes of different resolutions
+dist_compare_all <- bind_rows(a,b,c)
+
+# return table
+dist_compare_all
+```
 
