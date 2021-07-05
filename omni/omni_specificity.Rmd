@@ -208,98 +208,61 @@ specificity.table <- function(
       stop()
     }
 
+    #     # make column of all dates (increments of 5 min) within year
+    # # including all locations
+    # all_dates_year <- seq.POSIXt(
+    #   from = as.POSIXct(
+    #     data %>%
+    #   filter(home == home_num &
+    #            location %in% c('living', 'bedroom', 'kitchen'))%>%
+    #     pull(datetime) %>% min(), tz = 'UTC'),
+    # 
+    #   to =  as.POSIXct( data %>%
+    #   filter(home == home_num &
+    #            location %in% c('living', 'bedroom', 'kitchen'))%>%
+    #     pull(datetime) %>% max(), tz = 'UTC'),
+    #   by = '5 min')
     
-    # make df of entire monitoring period (approx. a year)
-    # recorded from given location
-    data_year <- data %>%
-      filter(home == home_num & location == location_type)
-    
-
-    if(metric %in% c('pm25', 'voc')) {
-      # convert 0 values to LOD/2 in to allow for log-normal distrib. estimation
-      data_year <- data_year %>%
-        mutate_at(all_of(metric), function(x) ifelse(x==0, LOD/2, x))
-    }
-
-
-    # make column of all dates (increments of 5 min) within year
-    # including all locations
-    all_dates_year <- seq.POSIXt(
-      from = as.POSIXct(
-        data %>%
-      filter(home == home_num &
-               location %in% c('living', 'bedroom', 'kitchen'))%>%
-        pull(datetime) %>% min(), tz = 'UTC'),
-
-      to =  as.POSIXct( data %>%
-      filter(home == home_num &
-               location %in% c('living', 'bedroom', 'kitchen'))%>%
-        pull(datetime) %>% max(), tz = 'UTC'),
-      by = '5 min')
-
-    
-    #calculate missingness of data in year for given location
-    year_data_avail <-
-      length(data_year %>% pull(datetime) %>% unique())/
-      length(all_dates_year)
-
-
-
-
-    # make df for recorded values in season for given location
-    data_season <- data_year %>%
-      # choose season date range
-      filter(
-        datetime >= ymd(monitor_season[1]) &
-          datetime <= ymd(monitor_season[2])
-      )
-
-
     # make column of all dates (increments of 5 min) within season
     # including all locations
-    all_dates_season <- seq.POSIXt(from = as.POSIXct( monitor_season[1], tz = 'UTC'),
-                                   to =  floor_date(as.POSIXct( monitor_season[2],
-                                                                tz = 'UTC')+24*60*60-1,
-                                                    unit = '5 min'),
-                                   by = '5 min')
-
-
-    # calculate missingness of data points in the season
-    season_data_avail <-
-      length(data_season %>% pull(datetime) %>% unique())/
-      length(all_dates_season)
-
+    all_dates_season <- seq.POSIXt(
+      from = as.POSIXct(monitor_season[1],tz = 'UTC'),
+      to =  floor_date(as.POSIXct( monitor_season[2],
+                                   tz = 'UTC')+24*60*60-1,
+                       unit = '5 min'), by = '5 min')
+  
+    data <-   data %>%
+      filter(home == home_num,location %in% locations_indoor)
     
-    if(all_time == TRUE) {
-      
-      # stop if missing 25% of data in year
-      if(year_data_avail < 0.75) {
-        output <<- na.result(
-          paste0('year_missing_',
-                 signif((1-year_data_avail)*100, 2),
-                 '%'),
-          period_label
-        )
-        stop()
-      }
-      
-      entire <- data_year
-      
-    } else { 
-      
-          # stop if missing 25% of data in season
-    if(season_data_avail < 0.75) {
-      output <<- na.result(
-        paste0('season_missing_',
-               signif((1-season_data_avail)*100, 2),
-               '%'),
-        period_label
-      )
+        if(metric %in% c('pm25', 'voc')) {
+      # convert 0 values to LOD/2 in to allow for log-normal distrib. estimation
+      data <- data %>%
+        mutate_at(all_of(metric), function(x) ifelse(x==0, LOD/2, x))
+    }
+    
+        # check data availability for entire season for each room
+    # and define which rooms have enough data
+    rooms_with_data <- data %>%
+      group_by(location) %>%
+      summarize(n_avail = n()/length(all_dates_season)) %>%
+      filter(n_avail >=0.75) %>%
+      pull(location)
+    
+    # give error if not all three rooms have enough data
+    if(rooms_with_data < 3){
+            output <<- na.result(paste0('only_data_',paste0(rooms_with_data,
+                                        collapse = '_')))
       stop()
     }
-      
-      entire <- data_season
-    }
+
+    data_wide <- data %>%
+      pivot_wider(id_cols = datetime, names_from = c(location),
+                  values_from = all_of(metric))
+    
+    # function to be applied to each room individually
+    # to determine covariance matrix, SD of 
+    
+    
     
     # make a fitted distribution for data assuming log-normal distribution
     entire_fit <- fitdistrplus::fitdist(pull(entire, metric),
