@@ -86,6 +86,8 @@ ggdensity(pull(data, all_of(x)),
 #define homes for analysis
 homes_all <- home.list(c(1:4, 7:16))
 
+homes_no10 <- homes_all[-which(homes_all == '010')]
+
 # define indoor rooms
 locations_indoor <- c('living', 'bedroom', 'kitchen')
 
@@ -175,27 +177,57 @@ ggqqplot(data_metric, 'value', facet.by = 'location',
 
 ```{r plot_normality_diff_resolutions, fig.width=10.5, fig.height=8, eval = FALSE}
 # make qqplots for all homes/locations/metrics
+
+# pm25------------------
+met <- 'pm25'
+
 res <- 'day'
-map(homes_all, function(x) qqplotter(hm = x, met = 'pm25',
+map(homes_all, function(x) qqplotter(hm = x, met = met,
                                      resolution = res,
                                         log.trans = TRUE)) %>%
   plot.grid(title = paste('Resolution =', res))
 
 res <- 'hour'
-map(homes_all, function(x) qqplotter(hm = x, met = 'pm25',
+map(homes_all, function(x) qqplotter(hm = x, met = met,
                                      resolution = res,
                                         log.trans = TRUE)) %>%
   plot.grid(title = paste('Resolution =', res))
 
 res <- '5min'
-map(homes_all, function(x) qqplotter(hm = x, met = 'pm25',
+map(homes_all, function(x) qqplotter(hm = x, met = met,
                                      resolution = res,
                                         log.trans = TRUE)) %>%
   plot.grid(title = paste('Resolution =', res))
 
+
+# voc------------------
+met <- 'voc'
+
+res <- 'day'
+map(homes_all, function(x) qqplotter(hm = x, met = met,
+                                     resolution = res,
+                                        log.trans = TRUE)) %>%
+  plot.grid(title = paste('Resolution =', res))
+
+res <- 'hour'
+map(homes_all, function(x) qqplotter(hm = x, met = met,
+                                     resolution = res,
+                                        log.trans = TRUE)) %>%
+  plot.grid(title = paste('Resolution =', res))
+
+res <- '5min'
+map(homes_all, function(x) qqplotter(hm = x, met = met,
+                                     resolution = res,
+                                        log.trans = TRUE)) %>%
+  plot.grid(title = paste('Resolution =', res))
+
+
 ```
 
+
 ## Test different distributions
+
+* Home 010 not tested for lack of good fit?
 
 ```{r plot_distribution_tests, fig.width=10.5, fig.height=8}
  
@@ -339,7 +371,7 @@ distribution.plotter('004', 'pm25', 'day')
 
 ```
 
-```{r df_distribution_tests, fig.width=10.5, fig.height=8}
+```{r function_plot_and_df_best_distribution}
  
 # test for normality for each location in one home for one metric
 distribution.compare <- function(hm, met, resolution){
@@ -401,13 +433,20 @@ distribution.compare <- function(hm, met, resolution){
   bind_rows()
   }
 
+```
 
-# plotting-------------------
+### PM2.5  
+
+```{r pm25_best_dist, fig.width=10.5, fig.height=8}
+
+met <- 'pm25'
+
+# pm25
 
 res <- 'day'
 {
-dist_compare_df <- map(homes_all, function (x_home){
-  distribution.compare(x_home, 'pm25', res)
+dist_compare_df <- map(homes_no10, function (x_home){
+  distribution.compare(x_home, met, res)
   }
   ) %>% bind_rows() %>%
   mutate( sensor = paste(location, home, sep = '_')) %>%
@@ -419,10 +458,10 @@ dist_compare_df <- map(homes_all, function (x_home){
   ungroup()
 
 # plot the aic of different distribution fits for each sensor
-ggplot(dist_compare_df, aes(x = sensor, y = aic, fill = dist_type, color = max))+
+plot<- ggplot(dist_compare_df, aes(x = sensor, y = aic, fill = dist_type, color = max))+
   geom_col(position = 'dodge')+
   scale_color_manual(values = c('black', NA), breaks = c(TRUE, FALSE))+
-  ggtitle(paste('AIC Value, Resolution =', res))
+  ggtitle(paste('AIC Value, Resolution =', met, res))
 
 # calculate precentages
 
@@ -432,11 +471,12 @@ a <- dist_compare_df %>%
   summarise(n_max = n()) %>%
   mutate(pct_max = n_max/sum(n_max), resolution = res)
 }
+plot
 
 res <- 'hour'
 {
-dist_compare_df <- map(homes_all, function (x_home){
-  distribution.compare(x_home, 'pm25', res)
+dist_compare_df <- map(homes_no10, function (x_home){
+  distribution.compare(x_home, met, res)
   }
   ) %>% bind_rows() %>%
   mutate( sensor = paste(location, home, sep = '_')) %>%
@@ -448,10 +488,10 @@ dist_compare_df <- map(homes_all, function (x_home){
   ungroup()
 
 # plot the aic of different distribution fits for each sensor
-ggplot(dist_compare_df, aes(x = sensor, y = aic, fill = dist_type, color = max))+
+plot<- ggplot(dist_compare_df, aes(x = sensor, y = aic, fill = dist_type, color = max))+
   geom_col(position = 'dodge')+
   scale_color_manual(values = c('black', NA), breaks = c(TRUE, FALSE))+
-  ggtitle(paste('AIC Value, Resolution =', res))
+  ggtitle(paste('AIC Value, Resolution =', met, res))
 
 # calculate precentages
 
@@ -461,11 +501,12 @@ b <- dist_compare_df %>%
   summarise(n_max = n()) %>%
   mutate(pct_max = n_max/sum(n_max), resolution = res)
 }
+plot
 
 res <- '5min'
 {
-dist_compare_df <- map(homes_all, function (x_home){
-  distribution.compare(x_home, 'pm25', res)
+dist_compare_df <- map(homes_no10, function (x_home){
+  distribution.compare(x_home, met, res)
   }
   ) %>% bind_rows() %>%
   mutate( sensor = paste(location, home, sep = '_')) %>%
@@ -477,10 +518,10 @@ dist_compare_df <- map(homes_all, function (x_home){
   ungroup()
 
 # plot the aic of different distribution fits for each sensor
-ggplot(dist_compare_df, aes(x = sensor, y = aic, fill = dist_type, color = max))+
+plot <- ggplot(dist_compare_df, aes(x = sensor, y = aic, fill = dist_type, color = max))+
   geom_col(position = 'dodge')+
   scale_color_manual(values = c('black', NA), breaks = c(TRUE, FALSE))+
-  ggtitle(paste('AIC Value, Resolution =', res))
+  ggtitle(paste('AIC Value, Resolution =', met, res))
 
 # calculate precentages
 
@@ -491,10 +532,132 @@ c <- dist_compare_df %>%
   mutate(pct_max = n_max/sum(n_max), resolution = res)
 }
 
+plot
+
 # combine summary dataframes of different resolutions
-dist_compare_all <- bind_rows(a,b,c)
+dist_compare_pm25 <- bind_rows(a,b,c) %>%
+  mutate(metric = met)
 
 # return table
-dist_compare_all
+dist_compare_pm25
 ```
+
+
+### TVOC  
+
+```{r voc_best_dist, fig.width=10.5, fig.height=8}
+
+met <- 'voc'
+
+# voc
+
+res <- 'day'
+{
+dist_compare_df <- map(homes_no10, function (x_home){
+  distribution.compare(x_home, met, res)
+  }
+  ) %>% bind_rows() %>%
+  mutate( sensor = paste(location, home, sep = '_')) %>%
+  pivot_longer(cols = c(log, weib, gam), names_to = 'dist_type',
+               values_to = 'aic') %>%
+  group_by(sensor) %>%
+  mutate(max = max(aic)) %>%
+  mutate(max = ifelse(max ==aic, TRUE, FALSE)) %>%
+  ungroup()
+
+# plot the aic of different distribution fits for each sensor
+plot<- ggplot(dist_compare_df, aes(x = sensor, y = aic, fill = dist_type, color = max))+
+  geom_col(position = 'dodge')+
+  scale_color_manual(values = c('black', NA), breaks = c(TRUE, FALSE))+
+  ggtitle(paste('AIC Value, Resolution =', met, res))
+
+# calculate precentages
+
+a <- dist_compare_df %>%
+  filter(max == TRUE) %>%
+  group_by(dist_type) %>%
+  summarise(n_max = n()) %>%
+  mutate(pct_max = n_max/sum(n_max), resolution = res)
+}
+plot
+
+res <- 'hour'
+{
+dist_compare_df <- map(homes_no10, function (x_home){
+  distribution.compare(x_home, met, res)
+  }
+  ) %>% bind_rows() %>%
+  mutate( sensor = paste(location, home, sep = '_')) %>%
+  pivot_longer(cols = c(log, weib, gam), names_to = 'dist_type',
+               values_to = 'aic') %>%
+  group_by(sensor) %>%
+  mutate(max = max(aic)) %>%
+  mutate(max = ifelse(max ==aic, TRUE, FALSE)) %>%
+  ungroup()
+
+# plot the aic of different distribution fits for each sensor
+plot<- ggplot(dist_compare_df, aes(x = sensor, y = aic, fill = dist_type, color = max))+
+  geom_col(position = 'dodge')+
+  scale_color_manual(values = c('black', NA), breaks = c(TRUE, FALSE))+
+  ggtitle(paste('AIC Value, Resolution =', met, res))
+
+# calculate precentages
+
+b <- dist_compare_df %>%
+  filter(max == TRUE) %>%
+  group_by(dist_type) %>%
+  summarise(n_max = n()) %>%
+  mutate(pct_max = n_max/sum(n_max), resolution = res)
+}
+plot
+
+res <- '5min'
+{
+dist_compare_df <- map(homes_no10, function (x_home){
+  distribution.compare(x_home, met, res)
+  }
+  ) %>% bind_rows() %>%
+  mutate( sensor = paste(location, home, sep = '_')) %>%
+  pivot_longer(cols = c(log, weib, gam), names_to = 'dist_type',
+               values_to = 'aic') %>%
+  group_by(sensor) %>%
+  mutate(max = max(aic)) %>%
+  mutate(max = ifelse(max ==aic, TRUE, FALSE)) %>%
+  ungroup()
+
+# plot the aic of different distribution fits for each sensor
+plot <- ggplot(dist_compare_df, aes(x = sensor, y = aic, fill = dist_type, color = max))+
+  geom_col(position = 'dodge')+
+  scale_color_manual(values = c('black', NA), breaks = c(TRUE, FALSE))+
+  ggtitle(paste('AIC Value, Resolution =', met, res))
+
+# calculate precentages
+
+c <- dist_compare_df %>%
+  filter(max == TRUE) %>%
+  group_by(dist_type) %>%
+  summarise(n_max = n()) %>%
+  mutate(pct_max = n_max/sum(n_max), resolution = res)
+}
+
+plot
+
+# combine summary dataframes of different resolutions
+dist_compare_voc <- bind_rows(a,b,c) %>%
+  mutate(metric = met)
+
+# return table
+dist_compare_voc
+```
+
+### COmbined  
+
+```{r best_dist}
+dist_compare_all <- bind_rows(dist_compare_pm25, dist_compare_voc)
+
+dist_compare_all
+
+write_csv(dist_compare_all, './csv_created/distribution_comparison.csv')
+```
+
 
