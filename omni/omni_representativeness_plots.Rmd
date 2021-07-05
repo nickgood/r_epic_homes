@@ -138,9 +138,10 @@ cluster_colors <- c('red', 'blue', 'darkgreen')
 
 # for labeling purposes
 xsmall <- 2
+smaller <- 4
 small <- 6
-medium <- 10
-large <- 16
+medium <- 16
+large <- 24
 
 ```
 
@@ -476,7 +477,7 @@ threshold_df <- map(thresh_vector, frac.above.threshold) %>% bind_rows()
 
 ```
 
-```{r barchart_threshold}
+```{r barchart_threshold, fig.height=8, fig.width = 10.5}
 
 # Time Structured--------------
 
@@ -489,12 +490,21 @@ ggplot(a, aes(x = as.factor(sample_length), y = frac_greater,
                          fill = as.factor(thresh)))+
   geom_col(position = 'dodge')+
   facet_wrap(vars( metric, energy_cluster))+
-  geom_text(aes( label = n_condition), y = 0.9, size = xsmall)+
+  geom_text(aes( label = n_condition), y = 0.9, size = smaller)+
   ggtitle(label = paste(meth, 'Samples Greater than Representativeness Thresholds'))+
   ylab('Fraction Greater than Threshold')+
   xlab('Sample Length, days')+
   coord_cartesian(ylim = c(0,1))+
-  scale_fill_manual(values = c('gold', 'orange', 'darkred'))
+  scale_fill_manual(values = c('gold', 'orange', 'darkred'),
+                    name = 'Threshold')+
+  theme(
+    title = element_text(size = medium),
+    axis.title = element_text(size = medium+2),
+    axis.text = element_text(size = medium),
+    strip.text = element_text(size = medium),
+    legend.text = element_text(size = medium),
+    legend.title = element_text(size = medium)
+    )
 
 # Magnitude-Based--------------
 
@@ -507,12 +517,21 @@ ggplot(a, aes(x = as.factor(sample_length), y = frac_greater,
                          fill = as.factor(thresh)))+
   geom_col(position = 'dodge')+
   facet_wrap(vars( metric, energy_cluster))+
-  geom_text(aes( label = n_condition), y = 0.9, size = xsmall)+
+  geom_text(aes( label = n_condition), y = 0.9, size = smaller)+
   ggtitle(label = paste(meth, 'Samples Greater than Representativeness Thresholds'))+
   ylab('Fraction Greater than Threshold')+
   xlab('Sample Length, days')+
     coord_cartesian(ylim = c(0,1))+
-    scale_fill_manual(values = c('gold', 'orange', 'darkred'))
+    scale_fill_manual(values = c('gold', 'orange', 'darkred'),
+                    name = 'Threshold')+
+  theme(
+    title = element_text(size = medium),
+    axis.title = element_text(size = medium+2),
+    axis.text = element_text(size = medium),
+    strip.text = element_text(size = medium),
+    legend.text = element_text(size = medium),
+    legend.title = element_text(size = medium)
+    )
 
 
   
@@ -591,7 +610,7 @@ ach50 <- if(is_empty(ach50)) NA else if (is.na(ach50)) {
             axis.text = element_text(size = small),
             title = element_text(size = small))+
             facet_wrap(vars(metric))+
-          annotate('text', x = 14, y = 0.25, hjust = 0.5, size = xsmall,
+          annotate('text', x = 14, y = 0.25, hjust = 0.5, size = xsmall+1,
              # label = bquote(ACH[50] ==  ~ .(ach50))
              label = paste( 'ACH50 =', ach50)
              ) # annotate with ach50
