@@ -201,6 +201,7 @@ map(homes_all, function(x) qqplotter(hm = x, met = met,
 # voc------------------
 met <- 'voc'
 
+
 res <- 'day'
 map(homes_all, function(x) qqplotter(hm = x, met = met,
                                      resolution = res,
@@ -215,10 +216,10 @@ map(homes_all, function(x) qqplotter(hm = x, met = met,
 
 res <- '5min'
 map(homes_all, function(x) qqplotter(hm = x, met = met,
+
                                      resolution = res,
                                         log.trans = TRUE)) %>%
   plot.grid(title = paste('Resolution =', res))
-
 
 ```
 
@@ -228,6 +229,24 @@ map(homes_all, function(x) qqplotter(hm = x, met = met,
 
 ```{r function_plot_distribution_tests}
 
+=======
+res <- '5min'
+map(homes_all, function(x) qqplotter(hm = x, met = met,
+                                     resolution = res,
+                                        log.trans = TRUE)) %>%
+  plot.grid(title = paste('Resolution =', res))
+
+
+```
+
+
+## Test different distributions
+
+* Home 010 not tested for lack of good fit?
+
+```{r plot_distribution_tests, fig.width=10.5, fig.height=8}
+ 
+>>>>>>> f5221affc869387f00666dcd2ec1a6bdc5138228
 # test for normality for each location in one home for one metric
 distribution.plotter <- function(hm, met, resolution){
   
@@ -351,6 +370,9 @@ map(homes_all,function (x_home) {
 ## Calculate AIC for each distribution  
 
 ```{r function_df_best_distribution}
+=======
+```{r function_plot_and_df_best_distribution}
+>>>>>>> f5221affc869387f00666dcd2ec1a6bdc5138228
  
 # test for normality for each location in one home for one metric
 distribution.compare <- function(hm, met, resolution){
@@ -469,6 +491,7 @@ dist_compare_df <- map(homes_all, function (x_home){
   mutate(max = ifelse(max ==aic, TRUE, FALSE)) %>%
   ungroup()
 
+<<<<<<< HEAD
 # plot the aic of different distribution fits for each sensor
 plot<- ggplot(dist_compare_df, aes(x = sensor, y = aic, fill = dist_type, color = max))+
   geom_col(position = 'dodge')+
@@ -536,6 +559,7 @@ met <- 'voc'
 res <- 'day'
 {
 dist_compare_df <- map(homes_all, function (x_home){
+
   distribution.compare(x_home, met, res)
   }
   ) %>% bind_rows() %>%
@@ -566,6 +590,7 @@ plot
 res <- 'hour'
 {
 dist_compare_df <- map(homes_all, function (x_home){
+
   distribution.compare(x_home, met, res)
   }
   ) %>% bind_rows() %>%
@@ -596,6 +621,7 @@ plot
 res <- '5min'
 {
 dist_compare_df <- map(homes_all, function (x_home){
+
   distribution.compare(x_home, met, res)
   }
   ) %>% bind_rows() %>%
@@ -629,17 +655,20 @@ dist_compare_voc <- bind_rows(a,b,c) %>%
   mutate(metric = met)
 
 # return table
+
 dist_compare_voc
 ```
 
 ### COmbined  
 
 ```{r best_dist, eval = FALSE}
+
 dist_compare_all <- bind_rows(dist_compare_pm25, dist_compare_voc)
 
 dist_compare_all
 
 # write_csv(dist_compare_all, './csv_created/distribution_comparison.csv')
+
 
 ```
 

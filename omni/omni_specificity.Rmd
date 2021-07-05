@@ -230,7 +230,7 @@ specificity.table <- function(
       to =  floor_date(as.POSIXct( monitor_season[2],
                                    tz = 'UTC')+24*60*60-1,
                        unit = '5 min'), by = '5 min')
-    
+
     
               # make df for recorded values in season for given location
     data <-   data %>%
@@ -262,12 +262,14 @@ specificity.table <- function(
       stop()
     }
 
+
     data_wide <- data %>%
       pivot_wider(id_cols = datetime, names_from = c(location),
                   values_from = all_of(metric))
     
     # function to be applied to each room individually
     # to determine covariance matrix, SD of each room, and relative mutual info
+
     
     
     
