@@ -82,15 +82,15 @@ ggdensity(pull(data, all_of(x)),
 
 ```{r define_variables}
 
-
 #define homes for analysis
 homes_all <- home.list(c(1:4, 7:16))
 
 # define indoor rooms
 locations_indoor <- c('living', 'bedroom', 'kitchen')
 
-# # define homes that have data for all indoor rooms (if needed)
-# homes_avail <- homes_all[-2]
+# define all resolutions of data to be tested
+res_all <- c('day', 'hour', '5min')
+
 
 # define metrics for acf testing
 metrics_all <- c('pm25', 'voc', 'co2', 'temp', 'humid')
@@ -126,7 +126,7 @@ plot.grid <- function(plots, title,
 ```
 
 
-## Normality  
+## Log Normality  
 
 ```{r function_normality_test}
 
@@ -223,10 +223,10 @@ map(homes_all, function(x) qqplotter(hm = x, met = met,
 ```
 
 
-## Test different distributions
+## Plot Tests of different distributions
 
 
-```{r plot_distribution_tests, fig.width=10.5, fig.height=8}
+```{r function_plot_distribution_tests}
 
 # test for normality for each location in one home for one metric
 distribution.plotter <- function(hm, met, resolution){
@@ -318,11 +318,37 @@ distribution.plotter <- function(hm, met, resolution){
   plot.grid(title = hm, ncol = 4,nrow = 3)
 }
 
-# plotting-------------------
+# test function-------------------
 
-distribution.plotter('010', 'voc', 'day')
+# distribution.plotter('010', 'voc', 'day')
 
 ```
+
+### PM2.5  
+
+```{r pm25_plot_distribution_tests, fig.width=10.5, fig.height=6, eval = TRUE}
+met <- 'pm25'
+
+map(homes_all,function (x_home) {
+  map(res_all, distribution.plotter, met = met, hm = x_home)
+}
+)
+
+```
+
+### TVOC  
+
+```{r voc_plot_distribution_tests, fig.width=10.5, fig.height=6, eval = TRUE}
+met <- 'voc'
+
+map(homes_all,function (x_home) {
+  map(res_all, distribution.plotter, met = met, hm = x_home)
+}
+)
+
+```
+
+## Calculate AIC for each distribution  
 
 ```{r function_df_best_distribution}
  
@@ -391,9 +417,9 @@ distribution.compare <- function(hm, met, resolution){
 
 ```
 
-### PM2.5  
+### PM2.5    
 
-```{r pm25_best_dist, fig.width=10.5, fig.height=8}
+```{r pm25_best_dist, fig.width=10.5, fig.height=4, eval = FALSE}
 
 met <- 'pm25'
 
@@ -501,7 +527,7 @@ dist_compare_pm25
 
 ### TVOC  
 
-```{r voc_best_dist, fig.width=10.5, fig.height=8}
+```{r voc_best_dist, fig.width=10.5, fig.height=4, eval = FALSE}
 
 met <- 'voc'
 
@@ -608,12 +634,13 @@ dist_compare_voc
 
 ### COmbined  
 
-```{r best_dist}
+```{r best_dist, eval = FALSE}
 dist_compare_all <- bind_rows(dist_compare_pm25, dist_compare_voc)
 
 dist_compare_all
 
-write_csv(dist_compare_all, './csv_created/distribution_comparison.csv')
+# write_csv(dist_compare_all, './csv_created/distribution_comparison.csv')
+
 ```
 
 
