@@ -173,7 +173,7 @@ ggqqplot(data_metric, 'value', facet.by = 'location',
 
 ```
 
-```{r plot_normality_diff_resolutions, fig.width=10.5, fig.height=8, eval = FALSE}
+```{r plot_normality_diff_resolutions, fig.width=10.5, fig.height=8, eval = TRUE}
 # make qqplots for all homes/locations/metrics
 
 # pm25------------------
@@ -326,7 +326,7 @@ distribution.plotter <- function(hm, met, resolution){
 
 ### PM2.5  
 
-```{r pm25_plot_distribution_tests, fig.width=10.5, fig.height=6, eval = TRUE}
+```{r pm25_plot_distribution_tests, fig.width=10.5, fig.height=6, eval = FALSE}
 met <- 'pm25'
 
 map(homes_all,function (x_home) {
@@ -338,7 +338,7 @@ map(homes_all,function (x_home) {
 
 ### TVOC  
 
-```{r voc_plot_distribution_tests, fig.width=10.5, fig.height=6, eval = TRUE}
+```{r voc_plot_distribution_tests, fig.width=10.5, fig.height=6, eval = FALSE}
 met <- 'voc'
 
 map(homes_all,function (x_home) {
