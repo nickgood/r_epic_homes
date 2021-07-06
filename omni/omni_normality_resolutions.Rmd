@@ -50,6 +50,22 @@ omni_daily_data<- read_csv(paste0('./csv_created/',
                          'omni_daily_data.csv'))
 ```
 
+```{r csv_censored_creation, eval = FALSE}
+# create data with upper 1 percentile removed
+omni_censor_high <- omni_data %>%
+  select(-c(timestamp, filename, pm10_est, score, lux, spl_a))%>%
+  pivot_longer(cols = c(pm25, voc, co2), names_to = 'metric',
+               values_to = 'value') %>%
+  group_by(home, location, metric) %>%
+  mutate(percentile99 = quantile(value, 0.99)) %>%
+  filter(value < percentile99) %>%
+      select(-percentile99) %>%
+  ungroup() %>%
+  pivot_wider(names_from = metric, values_from = c(value))
+
+omni_daily_censor_high <- 
+
+```
 
 
 ```{r functions_misc}
@@ -229,7 +245,6 @@ map(homes_all, function(x) qqplotter(hm = x, met = met,
 
 ```{r function_plot_distribution_tests}
 
-=======
 res <- '5min'
 map(homes_all, function(x) qqplotter(hm = x, met = met,
                                      resolution = res,
