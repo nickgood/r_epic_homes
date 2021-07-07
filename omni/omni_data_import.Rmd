@@ -1,0 +1,443 @@
+---
+title: "Summarize Location"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: paper
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.path = 'figures/',
+  warning = FALSE,
+  message = FALSE,
+  echo = FALSE,
+  fig.width = 10, fig.height = 3,
+  cache = FALSE)
+```
+
+---
+
+```{r}
+library(dplyr)
+library(purrr)
+library(tidyr)
+library(openair)
+library(ggplot2)
+library(readr)
+library(googlesheets4)
+library(lubridate)
+```
+
+```{r}
+clean_data <- function(x){
+  #print(x)
+  f <- read_rds(x)
+  
+  # make blank dataframe for files with no data
+  # or specific error message
+  blank_df <- 
+    tibble(timestamp = NA_character_,
+          co2 = NA_real_,
+          voc = NA_real_,
+          temp = NA_real_,
+          lux = NA_real_,
+          humid = NA_real_,
+          pm25 = NA_real_,
+          score = NA_real_,
+          spl_a  = NA_real_,    
+          datetime = NA_character_,
+          filename = NA_character_)
+  
+  # insert blank dataframe if connection error occurs on a day
+  if(grepl("upstream connect error or disconnect/reset before headers.",
+           f, fixed = TRUE)) blank_df
+  
+  else if(length(f$data) > 0){
+  data_long <- as_tibble(f) %>%
+  unnest_wider(data) %>%
+  select(-indices) %>%
+  mutate(df = map(sensors, ~ .x %>% map_df(magrittr::extract, c("comp", "value")))) %>%
+  unnest(df) %>%
+  select(-sensors, -score) %>%
+  pivot_wider(names_from = "comp", values_from = "value") %>%
+  mutate(datetime = format(as.POSIXct(strptime(timestamp,format = "%FT%H:%M:%S",tz = "GMT")),
+                          tz = "US/Mountain",
+                          usetz = TRUE),
+         filename = x)
+  
+    # insert blank dataframe if no data is recorded on a day
+ } else blank_df
+}
+
+
+```
+
+# 001 Outdoor
+
+```{r}
+
+id_home <- "001"
+location <- "outdoor"
+pattern = paste0(".*", id_home, "_", location, ".*.rds$")
+files <- list.files("../output/omni", pattern = pattern, full.names = TRUE)
+```
+
+```{r}
+data <- map(files, clean_data) %>%
+  bind_rows() %>%
+  mutate_at(vars(contains("time")), ymd_hms) %>%
+  filter(rowSums(is.na(.)) != ncol(.)) %>% # omit a row if every value is NA
+  mutate(home = id_home, location = location) # add home and location id
+
+```
+
+```{r fig_pm25, fig.width=10, fig.height= 5}
+timeVariation(data %>% rename(date = datetime),
+              pollutant = "pm25",
+              ylab = "pm2.5 (ug/m3)")
+```
+
+```{r fig_co2, fig.width=10, fig.height= 5}
+timeVariation(data %>% rename(date = datetime),
+              pollutant = "co2",
+              ylab = "CO2 (ppmV)")
+```
+
+```{r fig_temp, fig.width=10, fig.height= 5}
+timeVariation(data %>% rename(date = datetime) %>% filter(temp < 45),
+              pollutant = "temp",
+              ylab = "Temperature (oC)")
+```
+
+---
+
+# Search for files that cause errors when reading in
+
+```{r error_file_search, eval = FALSE}
+
+
+# columns change on 2021-01-27_2021-01-28 to include pm10est? cause error in kitchen007
+# columns change on 2021-01-17_2021-01-18 to stop including pm10est? cause error in garage007
+
+
+
+  #check how many columns each of the files I've downloaded have
+  col.check <- function(hm, rm) {
+  read.table(paste0("../output/omni_clean/omni_", hm, "_", rm, ".csv"),             # Read only header of example data
+           head = TRUE,
+           nrows = 1,
+           sep = ',') %>%
+      colnames()
+  }
+    
+  home <- '009'
+
+  lapply(c('living', 'bedroom', 'kitchen', 'outdoor', 'garage'), col.check,
+         hm = home)
+
+  
+
+```
+
+
+# Make CSVs of data and merge into one csv
+
+```{r function_data_maker, eval = FALSE}
+
+# function to make files for multiple homes/locations
+
+data.maker <- function(id_home, location) {
+pattern = paste0(".*", id_home, "_", location, ".*.rds$")
+files <- list.files("../drive_sync/epic_homes/r_epic_homes/output/omni", pattern = pattern, full.names = TRUE)
+
+# # if want to put end_date on file name
+# end_date <- map(files, function(x) {
+#   # extract ending date of file from file name
+#   substr(x, nchar(x)-13, nchar(x)-4)
+# }
+# ) %>%
+#   # find most recent dated file for given home/sensor
+#   unlist() %>%
+#   as.Date() %>%
+#   max()
+
+data <- map(files, clean_data) %>%
+  bind_rows() %>%
+  mutate_at(vars(contains("time")), ymd_hms) %>%
+  filter(rowSums(is.na(.)) != ncol(.)) %>% # omit a row if every value is NA
+  mutate(home = id_home, location = location) %>% # add home and location id
+  select(-c(timestamp,filename))
+
+# create a foder to store data in if doesn't aready exist
+folder_dated <- paste0('./csv_created/omni_raw_', Sys.Date(),'/')
+
+ifelse(!dir.exists(file.path(folder_dated)), dir.create(file.path(folder_dated)), FALSE)
+
+write_csv(data, paste0(folder_dated, id_home, '_', location,
+                       '.csv'))
+}
+
+
+```
+
+```{r make_data_individuals, eval = FALSE}
+
+# # test for just one sensor
+# lapply('outdoor', data.maker, id_home = '003')
+
+locations_all <- c( 'bedroom', 'living', 'kitchen', 'garage', 'outdoor')
+
+
+# make files for one home for all locations
+lapply(locations_all, data.maker, id_home = '007')
+```
+
+
+```{r function_data_merger, eval = FALSE}
+
+# make single csv file merging all homes/location csv files
+pattern <- paste0(".*omni_.*.csv$")
+files <- list.files("./csv_created/omni_clean/", pattern = pattern, full.names = TRUE)
+
+a<- map(files, function(x) {
+  read_csv(x) %>%
+    select(!contains('X1')) # remove X1 for dataframes that have rownames
+}
+) %>%
+  bind_rows() %>%
+      filter(rowSums(is.na(.)) != ncol(.)) # omit a row if every value is NA
+
+
+write_csv(a, paste0('./csv_created/omni_all_locations_',
+                       Sys.Date(), '.csv'))
+
+
+```
+
+# Clean minutely data
+
+
+```{r import_all_data, eval = TRUE}
+
+omni_data <- read_csv(paste0('./csv_created/omni_all_locations_raw_',
+'2021-07-07.csv'))
+
+```
+
+
+```{r}
+
+ # remove unneeded columns
+omni_data_clean <- omni_data %>%
+      select(-c(timestamp, score, filename))
+
+# find and remove (average) duplicates--------------------
+
+
+# clean duplicates from sensor overlaps----------
+ 
+ # remove home 003 outdoor for now...
+omni_data_clean <- omni_data_clean %>%
+    filter(!(home=='003' & location == 'outdoor'))
+
+  # average dupicates in home 009 living due to sensor overlap
+ a <- omni_data_clean %>%
+    filter(!(home=='009' & location == 'living'))
+
+
+b <- omni_data_clean %>%
+  filter(home=='009', location == 'living') %>%
+    group_by(datetime) %>% 
+    summarise_if(is.numeric, list(mean), na.rm = TRUE, .groups = 'drop')
+
+omni_data_clean <- bind_rows(a,b)
+
+  # average dupicates in home 003 living due to sensor overlap
+ a <- omni_data_clean %>%
+    filter(!(home=='003' & location == 'living'))
+
+
+b <- omni_data_clean %>%
+  filter(home=='003', location == 'living') %>%
+    group_by(datetime) %>% 
+    summarise_if(is.numeric, list(mean), na.rm = TRUE, .groups = 'drop')
+
+omni_data_clean <- bind_rows(a,b)
+ 
+# average duplicates from daylight savings------------
+
+# label duplicate rows
+omni_data_clean <- omni_data_clean %>% 
+  group_by(datetime, home, location) %>% 
+  mutate(duplicate = n()>1) %>%
+  ungroup() 
+
+# unique rows
+unique<- omni_data_clean %>%
+  filter(duplicate == FALSE) %>%
+  select(-duplicate)
+
+# duplicate rows
+duplicates<- omni_data_clean %>%
+  filter(duplicate == TRUE)%>%
+  select(-duplicate)
+
+# average duplicates that are from daylight savings
+avg_daylight <-  duplicates %>%
+  filter(between(datetime, ymd_hms("2020-10-31 23:59:00"),
+                                ymd_hms("2020-11-01 01:59:00"))) %>%
+  group_by(datetime, home, location) %>% 
+  summarise_if(is.numeric, mean) %>%
+  ungroup()
+
+duplicates_no_daylight <-  duplicates %>%
+  filter(!between(datetime, ymd_hms("2020-10-31 23:59:00"),
+                                ymd_hms("2020-11-01 01:59:00"))) 
+  
+
+  # combine rows into dataframe without duplicates
+ omni_data_clean <- bind_rows(unique,duplicates_no_daylight,avg_daylight)
+  
+ # test to ensure no duplicates are remaining (should be no rows)
+ 
+ if(nrow(duplicates_no_daylight)>0) {
+stop('duplicates outside of daylight savings time exist')}
+ 
+# method 2---------
+#   # find duplicates by date logged for each sensor
+#   duplicates <- omni_data %>%
+#   select(-c(timestamp, score, lux, filename, spl_a, pm10_est)) %>%
+#     group_by(datetime, home, location) %>% 
+#     summarise(n = n(), .groups = 'drop') %>%
+#   filter(n >1)
+# 
+# # ignore dupicates from daylight savings
+# duplicates_not_daylight <- duplicates %>%
+#   filter(!between(datetime,
+#                  ymd_hms('2020-11-01 01:00:00'),
+#                  ymd_hms('2020-11-01 02:00:00')))
+# 
+# if(duplicates_not_daylight %>% nrow() > 0) {
+# stop('duplicates other than daylight savings time exist')}
+# 
+# # # test home 3 duplicates
+# # test <- omni_data %>% filter(home=='003', location == 'outdoor',
+# #                              datetime >  ymd_hms('2020-11-06 01:00:00'))
+# #   
+# # home3 <- read_csv('./csv_created/omni_raw_2021-07-06/003_outdoor.csv') %>%
+# #   select(-filename)
+# # 
+# # testhome3 <- home3 %>%   
+# #   group_by(datetime, home, location) %>% 
+# #     summarise(n = n(), .groups = 'drop') %>%
+# #   filter(n >1)
+# 
+# # average duplicates if only sparce/due to daylight savings
+#   # find duplicates by date logged for each sensor
+#   omni_data_clean <- omni_data %>%
+#       select(-c(timestamp, score, filename)) %>%
+#     group_by(datetime, home, location) %>% 
+#     summarise_if(is.numeric, list(mean), na.rm = TRUE, .groups = 'drop')
+
+  
+  
+  
+ 
+ # omit unrealistic temperatures-------------
+
+  omni_data_clean <- omni_data_clean %>%
+  mutate(temp = ifelse(temp > 100, NA, temp))
+  
+write_csv(omni_data_clean, paste0('./csv_created/omni_all_locations_', Sys.Date(), '.csv'))
+
+
+```
+
+
+# create data of multiple resolutions from cleaned data
+
+
+```{r hourly_data_csv}
+
+omni_hourly_data <- omni_data_clean %>%
+  group_by(datehour = floor_date(datetime, unit = 'hour'),
+           home, location) %>%
+  summarise_if(is.numeric, list(mean), na.rm = TRUE) %>%
+  ungroup()
+
+write_csv(omni_hourly_data, paste0('./csv_created/omni_hourly_data_',
+Sys.Date(),'.csv'))
+
+```
+
+```{r daily_data_csv}
+
+  omni_daily_data <- omni_data_clean %>%
+  group_by(dateday = floor_date(datetime, unit = 'day'),
+           home, location) %>%
+  summarise_if(is.numeric, list(mean), na.rm = TRUE) %>%
+  ungroup()
+
+write_csv(omni_daily_data, paste0('./csv_created/omni_daily_data_',
+Sys.Date(),'.csv'))
+
+```
+
+# try to ignore files that have been downloaded before (beta code)
+
+```{r data_maker_2, eval = FALSE}
+
+# function to make files for multiple homes/locations
+# but in increments (NOT COMPLETE YET)
+
+data.maker2 <- function(id_home, location) {
+ 
+   pattern_csv <- paste0(".*omni_", id_home, "_", location, ".*.csv$")
+   
+file_csv <- list.files("../output/omni_clean", pattern = pattern_csv, full.names = TRUE)
+
+
+# end date of existing csv, used as start date for downoading data
+start_date <- substr(file_csv, nchar(file_csv)-13, nchar(file_csv)-4)
+
+pattern = paste0(".*", id_home, "_", location, ".*.rds$")
+files <- list.files("../output/omni", pattern = pattern, full.names = TRUE)
+
+end_date <- map(files, function(x) {
+  # extract ending date of file from file name
+  substr(x, nchar(x)-13, nchar(x)-4)
+}
+) %>%
+  unlist() %>%
+  as.Date() %>%
+  # find most recent dated file for given home/sensor
+  max()
+
+
+
+# find where starting date of rds file is equal to most recent csv date
+# or before?????
+file_start <- map(files, function(x) {
+  # extract starting date of file from file name
+  substr(x, nchar(x)-24, nchar(x)-15)
+}
+) %>%
+  unlist() %>%
+  as.Date() %>%
+  # find most recent dated file for given home/sensor
+  max() #################
+
+
+data <- map(files, clean_data) %>%
+  bind_rows() %>%
+  mutate_at(vars(contains("time")), ymd_hms) %>%
+  filter(rowSums(is.na(.)) != ncol(.)) %>% # omit a row if every value is NA
+  mutate(home = id_home, location = location) # add home and location id
+
+write_csv(data, paste0('../output/omni_clean/omni_', id_home, '_', location,
+                       '_', end_date, '.csv'))
+}
+```
+
+
