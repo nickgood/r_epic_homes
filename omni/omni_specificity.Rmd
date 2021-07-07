@@ -109,6 +109,7 @@ na.result <- function(error, season = NA, sample_days = NA, samp_avail = NA) {
 )
 }
 
+
 ```
 
 
@@ -243,7 +244,7 @@ specificity.table <- function(
                                    tz = 'UTC')+24*60*60-1,
                        unit = '5 min'), by = '5 min')
 
-              # make df for recorded values in season for given location
+                  # make df for recorded values in season for given location
     data <-   data %>%
       select(datetime, home, location, all_of(metric))%>%
       filter(home == home_num,location %in% locations_indoor) %>%
@@ -281,10 +282,25 @@ specificity.table <- function(
                   values_fn = length)
     
     # function to be applied to each room individually
-    # to determine covariance matrix, SD of each room, and relative mutual info
+    # to determine covariance matrix, variance of each room, and relative mutual info
 
     
-    covariance_matrix <- 
+    function(room){
+  other_rooms <- rooms_with_data[-which(rooms_with_data == room)]
+  
+var00 <- sd(data %>% pull(room))^2
+cov01 <- cov(data %>% pull(room), data %>% pull(other_rooms[1]))
+cov02 <- cov(data %>% pull(room), data %>% pull(other_rooms[2]))
+cov10 <- cov(data %>% pull(other_rooms[1]), data %>% pull(room))
+var11 <- sd(data %>% pull(other_rooms[1]))^2
+cov12 <- cov(data %>% pull(other_rooms[1]),
+             data %>% pull(other_rooms[2]))
+cov20 <- cov(data %>% pull(other_rooms[2]),
+             data %>% pull(room))
+cov21 <- cov(data %>% pull(other_rooms[2]),
+             data %>% pull(other_rooms[1]))
+var22 <- sd(data %>% pull(other_rooms[2]))^2
+}
     
 
     # make a fitted distribution for data assuming log-normal distribution
