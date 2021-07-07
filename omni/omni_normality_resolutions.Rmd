@@ -51,6 +51,7 @@ omni_daily_data<- read_csv(paste0('./csv_created/',
 ```
 
 ```{r csv_censored_creation, eval = FALSE}
+
 # create data with upper 1 percentile removed
 omni_censor_high <- omni_data %>%
   select(-c(timestamp, filename, pm10_est, score, lux, spl_a))%>%
@@ -63,10 +64,38 @@ omni_censor_high <- omni_data %>%
   ungroup() %>%
   pivot_wider(names_from = metric, values_from = c(value))
 
-omni_daily_censor_high <- 
+omni_hourly_censor_high <- omni_censor_high %>%
+  group_by(datehour = floor_date(datetime, unit = 'hour'),
+           home, location) %>%
+  summarise_if(is.numeric, list(mean), na.rm = TRUE) %>%
+  ungroup()
+
+
+omni_daily_censor_high <- omni_censor_high %>%
+  group_by(dateday = floor_date(datetime, unit = 'day'),
+           home, location) %>%
+  summarise_if(is.numeric, list(mean), na.rm = TRUE) %>%
+  ungroup()
+
+# create csvs
+write_csv(omni_censor_high, paste0('./csv_created/omni_censor99_',
+Sys.Date(),'.csv'))
+
+write_csv(omni_hourly_censor_high, paste0('./csv_created/omni_hourly_censor99_',
+Sys.Date(),'.csv'))
+
+write_csv(omni_daily_censor_high, paste0('./csv_created/omni_daily_censor99_',
+Sys.Date(),'.csv'))
 
 ```
 
+```{r import_censored_data}
+omni_censor_high <- read_csv('./csv_created/omni_censor99.csv')
+omni_hourly_censor_high <- read_csv('./csv_created/omni_hourly_censor99.csv')
+omni_daily_censor_high <- read_csv('./csv_created/omni_daily_censor99.csv')
+
+
+```
 
 ```{r functions_misc}
 
@@ -147,11 +176,19 @@ plot.grid <- function(plots, title,
 ```{r function_normality_test}
 
 # test for normality for each location in one home for one metric
-qqplotter <- function(hm, met, resolution, log.trans = TRUE){
+qqplotter <- function(hm, met, resolution, log.trans = TRUE,
+                      censored = FALSE){
   
-  data <- if(resolution == '5min') omni_data else
-    if(resolution == 'hour') omni_hourly_data else
-    if(resolution == 'day') omni_daily_data
+  data <- if(censored == FALSE) {
+    if(resolution == '5min') omni_data else
+      if(resolution == 'hour') omni_hourly_data else
+        if(resolution == 'day') omni_daily_data
+    
+  } else if(censored == TRUE) {
+    if(resolution == '5min') omni_censor_high else
+      if(resolution == 'hour') omni_hourly_censor_high else
+        if(resolution == 'day') omni_daily_censor_high
+  }
   
   if(met %in% c('pm25', 'voc')) {
     # define LOD of metric to be 1/2 minimum detected (non-zero) value
@@ -189,7 +226,7 @@ ggqqplot(data_metric, 'value', facet.by = 'location',
 
 ```
 
-```{r plot_normality_diff_resolutions, fig.width=10.5, fig.height=8, eval = TRUE}
+```{r plot_normality_diff_resolutions, fig.width=10.5, fig.height=8, eval = FALSE, results= 'asis'}
 # make qqplots for all homes/locations/metrics
 
 # pm25------------------
@@ -201,11 +238,19 @@ map(homes_all, function(x) qqplotter(hm = x, met = met,
                                         log.trans = TRUE)) %>%
   plot.grid(title = paste('Resolution =', res))
 
+#insert page break
+cat("\n\n\\pagebreak\n")
+  writeLines("ValueForV")
+
 res <- 'hour'
 map(homes_all, function(x) qqplotter(hm = x, met = met,
                                      resolution = res,
                                         log.trans = TRUE)) %>%
   plot.grid(title = paste('Resolution =', res))
+
+#insert page break
+cat("\n\n\\pagebreak\n")
+  writeLines("ValueForV")
 
 res <- '5min'
 map(homes_all, function(x) qqplotter(hm = x, met = met,
@@ -224,11 +269,19 @@ map(homes_all, function(x) qqplotter(hm = x, met = met,
                                         log.trans = TRUE)) %>%
   plot.grid(title = paste('Resolution =', res))
 
+#insert page break
+cat("\n\n\\pagebreak\n")
+  writeLines("ValueForV")
+
 res <- 'hour'
 map(homes_all, function(x) qqplotter(hm = x, met = met,
                                      resolution = res,
                                         log.trans = TRUE)) %>%
   plot.grid(title = paste('Resolution =', res))
+
+#insert page break
+cat("\n\n\\pagebreak\n")
+  writeLines("ValueForV")
 
 res <- '5min'
 map(homes_all, function(x) qqplotter(hm = x, met = met,
@@ -239,18 +292,76 @@ map(homes_all, function(x) qqplotter(hm = x, met = met,
 
 ```
 
+```{r plot_censored_normality_diff_resolutions, fig.width=10.5, fig.height=8, eval = TRUE, results='asis'}
+# make qqplots for all homes/locations/metrics
+# censored data
 
-## Plot Tests of different distributions
+# pm25------------------
+met <- 'pm25'
 
+res <- 'day'
+map(homes_all, function(x) qqplotter(hm = x, met = met,
+                                     resolution = res,
+                                        log.trans = TRUE,
+                                     censored = TRUE)) %>%
+  plot.grid(title = paste('Resolution =', res))
 
-```{r function_plot_distribution_tests}
+#insert page break
+cat("\n\n\\pagebreak\n")
+  writeLines("ValueForV")
+  
+res <- 'hour'
+map(homes_all, function(x) qqplotter(hm = x, met = met,
+                                     resolution = res,
+                                        log.trans = TRUE,
+                                     censored = TRUE)) %>%
+  plot.grid(title = paste('Resolution =', res))
 
+#insert page break
+cat("\n\n\\pagebreak\n")
+  writeLines("ValueForV")
+  
 res <- '5min'
 map(homes_all, function(x) qqplotter(hm = x, met = met,
                                      resolution = res,
-                                        log.trans = TRUE)) %>%
+                                        log.trans = TRUE,
+                                     censored = TRUE)) %>%
   plot.grid(title = paste('Resolution =', res))
 
+
+# voc------------------
+met <- 'voc'
+
+
+res <- 'day'
+map(homes_all, function(x) qqplotter(hm = x, met = met,
+                                     resolution = res,
+                                        log.trans = TRUE,
+                                     censored = TRUE)) %>%
+  plot.grid(title = paste('Resolution =', res))
+
+#insert page break
+cat("\n\n\\pagebreak\n")
+  writeLines("ValueForV")
+
+res <- 'hour'
+map(homes_all, function(x) qqplotter(hm = x, met = met,
+                                     resolution = res,
+                                        log.trans = TRUE,
+                                     censored = TRUE)) %>%
+  plot.grid(title = paste('Resolution =', res))
+
+#insert page break
+cat("\n\n\\pagebreak\n")
+  writeLines("ValueForV")
+
+res <- '5min'
+map(homes_all, function(x) qqplotter(hm = x, met = met,
+
+                                     resolution = res,
+                                        log.trans = TRUE,
+                                     censored = TRUE)) %>%
+  plot.grid(title = paste('Resolution =', res))
 
 ```
 
@@ -259,9 +370,8 @@ map(homes_all, function(x) qqplotter(hm = x, met = met,
 
 * Home 010 not tested for lack of good fit?
 
-```{r plot_distribution_tests, fig.width=10.5, fig.height=8}
+```{r function_plot_distribution_tests}
  
->>>>>>> f5221affc869387f00666dcd2ec1a6bdc5138228
 # test for normality for each location in one home for one metric
 distribution.plotter <- function(hm, met, resolution){
   
@@ -336,14 +446,16 @@ distribution.plotter <- function(hm, met, resolution){
                          main = paste('qq', hm, met, room, resolution),
                            plotstyle = 'ggplot')
 
-    c <- fitdistrplus::cdfcomp(plot_list, legendtext = plot.legend,
-                          main = paste('cdf', hm, met, room, resolution),
-                           plotstyle = 'ggplot')
-
-   d<-  fitdistrplus::ppcomp(plot_list, legendtext = plot.legend,
-                         main = paste('pp', hm, met, room, resolution),
-                           plotstyle = 'ggplot')
-   list(a, b, c, d)
+   #  c <- fitdistrplus::cdfcomp(plot_list, legendtext = plot.legend,
+   #                        main = paste('cdf', hm, met, room, resolution),
+   #                         plotstyle = 'ggplot')
+   # 
+   # d<-  fitdistrplus::ppcomp(plot_list, legendtext = plot.legend,
+   #                       main = paste('pp', hm, met, room, resolution),
+   #                         plotstyle = 'ggplot')
+   list(a, b
+        # c, d
+        )
         }
    
                 }# end of map function
@@ -385,9 +497,7 @@ map(homes_all,function (x_home) {
 ## Calculate AIC for each distribution  
 
 ```{r function_df_best_distribution}
-=======
-```{r function_plot_and_df_best_distribution}
->>>>>>> f5221affc869387f00666dcd2ec1a6bdc5138228
+
  
 # test for normality for each location in one home for one metric
 distribution.compare <- function(hm, met, resolution){
@@ -472,12 +582,12 @@ dist_compare_df <- map(homes_all, function (x_home){
   pivot_longer(cols = c(log, weib, gam), names_to = 'dist_type',
                values_to = 'aic') %>%
   group_by(sensor) %>%
-  mutate(max = max(aic)) %>%
-  mutate(max = ifelse(max ==aic, TRUE, FALSE)) %>%
+  mutate(min = min(aic)) %>%
+  mutate(min = ifelse(min ==aic, TRUE, FALSE)) %>%
   ungroup()
 
 # plot the aic of different distribution fits for each sensor
-plot<- ggplot(dist_compare_df, aes(x = sensor, y = aic, fill = dist_type, color = max))+
+plot<- ggplot(dist_compare_df, aes(x = sensor, y = aic, fill = dist_type, color = min))+
   geom_col(position = 'dodge')+
   scale_color_manual(values = c('black', NA), breaks = c(TRUE, FALSE))+
   ggtitle(paste('AIC Value, Resolution =', met, res))
@@ -485,10 +595,10 @@ plot<- ggplot(dist_compare_df, aes(x = sensor, y = aic, fill = dist_type, color 
 # calculate precentages
 
 a <- dist_compare_df %>%
-  filter(max == TRUE) %>%
+  filter(min == TRUE) %>%
   group_by(dist_type) %>%
-  summarise(n_max = n()) %>%
-  mutate(pct_max = n_max/sum(n_max), resolution = res)
+  summarise(n_min = n()) %>%
+  mutate(pct_min = n_min/sum(n_min), resolution = res)
 }
 plot
 
@@ -502,13 +612,12 @@ dist_compare_df <- map(homes_all, function (x_home){
   pivot_longer(cols = c(log, weib, gam), names_to = 'dist_type',
                values_to = 'aic') %>%
   group_by(sensor) %>%
-  mutate(max = max(aic)) %>%
-  mutate(max = ifelse(max ==aic, TRUE, FALSE)) %>%
+  mutate(min = min(aic)) %>%
+  mutate(min = ifelse(min ==aic, TRUE, FALSE)) %>%
   ungroup()
 
-<<<<<<< HEAD
 # plot the aic of different distribution fits for each sensor
-plot<- ggplot(dist_compare_df, aes(x = sensor, y = aic, fill = dist_type, color = max))+
+plot<- ggplot(dist_compare_df, aes(x = sensor, y = aic, fill = dist_type, color = min))+
   geom_col(position = 'dodge')+
   scale_color_manual(values = c('black', NA), breaks = c(TRUE, FALSE))+
   ggtitle(paste('AIC Value, Resolution =', met, res))
@@ -516,10 +625,10 @@ plot<- ggplot(dist_compare_df, aes(x = sensor, y = aic, fill = dist_type, color 
 # calculate precentages
 
 b <- dist_compare_df %>%
-  filter(max == TRUE) %>%
+  filter(min == TRUE) %>%
   group_by(dist_type) %>%
-  summarise(n_max = n()) %>%
-  mutate(pct_max = n_max/sum(n_max), resolution = res)
+  summarise(n_min = n()) %>%
+  mutate(pct_min = n_min/sum(n_min), resolution = res)
 }
 plot
 
@@ -533,12 +642,12 @@ dist_compare_df <- map(homes_all, function (x_home){
   pivot_longer(cols = c(log, weib, gam), names_to = 'dist_type',
                values_to = 'aic') %>%
   group_by(sensor) %>%
-  mutate(max = max(aic)) %>%
-  mutate(max = ifelse(max ==aic, TRUE, FALSE)) %>%
+  mutate(min = min(aic)) %>%
+  mutate(min = ifelse(min ==aic, TRUE, FALSE)) %>%
   ungroup()
 
 # plot the aic of different distribution fits for each sensor
-plot <- ggplot(dist_compare_df, aes(x = sensor, y = aic, fill = dist_type, color = max))+
+plot <- ggplot(dist_compare_df, aes(x = sensor, y = aic, fill = dist_type, color = min))+
   geom_col(position = 'dodge')+
   scale_color_manual(values = c('black', NA), breaks = c(TRUE, FALSE))+
   ggtitle(paste('AIC Value, Resolution =', met, res))
@@ -546,10 +655,10 @@ plot <- ggplot(dist_compare_df, aes(x = sensor, y = aic, fill = dist_type, color
 # calculate precentages
 
 c <- dist_compare_df %>%
-  filter(max == TRUE) %>%
+  filter(min == TRUE) %>%
   group_by(dist_type) %>%
-  summarise(n_max = n()) %>%
-  mutate(pct_max = n_max/sum(n_max), resolution = res)
+  summarise(n_min = n()) %>%
+  mutate(pct_min = n_min/sum(n_min), resolution = res)
 }
 
 plot
@@ -582,12 +691,12 @@ dist_compare_df <- map(homes_all, function (x_home){
   pivot_longer(cols = c(log, weib, gam), names_to = 'dist_type',
                values_to = 'aic') %>%
   group_by(sensor) %>%
-  mutate(max = max(aic)) %>%
-  mutate(max = ifelse(max ==aic, TRUE, FALSE)) %>%
+  mutate(min = min(aic)) %>%
+  mutate(min = ifelse(min ==aic, TRUE, FALSE)) %>%
   ungroup()
 
 # plot the aic of different distribution fits for each sensor
-plot<- ggplot(dist_compare_df, aes(x = sensor, y = aic, fill = dist_type, color = max))+
+plot<- ggplot(dist_compare_df, aes(x = sensor, y = aic, fill = dist_type, color = min))+
   geom_col(position = 'dodge')+
   scale_color_manual(values = c('black', NA), breaks = c(TRUE, FALSE))+
   ggtitle(paste('AIC Value, Resolution =', met, res))
@@ -595,10 +704,10 @@ plot<- ggplot(dist_compare_df, aes(x = sensor, y = aic, fill = dist_type, color 
 # calculate precentages
 
 a <- dist_compare_df %>%
-  filter(max == TRUE) %>%
+  filter(min == TRUE) %>%
   group_by(dist_type) %>%
-  summarise(n_max = n()) %>%
-  mutate(pct_max = n_max/sum(n_max), resolution = res)
+  summarise(n_min = n()) %>%
+  mutate(pct_min = n_min/sum(n_min), resolution = res)
 }
 plot
 
@@ -613,12 +722,12 @@ dist_compare_df <- map(homes_all, function (x_home){
   pivot_longer(cols = c(log, weib, gam), names_to = 'dist_type',
                values_to = 'aic') %>%
   group_by(sensor) %>%
-  mutate(max = max(aic)) %>%
-  mutate(max = ifelse(max ==aic, TRUE, FALSE)) %>%
+  mutate(min = min(aic)) %>%
+  mutate(min = ifelse(min ==aic, TRUE, FALSE)) %>%
   ungroup()
 
 # plot the aic of different distribution fits for each sensor
-plot<- ggplot(dist_compare_df, aes(x = sensor, y = aic, fill = dist_type, color = max))+
+plot<- ggplot(dist_compare_df, aes(x = sensor, y = aic, fill = dist_type, color = min))+
   geom_col(position = 'dodge')+
   scale_color_manual(values = c('black', NA), breaks = c(TRUE, FALSE))+
   ggtitle(paste('AIC Value, Resolution =', met, res))
@@ -626,10 +735,10 @@ plot<- ggplot(dist_compare_df, aes(x = sensor, y = aic, fill = dist_type, color 
 # calculate precentages
 
 b <- dist_compare_df %>%
-  filter(max == TRUE) %>%
+  filter(min == TRUE) %>%
   group_by(dist_type) %>%
-  summarise(n_max = n()) %>%
-  mutate(pct_max = n_max/sum(n_max), resolution = res)
+  summarise(n_min = n()) %>%
+  mutate(pct_min = n_min/sum(n_min), resolution = res)
 }
 plot
 
@@ -644,12 +753,12 @@ dist_compare_df <- map(homes_all, function (x_home){
   pivot_longer(cols = c(log, weib, gam), names_to = 'dist_type',
                values_to = 'aic') %>%
   group_by(sensor) %>%
-  mutate(max = max(aic)) %>%
-  mutate(max = ifelse(max ==aic, TRUE, FALSE)) %>%
+  mutate(min = min(aic)) %>%
+  mutate(min = ifelse(min ==aic, TRUE, FALSE)) %>%
   ungroup()
 
 # plot the aic of different distribution fits for each sensor
-plot <- ggplot(dist_compare_df, aes(x = sensor, y = aic, fill = dist_type, color = max))+
+plot <- ggplot(dist_compare_df, aes(x = sensor, y = aic, fill = dist_type, color = min))+
   geom_col(position = 'dodge')+
   scale_color_manual(values = c('black', NA), breaks = c(TRUE, FALSE))+
   ggtitle(paste('AIC Value, Resolution =', met, res))
@@ -657,10 +766,10 @@ plot <- ggplot(dist_compare_df, aes(x = sensor, y = aic, fill = dist_type, color
 # calculate precentages
 
 c <- dist_compare_df %>%
-  filter(max == TRUE) %>%
+  filter(min == TRUE) %>%
   group_by(dist_type) %>%
-  summarise(n_max = n()) %>%
-  mutate(pct_max = n_max/sum(n_max), resolution = res)
+  summarise(n_min = n()) %>%
+  mutate(pct_min = n_min/sum(n_min), resolution = res)
 }
 
 plot
