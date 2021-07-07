@@ -46,6 +46,17 @@ omni_data<- read_csv('./csv_created/omni_all_locations.csv')
 #   mutate(pm25_zero_pct = pm25_zeros/pm25_n*100) %>%
 #   ungroup()
 
+# # find duplicates
+# test3_n <- test_sing %>%
+#     group_by(datetime, home, location) %>% 
+#     summarise(n = n(), .groups = 'drop')
+# #replace with mean
+# test2_sing <- test_sing %>%
+#     group_by(datetime, home, location) %>% 
+#     summarise_if(is.numeric, list(mean), na.rm = TRUE)
+
+
+
 ```
 
 
@@ -109,14 +120,15 @@ na.result <- function(error, season = NA, sample_days = NA, samp_avail = NA) {
 
 date_ranges_entire <- list(c('2020-12-02','2021-04-23'))
 tested_sample_sequence <- seq(1,5,2)
-home_num <- '011'
-location_type <- 'bedroom'
-data <- omni_data
+home_num <- '009'
+location_type <- 'living'
+data <- omni_data 
 monitor_season <- date_ranges_entire[1]
 metric <- 'voc'
 days <- 1
 days2 <- 1
 all_time <- TRUE
+warn <- 'none'
 # 
 # 
 # # remove variables after done testing
@@ -231,9 +243,9 @@ specificity.table <- function(
                                    tz = 'UTC')+24*60*60-1,
                        unit = '5 min'), by = '5 min')
 
-    
               # make df for recorded values in season for given location
     data <-   data %>%
+      select(datetime, home, location, all_of(metric))%>%
       filter(home == home_num,location %in% locations_indoor) %>%
       # choose season date range
       filter(
@@ -256,7 +268,7 @@ specificity.table <- function(
       pull(location)
     
     # give error if not all three rooms have enough data
-    if(rooms_with_data < 3){
+    if(length(rooms_with_data) < 3){
             output <<- na.result(paste0('only_data_',paste0(rooms_with_data,
                                         collapse = '_')))
       stop()
@@ -264,14 +276,15 @@ specificity.table <- function(
 
 
     data_wide <- data %>%
-      pivot_wider(id_cols = datetime, names_from = c(location),
-                  values_from = all_of(metric))
+      pivot_wider(names_from = c(location),
+                  values_from = all_of(metric),
+                  values_fn = length)
     
     # function to be applied to each room individually
     # to determine covariance matrix, SD of each room, and relative mutual info
 
     
-    
+    covariance_matrix <- 
     
 
     # make a fitted distribution for data assuming log-normal distribution
@@ -506,7 +519,7 @@ threshold_seq <- c(0.1, 0.2, 0.3)
 
 pdf_days <- c(3,7,10,14,21)
 
-
+warn <- 'none'
 
 ```
 
