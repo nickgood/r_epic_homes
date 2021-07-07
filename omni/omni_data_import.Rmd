@@ -248,7 +248,7 @@ omni_data_clean <- omni_data_clean %>%
 
 b <- omni_data_clean %>%
   filter(home=='009', location == 'living') %>%
-    group_by(datetime) %>% 
+    group_by(datetime, home, location) %>% 
     summarise_if(is.numeric, list(mean), na.rm = TRUE, .groups = 'drop')
 
 omni_data_clean <- bind_rows(a,b)
@@ -260,11 +260,13 @@ omni_data_clean <- bind_rows(a,b)
 
 b <- omni_data_clean %>%
   filter(home=='003', location == 'living') %>%
-    group_by(datetime) %>% 
+    group_by(datetime, home, location) %>% 
     summarise_if(is.numeric, list(mean), na.rm = TRUE, .groups = 'drop')
+
 
 omni_data_clean <- bind_rows(a,b)
  
+
 # average duplicates from daylight savings------------
 
 # label duplicate rows
