@@ -89,7 +89,7 @@ Sys.Date(),'.csv'))
 
 ```
 
-```{r import_censored_data}
+```{r import_censored_data, eval = FALSE}
 omni_censor_high <- read_csv('./csv_created/omni_censor99.csv')
 omni_hourly_censor_high <- read_csv('./csv_created/omni_hourly_censor99.csv')
 omni_daily_censor_high <- read_csv('./csv_created/omni_daily_censor99.csv')
@@ -292,7 +292,7 @@ map(homes_all, function(x) qqplotter(hm = x, met = met,
 
 ```
 
-```{r plot_censored_normality_diff_resolutions, fig.width=10.5, fig.height=8, eval = TRUE, results='asis'}
+```{r plot_censored_normality_diff_resolutions, fig.width=10.5, fig.height=8, eval = FALSE, results='asis'}
 # make qqplots for all homes/locations/metrics
 # censored data
 
@@ -566,7 +566,7 @@ distribution.compare <- function(hm, met, resolution){
 
 ### PM2.5    
 
-```{r pm25_best_dist, fig.width=10.5, fig.height=4, eval = FALSE}
+```{r pm25_best_dist, fig.width=10.5, fig.height=4, eval = TRUE}
 
 met <- 'pm25'
 
@@ -674,7 +674,7 @@ dist_compare_pm25
 
 ### TVOC  
 
-```{r voc_best_dist, fig.width=10.5, fig.height=4, eval = FALSE}
+```{r voc_best_dist, fig.width=10.5, fig.height=4, eval = TRUE}
 
 met <- 'voc'
 
@@ -785,13 +785,13 @@ dist_compare_voc
 
 ### COmbined  
 
-```{r best_dist, eval = FALSE}
+```{r best_dist, eval = TRUE}
 
 dist_compare_all <- bind_rows(dist_compare_pm25, dist_compare_voc)
 
 dist_compare_all
 
-# write_csv(dist_compare_all, './csv_created/distribution_comparison.csv')
+write_csv(dist_compare_all, './csv_created/distribution_comparison.csv')
 
 
 ```
