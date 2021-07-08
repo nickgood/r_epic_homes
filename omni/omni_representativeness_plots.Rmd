@@ -477,7 +477,7 @@ threshold_df <- map(thresh_vector, frac.above.threshold) %>% bind_rows()
 
 ```
 
-```{r barchart_threshold, fig.height=8, fig.width = 10.5}
+```{r barchart_threshold, fig.height=7, fig.width = 10.5}
 
 # Time Structured--------------
 
