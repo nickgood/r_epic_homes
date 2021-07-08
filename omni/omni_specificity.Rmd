@@ -37,23 +37,11 @@ library(ggpubr) # for tesing log-normality
 ```{r import_omni_minute_data}
 omni_data<- read_csv('./csv_created/omni_all_locations.csv')
 
-# # remove all variables but omni_data
-# rm(list=setdiff(ls(), "omni_data"))
-
 # zero_test <- omni_data %>%
 #   group_by(home, location) %>%
 #   summarize(pm25_zeros = sum(pm25 == 0), pm25_n = n()) %>%
 #   mutate(pm25_zero_pct = pm25_zeros/pm25_n*100) %>%
 #   ungroup()
-
-# # find duplicates
-# test3_n <- test_sing %>%
-#     group_by(datetime, home, location) %>% 
-#     summarise(n = n(), .groups = 'drop')
-# #replace with mean
-# test2_sing <- test_sing %>%
-#     group_by(datetime, home, location) %>% 
-#     summarise_if(is.numeric, list(mean), na.rm = TRUE)
 
 
 
@@ -122,7 +110,6 @@ na.result <- function(error, season = NA, sample_days = NA, samp_avail = NA) {
 date_ranges_entire <- list(c('2020-12-02','2021-04-23'))
 tested_sample_sequence <- seq(1,5,2)
 home_num <- '009'
-location_type <- 'living'
 data <- omni_data 
 monitor_season <- date_ranges_entire[1]
 metric <- 'voc'
@@ -130,6 +117,7 @@ days <- 1
 days2 <- 1
 all_time <- TRUE
 warn <- 'none'
+room <- 'living'
 # 
 # 
 # # remove variables after done testing
@@ -149,7 +137,8 @@ warn <- 'none'
 # date_col_season,
 # date_col_year,
 # all_dates_season,
-# all_dates_year
+# all_dates_year,
+# room
 # )
 
 # entropy function minutely data ----------------------------
@@ -278,30 +267,69 @@ specificity.table <- function(
 
     data_wide <- data %>%
       pivot_wider(names_from = c(location),
-                  values_from = all_of(metric),
-                  values_fn = length)
+                  values_from = all_of(metric))
     
     # function to be applied to each room individually
     # to determine covariance matrix, variance of each room, and relative mutual info
 
+      # note location of missing values across all room data sets
+    # so the variance can be corrected
+    # in the mutual information calculation
+    missing_indeces <- lapply(rooms_with_data, function(x) {
+      data_wide %>% pull(x) %>% is.na() %>% which()
+    }) %>%
+      unlist()
     
-    function(room){
-  other_rooms <- rooms_with_data[-which(rooms_with_data == room)]
-  
-var00 <- sd(data %>% pull(room))^2
-cov01 <- cov(data %>% pull(room), data %>% pull(other_rooms[1]))
-cov02 <- cov(data %>% pull(room), data %>% pull(other_rooms[2]))
-cov10 <- cov(data %>% pull(other_rooms[1]), data %>% pull(room))
-var11 <- sd(data %>% pull(other_rooms[1]))^2
-cov12 <- cov(data %>% pull(other_rooms[1]),
-             data %>% pull(other_rooms[2]))
-cov20 <- cov(data %>% pull(other_rooms[2]),
-             data %>% pull(room))
-cov21 <- cov(data %>% pull(other_rooms[2]),
-             data %>% pull(other_rooms[1]))
-var22 <- sd(data %>% pull(other_rooms[2]))^2
-}
-    
+        data_wide_complete <- data_wide %>% slice(-c(missing_indeces))
+
+    # make matrix with cov function
+#NOTE: if a value is missing from one data set, the function will delete that value from all data-sets when calculating variance and covariance
+        
+        
+        function(room){
+          
+          
+        }
+        
+        # Note: Need to move inside room funciton
+        
+        other_rooms <- rooms_with_data[-which(rooms_with_data == room)]
+        
+        # using three data sets---------------
+        covariance_matrix <- cov(
+          matrix(c(data_wide_complete %>% pull(rooms_with_data[1]),
+                   data_wide_complete %>% pull(rooms_with_data[2]),
+                   data_wide_complete %>% pull(rooms_with_data[3])), ncol = 3), 
+          use = 'complete.obs')
+        
+        cov_determinant <- det(covariance_matrix)
+        
+        
+        variance_room <- var(data_wide_complete %>% pull(room))
+        variance_complement <- var(c(data_wide_complete %>% pull(other_rooms[1]),
+                                     data_wide_complete %>% pull(other_rooms[2])
+        ))
+        specificity <-
+          -0.5*log( cov_determinant/ (variance_room*variance_complement) )
+        
+        # using two data sets (room and complement)---------------
+        data_comp <- data_wide_complete %>% select(all_of(other_rooms))%>%
+          mutate(mean = rowMeans(.)) %>% pull(mean)
+        
+        covariance_matrix2 <- cov(
+          matrix(c(data_wide_complete %>% pull(rooms_with_data[1]),
+                   data_comp), ncol = 2), 
+          use = 'complete.obs')
+        
+        cov_determinant2 <- det(covariance_matrix2)
+        
+        variance_room <- var(data_wide_complete %>% pull(room))
+        variance_complement2 <- var(data_comp)
+        specificity2 <-
+          -0.5*log( cov_determinant2/ (variance_room*variance_complement2) )
+        
+        
+
 
     # make a fitted distribution for data assuming log-normal distribution
     entire_fit <- fitdistrplus::fitdist(pull(entire, metric),
