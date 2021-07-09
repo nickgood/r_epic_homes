@@ -324,7 +324,7 @@ specificity.table <- function(
         #### usiing covariance matrix method
 
         cov_matrix2 <- cov(
-          matrix(c(data_wide_complete_log %>% pull(rooms_with_data[1]),
+          matrix(c(data_wide_complete_log %>% pull(room),
                    data_comp), ncol = 2), 
           use = 'complete.obs')
         
@@ -337,11 +337,31 @@ specificity.table <- function(
         
         #### using correlation method
         
-        r_value <- cor.test(data_wide_complete_log %>% pull(rooms_with_data[1]),
+        r_value <- cor.test(data_wide_complete_log %>% pull(room),
                             data_comp)$estimate
         # result from Osses formula
         specificity3 <- -0.5*log((1-(r_value^2)))
+        
+        # gut check that mutual info is zero for two identical data sets-----
+        
+        cov_matrix4 <- cov(
+          matrix(c(data_wide_complete_log %>% pull(room),
+                   data_wide_complete_log %>% pull(room)), ncol = 2), 
+          use = 'complete.obs')
+        
+        cov_determinant4 <- det(cov_matrix4)
+        
+        variance_room <- var(data_wide_complete_log %>% pull(room))
+        specificity4 <-
+          -0.5*log( cov_determinant4/ (variance_room*variance_room) )
 
+        
+        
+        
+        
+        
+        
+        
     # make a fitted distribution for data assuming log-normal distribution
     entire_fit <- fitdistrplus::fitdist(pull(entire, metric),
                                         "lnorm", method = 'mle') %>%
