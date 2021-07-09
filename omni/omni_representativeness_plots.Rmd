@@ -55,7 +55,6 @@ energy_cluster_df <- read_csv('./csv_created/from_sense/energy_cluster_df.csv')
 ```
 
 ```{r import_pdf_data}
-
 # read in csv files
 entropy_df <- bind_rows(
   read_csv(file = './csv_created/representativeness_data/rep_data_shape_pdf.csv'),
@@ -108,7 +107,7 @@ home.list <- function(x) sapply(x, threedig)
 
 ```{r define_variables}
 # fraction of sample needed to use sample of certain length
-frac_samp_required <- 0.5
+frac_samp_required <- 0
 
 # method of scaling relative entropy to scaled entropy
 # 'universal' or 'conditional'
@@ -193,8 +192,9 @@ kld_max_df_clean <- kld_max_df%>%
 entropy_df_clean <- entropy_df%>% 
   filter(period_compare == 'year', # only comparing sample to whole mon. period
     !is.na(kld), # with insufficient data in cluster/year/no cluster
-  n_samp_avail >= frac_samp_required)# with less than certain percentage of available samples
-
+  n_samp_avail >= frac_samp_required) %>% # with less than certain percentage of available samples
+# omit home 011 in shoulder season for severe lack of data
+  filter(!(home =='011' & location == 'bedroom' & energy_cluster == 'shoulder')) 
 # test <- kld_max_df_clean %>%
 #   group_by(home, location, energy_cluster) %>%
 #   summarise(n = n(), .groups = 'drop')
@@ -545,7 +545,8 @@ pooled_scaled_entropy_df <- scaled_entropy_df %>%
             high_val = avg_scaled_kld+ sd(scaled_kld),
                       low_val = avg_scaled_kld- sd(scaled_kld),
             .groups = 'drop')
-  
+
+
 ```
 
 
