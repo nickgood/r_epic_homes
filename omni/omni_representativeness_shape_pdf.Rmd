@@ -127,16 +127,16 @@ pdf_days <- c(3,7,10,14,21)
 
 # define variables for testing-----------------------
 
-date_ranges_entire <- list(c('2020-12-02','2021-04-23'))
-tested_sample_sequence <- seq(1,5,2)
-home_num <- '011'
-location_type <- 'bedroom'
-data <- omni_data
-monitor_season <- date_ranges_entire[1]
-metric <- 'voc'
-days <- 1
-days2 <- 1
-all_time <- TRUE
+# date_ranges_entire <- list(c('2020-12-02','2021-04-23'))
+# tested_sample_sequence <- seq(1,5,2)
+# home_num <- '011'
+# location_type <- 'bedroom'
+# data <- omni_data
+# monitor_season <- date_ranges_entire[1]
+# metric <- 'voc'
+# days <- 1
+# days2 <- 1
+# all_time <- TRUE
 # 
 # 
 # # remove variables after done testing
@@ -164,19 +164,22 @@ all_time <- TRUE
     
 # function to calculate scaled entropy for a house
 # during multiple different time periods
-entropy.table.shape <- function(home_num, metric,
-                                       
-                                       # date range of entire monitoring period
-                                       # in the form: list(
-                                       #                    c('YYYY-MM-DD', 'YYYY-MM-DD'),
-                                       #                    c('YYYY-MM-DD', 'YYYY-MM-DD')
-                                       #                  )
-                                       # data in start and end day included
-                                       date_ranges_entire,
-                                       tested_sample_sequence, # sequence of tested short sampling period lengths (in days)
-                                       location_type, # sensor location (living, bedroom, or kitchen)
-                                       all_time = FALSE, # if TRUE, compare each short sampling period to entire monitoring year of home
-                                       data = omni_data) {
+entropy.table.shape <- function(
+  home_num, metric,
+  
+  # date range of entire monitoring period
+  # in the form: list(
+  #                    c('YYYY-MM-DD', 'YYYY-MM-DD'),
+  #                    c('YYYY-MM-DD', 'YYYY-MM-DD')
+  #                  )
+  # data in start and end day included
+  date_ranges_entire,
+  tested_sample_sequence, # sequence of tested short sampling period lengths (in days)
+  location_type, # sensor location (living, bedroom, or kitchen)
+  all_time = FALSE, # if TRUE, compare each short sampling period to entire monitoring year of home
+  longterm_avail_limit = 0, # only use data from a long-term period if it has at least this fraction of data available (0 means no periods are omitted if they have any data)
+  sample_avail_limit = 0, # only use data from a sample period if it has at least this fraction of data available (0 means no periods are omitted if they have any data)
+  data = omni_data) {
   
   output <<- na.result(NA) # clear error output in case it was triggered previously
   warn <<- 'none'# clear warning output in case it was triggered previously
@@ -292,7 +295,7 @@ entropy.table.shape <- function(home_num, metric,
     if(all_time == TRUE) {
       
       # stop if missing 25% of data in year
-      if(year_data_avail < 0.75) {
+      if(year_data_avail < longterm_avail_limit) {
         output <<- na.result(
           paste0('year_missing_',
                  signif((1-year_data_avail)*100, 2),
@@ -307,7 +310,7 @@ entropy.table.shape <- function(home_num, metric,
     } else { 
       
           # stop if missing 25% of data in season
-    if(season_data_avail < 0.75) {
+    if(season_data_avail < longterm_avail_limit) {
       output <<- na.result(
         paste0('season_missing_',
                signif((1-season_data_avail)*100, 2),
@@ -345,7 +348,7 @@ entropy.table.shape <- function(home_num, metric,
                  
                  # omit sampling period if missing more than
                  # 25 % of sampling period
-                 if(nrow(sample) < 0.75 * days*24*12) {
+                 if(nrow(sample) < sample_avail_limit * days*24*12) {
                    
                    a <- rep(NA, 2) %>% as.integer()
                    
@@ -466,19 +469,19 @@ entropy.table.shape <- function(home_num, metric,
 
 # test function--------------------------
 
-start <- Sys.time()
-
-test<- entropy.table.shape('004', 'pm25',
-
-                           date_ranges_entire = list(
-                             c('2020-12-01', '2020-12-31'),
-                                                     c('2020-11-01',
-                                                       '2020-11-30')),
-                           tested_sample_sequence = c(4,5),
-                           location_type = 'living',
-                           all_time = TRUE)
-end <- Sys.time()
-run2 <- end- start
+# start <- Sys.time()
+# 
+# test<- entropy.table.shape('004', 'pm25',
+# 
+#                            date_ranges_entire = list(
+#                              c('2020-12-01', '2020-12-31'),
+#                                                      c('2020-11-01',
+#                                                        '2020-11-30')),
+#                            tested_sample_sequence = c(4,5),
+#                            location_type = 'living',
+#                            all_time = TRUE)
+# end <- Sys.time()
+# run2 <- end- start
 
 ```
 
@@ -563,7 +566,7 @@ all_time_choice <- TRUE
   
                 met <- 'voc'
 
-     loc <- 'bedroom'
+     loc <- 'living'
     {lapply(clust, function(cluster_type) {
       
       rep_data <-  lapply(homes_all, function(x_home) {
@@ -601,7 +604,79 @@ all_time_choice <- TRUE
     }
 
 
+          loc <- 'kitchen'
+    {lapply(clust, function(cluster_type) {
+      
+      rep_data <-  lapply(homes_all, function(x_home) {
+        
+        start_date <- pick.start(x_home, cluster_type)
+        end_date <- pick.end(x_home, cluster_type)
+        sample_min <- pick.sample.min(met)
+        sample_max <- if_else(
+          as.numeric(as.Date(end_date) - as.Date(start_date))>=28,
+          28,
+          as.numeric(as.Date(end_date) - as.Date(start_date))
+          )
+        
+        entropy.table.shape(
+          x_home, metric = met,
+          date_ranges_entire = list(c(start_date,
+                                      end_date)),
+          tested_sample_sequence = 
+           c(1, seq(3,sample_max,4)),
+          location_type = loc,
+          all_time = all_time_choice) %>%
+          
+          # add in column for energy_cluster
+          mutate(energy_cluster = cluster_type) 
+      }
+      ) %>%
+        bind_rows()
+      
+      # give a variable name to the created data
+      assign(paste(met, loc, cluster_type, 'rep_data_shape_pdf', sep = '_'),
+             rep_data,
+             envir = .GlobalEnv)
+    }
+    )
+    }
 
+                    loc <- 'bedroom'
+    {lapply(clust, function(cluster_type) {
+      
+      rep_data <-  lapply(homes_all, function(x_home) {
+        
+        start_date <- pick.start(x_home, cluster_type)
+        end_date <- pick.end(x_home, cluster_type)
+        sample_min <- pick.sample.min(met)
+        sample_max <- if_else(
+          as.numeric(as.Date(end_date) - as.Date(start_date))>=28,
+          28,
+          as.numeric(as.Date(end_date) - as.Date(start_date))
+          )
+        
+        entropy.table.shape(
+          x_home, metric = met,
+          date_ranges_entire = list(c(start_date,
+                                      end_date)),
+          tested_sample_sequence = 
+           c(1, seq(3,sample_max,4)),
+          location_type = loc,
+          all_time = all_time_choice) %>%
+          
+          # add in column for energy_cluster
+          mutate(energy_cluster = cluster_type) 
+      }
+      ) %>%
+        bind_rows()
+      
+      # give a variable name to the created data
+      assign(paste(met, loc, cluster_type, 'rep_data_shape_pdf', sep = '_'),
+             rep_data,
+             envir = .GlobalEnv)
+    }
+    )
+    }
 
 entropy_shape_pdf_df <- bind_rows(
   pm25_bedroom_heat_rep_data_shape_pdf,
@@ -647,7 +722,7 @@ entropy_shape_pdf_df <- bind_rows(
 
 # make csv of all data
 write_csv(entropy_shape_pdf_df, file =
-            paste0('./csv_created/representativeness_data/rep_data_shape_pdf_actual_stats',
+            paste0('./csv_created/representativeness_data/rep_data_shape_pdf_',
                    Sys.Date(), '.csv'))
 
 ```
