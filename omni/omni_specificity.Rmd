@@ -101,7 +101,9 @@ na.result <- function(error, location = NA, season = NA, n_data_avail = NA) {
 )
 }
 
-
+# make function to label metric names with subscripts
+labeller.metrics <- as_labeller(c('pm25'='PM[2.5]', 'voc'="TVOC"),
+                           default = label_parsed)
 ```
 
 ```{r define_variables}
@@ -478,7 +480,7 @@ write_csv(mutual_info_df, file =
 # Plotting
 
 ```{r import_mutual_info_data}
-mutual_info_df <- read_csv('./csv_created/representativeness_data/mutual_info_new_var_2021-07-12.csv')
+mutual_info_df <- read_csv('./csv_created/representativeness_data/mutual_info.csv')
 
 ```
 
@@ -495,7 +497,7 @@ mutual_info_df_clean <- mutual_info_df%>%
 ```{r create_scaled_spec_df}
 
 spec_df <- mutual_info_df_clean %>%
-  group_by(home) %>%
+  group_by(home, metric) %>%
   mutate(mutual_info_max = max(mutual_info)) %>%
   ungroup() %>%
   mutate(specificity = 1-mutual_info/mutual_info_max)
@@ -511,8 +513,43 @@ unwanted_scaled_na <- spec_df %>%
 ```{r plot_spec_rooms}
 ggplot(spec_df, aes(x = location, y = specificity))+
   geom_boxplot(outlier.shape = NA)+
-  geom_jitter( aes(color = energy_cluster), width = 0.1)
+  geom_jitter( aes(color = energy_cluster), width = 0.1)+
+  facet_wrap(vars(metric), labeller = labeller.metrics)+
+  scale_color_manual(breaks = c('ac', 'shoulder', 'heat'),
+                     values = c('blue', 'green', 'red'),
+                     name = 'Season')
 ```
+
+```{r table_rank}
+
+a <- spec_df %>%
+  group_by(home, energy_cluster, metric) %>%
+  mutate(rank = rank(specificity) %>% as.factor()) %>%
+  ungroup() %>%
+  mutate(home_clust = interaction(home, energy_cluster),
+         loc_abbr = toupper(substring(location, 1,1)))
+
+ggplot(a, (aes(x = home, y = rank)))+
+  geom_text(aes(label = loc_abbr, color = energy_cluster,
+                group = energy_cluster),
+            position =position_dodge(width = 1)
+            )+
+  facet_wrap(vars(metric), labeller = labeller.metrics)+
+  theme_minimal()+
+  theme(panel.grid = element_blank())+
+  scale_y_discrete(breaks = c('1','2','3'), labels = c('least', '', 'greatest'))+
+  ylab('Specificity Rank')+
+  geom_vline(
+    xintercept = seq(1.5,length(a %>% pull(home)%>%as.factor%>% levels)-0.5, 1),
+    color = 'grey')+ # insert lines between homes
+  scale_color_manual(breaks = c('ac', 'shoulder', 'heat'),
+                     values = c('blue', 'green', 'red'),
+                     name = 'Season')
+
+
+```
+
+
 
 # Testing
 * NOTE: PROBABLY OLD FUNCTION
