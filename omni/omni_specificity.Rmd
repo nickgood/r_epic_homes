@@ -34,7 +34,7 @@ library(ggpubr) # for tesing log-normality
 
 ```
 
-```{r import_omni_minute_data}
+```{r import_omni_minute_data, eval = FALSE}
 # omni_data<- read_csv('./csv_created/omni_all_locations.csv')
 # 
 # zero_test <- omni_data %>%
@@ -321,19 +321,27 @@ data = omni_hourly_data) {
             
             other_rooms <- rooms_with_data[-which(rooms_with_data == room)]
             
-            ## make compliment data set by averaging each measurment between to rooms
-            data_comp <- data_wide_complete_log %>% select(all_of(other_rooms))%>%
+            ## make complement data set by averaging each measurment between to rooms
+            ## and find the covariance between these two rooms
+            data_complement <- data_wide_complete_log %>% select(all_of(other_rooms))%>%
               mutate(mean = rowMeans(.)) %>% pull(mean)
+                        cov_complement <- cov(data_wide_complete_log %>% pull(other_rooms[1]),
+                                  data_wide_complete_log %>% pull(other_rooms[2]))
             
             cov_matrix <- cov(
               matrix(c(data_wide_complete_log %>% pull(room),
-                       data_comp), ncol = 2), 
+                       data_complement), ncol = 2), 
               use = 'complete.obs')
             
             cov_determinant <- det(cov_matrix)
             
             variance_room <- var(data_wide_complete_log %>% pull(room))
-            variance_complement <- var(data_comp)
+            variance_complement <- (
+              var(data_wide_complete_log %>% pull(other_rooms[1])) +
+              var(data_wide_complete_log %>% pull(other_rooms[2])) +
+              2*cov_complement
+            )/length(other_rooms)^2
+
             mutual_info <-
               -0.5*log( cov_determinant/ (variance_room*variance_complement) )
             
@@ -459,7 +467,7 @@ mutual_info_df <-
 
 
 # make csv of all data
-write_csv(mutual_info, file =
+write_csv(mutual_info_df, file =
             paste0('./csv_created/representativeness_data/mutual_info_',
                    Sys.Date(), '.csv'))
 
@@ -470,7 +478,7 @@ write_csv(mutual_info, file =
 # Plotting
 
 ```{r import_mutual_info_data}
-mutual_info_df <- read_csv('./csv_created/representativeness_data/mutual_info.csv')
+mutual_info_df <- read_csv('./csv_created/representativeness_data/mutual_info_new_var_2021-07-12.csv')
 
 ```
 
