@@ -579,7 +579,7 @@ all_time_choice <- TRUE
     clust <- c('heat', 'shoulder', 'ac') # can do multiple
    
   
-                met <- 'pm25'
+                met <- 'voc'
 
      loc <- 'living'
     {lapply(clust, function(cluster_type) {
