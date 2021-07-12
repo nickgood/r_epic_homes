@@ -197,7 +197,7 @@ data = omni_hourly_data) {
   
   # function to find scaled_entropy for samples in a given monitor season
   
-  specifity.season <- function(monitor_season) {
+  mutual.info.season <- function(monitor_season) {
     
     
     # must unlist the listed range that is used in lapply funnction
@@ -370,11 +370,11 @@ data = omni_hourly_data) {
     tryCatch(error = function(e) output)
   
   # mutual_info for all specified date ranges  
-  specifity_data_season <- lapply(date_ranges_entire, specifity.season)
+  mutual_info_data_season <- lapply(date_ranges_entire, mutual.info.season)
   
   
   # bind all into a dataframe
-  bind_rows(specifity_data_season) %>%
+  bind_rows(mutual_info_data_season) %>%
     mutate(
       home = home_num,
       metric = metric,
