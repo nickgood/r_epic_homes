@@ -511,7 +511,7 @@ unwanted_scaled_na <- spec_df %>%
 ```{r plot_spec_rooms}
 ggplot(spec_df, aes(x = location, y = specificity))+
   geom_boxplot(outlier.shape = NA)+
-  geom_jitter( aes(color = energy_cluster))
+  geom_jitter( aes(color = energy_cluster), width = 0.1)
 ```
 
 # Testing
