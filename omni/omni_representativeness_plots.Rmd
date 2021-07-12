@@ -57,8 +57,8 @@ energy_cluster_df <- read_csv('./csv_created/from_sense/energy_cluster_df.csv')
 ```{r import_pdf_data}
 # read in csv files
 entropy_df <- bind_rows(
-  read_csv(file = './csv_created/representativeness_data/rep_data_shape_pdf.csv'),
-  read_csv(file = './csv_created/representativeness_data/rep_data_time_pdf.csv'))
+  read_csv(file = './csv_created/representativeness_data/rep_data_shape_hourly_pdf.csv'),
+  read_csv(file = './csv_created/representativeness_data/rep_data_time_hourly_pdf.csv'))
 
 ```
 
@@ -121,7 +121,7 @@ clusters_all <- c('heat','shoulder', 'ac')
 locations_indoor <- c('living', 'kitchen', 'bedroom')
 
 # sequence of representative thresholds to test
-thresh_vector <- c(0.7, 0.8, 0.90)
+thresh_vector <- c(0.6, 0.7, 0.9)
 
 # sequence of days to test thresholds for shape entropy values
 pdf_days <- c(3,7,19,27)
