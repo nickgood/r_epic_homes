@@ -92,7 +92,7 @@ home.list <- function(x) sapply(x, threedig)
 # causes of errors in function
 na.result <- function(error, location = NA, season = NA, n_data_avail = NA) {
   tibble(
-  'specificity' = NA,
+  'mutual_info' = NA,
   'location' = location, # sample_length,
   'monitor_season' = season, # period_label,
   'n_data_avail' = n_data_avail,
@@ -124,7 +124,7 @@ warn <- 'none'
 
 ```
 
-```{r function_specificity_master}
+```{r function_mutual_info_master}
 
 # calculate kld for continuous probability distributions
 
@@ -168,7 +168,7 @@ warn <- 'none'
     
 # function to calculate scaled entropy for a house
 # during multiple different time periods
-specificity.table <- function(
+mutual.info.table <- function(
   home_num, metric,
   
   # date range of entire monitoring period
@@ -315,7 +315,7 @@ data = omni_hourly_data) {
     #NOTE: if a value is missing from one data set, the function will delete that value from all data-sets when calculating variance and covariance
     
     
-    specificity_rooms <- 
+    mutual_info_rooms <- 
       map(rooms_with_data,
           function(room){
             
@@ -334,10 +334,10 @@ data = omni_hourly_data) {
             
             variance_room <- var(data_wide_complete_log %>% pull(room))
             variance_complement <- var(data_comp)
-            specificity <-
+            mutual_info <-
               -0.5*log( cov_determinant/ (variance_room*variance_complement) )
             
-            list('specificity' = specificity,
+            list('mutual_info' = mutual_info,
                  'location' = room,
                  'monitor_season' = period_label,
                  # amount of data points  for which all three rooms were available
@@ -349,10 +349,10 @@ data = omni_hourly_data) {
     
     # add no error note, and warning if triggered
     c(
-      specificity_rooms,
+      mutual_info_rooms,
       list(
-        'error' = rep('none', nrow(specificity_rooms)),
-        'warn' = rep(warn, nrow(specificity_rooms))
+        'error' = rep('none', nrow(mutual_info_rooms)),
+        'warn' = rep(warn, nrow(mutual_info_rooms))
       )
     )
     
@@ -361,7 +361,7 @@ data = omni_hourly_data) {
     # if season results in an error, return the error message in a df
     tryCatch(error = function(e) output)
   
-  # specificity for all specified date ranges  
+  # mutual_info for all specified date ranges  
   specifity_data_season <- lapply(date_ranges_entire, specifity.season)
   
   
@@ -380,7 +380,7 @@ data = omni_hourly_data) {
 
 # start <- Sys.time()
 # 
-# test<- specificity.table('004', 'pm25',
+# test<- mutual.info.table('004', 'pm25',
 # 
 #                            date_ranges_entire = list(
 #                              c('2020-12-01', '2020-12-31'),
@@ -426,7 +426,7 @@ data = omni_hourly_data) {
 
 all_time_choice <- TRUE
 
-spec_df <-  
+mutual_info_df <-  
   
   lapply(metrics_all, function(x_metric) {
     
@@ -439,7 +439,7 @@ spec_df <-
         
         
         
-        specificity.table(
+        mutual.info.table(
           x_home, metric = x_metric,
           date_ranges_entire = list(c(start_date,
                                       end_date)),
@@ -459,8 +459,8 @@ spec_df <-
 
 
 # make csv of all data
-write_csv(spec_df, file =
-            paste0('./csv_created/representativeness_data/specificity_',
+write_csv(mutual_info, file =
+            paste0('./csv_created/representativeness_data/mutual_info_',
                    Sys.Date(), '.csv'))
 
 
@@ -469,39 +469,39 @@ write_csv(spec_df, file =
 
 # Plotting
 
-```{r import_specificity_data}
-spec_df <- read_csv('./csv_created/representativeness_data/specificity.csv')
-all.equal(spec_df, spec_df_old)
+```{r import_mutual_info_data}
+mutual_info_df <- read_csv('./csv_created/representativeness_data/mutual_info.csv')
+
 ```
 
 
 ```{r omissions_cleaning}
 # remove na spec values from runs
-spec_df_clean <- spec_df%>% 
+mutual_info_df_clean <- mutual_info_df%>% 
   filter(period_compare == 'year', # only comparing sample to whole mon. period
-         !is.na(specificity)) # with insufficient data in cluster/year/no cluster
+         !is.na(mutual_info)) # with insufficient data in cluster/year/no cluster
 
 ```
 
 
 ```{r create_scaled_spec_df}
 
-scaled_spec_df <- spec_df_clean %>%
+spec_df <- mutual_info_df_clean %>%
   group_by(home) %>%
-  mutate(specificity_max = max(specificity)) %>%
+  mutate(mutual_info_max = max(mutual_info)) %>%
   ungroup() %>%
-  mutate(scaled_specificity = 1-specificity/specificity_max)
+  mutate(specificity = 1-mutual_info/mutual_info_max)
 
 
-unwanted_scaled_na <- scaled_spec_df %>%
-  filter(scaled_specificity %>% is.na())
+unwanted_scaled_na <- spec_df %>%
+  filter(specificity %>% is.na())
 
 ```
 
 ### `r unwanted_scaled_na %>% nrow()` unexpected missing values in scaled spec data
 
 ```{r plot_spec_rooms}
-ggplot(scaled_spec_df, aes(x = location, y = scaled_specificity))+
+ggplot(spec_df, aes(x = location, y = specificity))+
   geom_boxplot(outlier.shape = NA)+
   geom_jitter( aes(color = energy_cluster))
 ```
