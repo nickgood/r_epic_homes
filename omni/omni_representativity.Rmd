@@ -1,0 +1,1239 @@
+---
+title: "Representativity"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: paper
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.path = 'figures/',
+  warning = FALSE,
+  message = FALSE,
+  echo = FALSE,
+  fig.width = 10, fig.height = 3,
+  cache = FALSE)
+```
+
+```{r libraries, include=FALSE}
+library(dplyr)
+library(purrr)
+library(tidyr)
+library(openair)
+library(ggplot2)
+library(readr)
+library(googlesheets4)
+library(lubridate)
+library(gridExtra)
+library(runner) # for moving window functions
+library(ggpubr) # for tesing log-normality
+# library(cubature) # for alternative method of integrating kld function
+# library(entropy) # for KLD function
+# library(fitdistrplus) # for fitting distribution to data NOTE, MASS::select CONFLICTS WITH dplyr::select
+
+```
+
+```{r import_omni_minute_data}
+# omni_data<- read_csv('./csv_created/omni_all_locations.csv')
+# 
+# zero_test <- omni_data %>%
+#   group_by(home, location) %>%
+#   summarize(pm25_zeros = sum(pm25 == 0), pm25_n = n()) %>%
+#   mutate(pm25_zero_pct = pm25_zeros/pm25_n*100) %>%
+#   ungroup()
+
+
+
+```
+
+```{r import_omni_hourly_data}
+omni_hourly_data<- read_csv('./csv_created/omni_hourly_data.csv')
+
+```
+
+```{r import_energy_cluster_homes}
+# import energy cluster dataframe for all homes
+energy_cluster_df <- read_csv('./csv_created/from_sense/energy_cluster_df.csv')
+```
+
+```{r import_acf_lags}
+# import summary df of how many lags required
+# before autocorrelation was insignificant
+lag_summary_df <- read_csv('./csv_created/lag_summary.csv')
+```
+
+
+
+```{r functions_misc}
+
+#Function to only display 3 significant figures (for tables)
+signif3 <- function(x){
+  signif(x, digits = 3)
+}
+
+##Define a char vector of home numbers using a number vector,
+##ex: x <- home.list(c(1:15)) for homes 1-15
+threedig <- function(x) {
+  if (nchar(x) == 1) {a <- paste0('00', x)
+  return(a)
+  }
+  
+  if (nchar(x) == 2) {a<- paste0('0', x)
+  return(a)
+  }
+  else return(a)
+}
+
+home.list <- function(x) sapply(x, threedig)
+
+
+# give a row of NA values with identifers to help with identifying
+# causes of errors in function
+na.result <- function(error, location = NA, season = NA, n_data_avail = NA) {
+  tibble(
+  'info_gain' = NA,
+  'location' = location, # sample_length,
+  'monitor_season' = season, # period_label,
+  'n_data_avail' = n_data_avail,
+  'error' = error,
+  'warn' = warn # return warning if triggered
+)
+}
+
+
+```
+
+```{r define_variables}
+
+# list of all home numbers
+homes_all <- home.list(1:17)
+
+clusters_all <- c('heat','shoulder', 'ac')
+locations_indoor <- c('living', 'kitchen', 'bedroom')
+metrics_all <- c('pm25', 'voc')
+
+# sequence of representative thresholds to test
+threshold_seq <- c(0.1, 0.2, 0.3)
+
+# sequence of days to test thresholds for shape entropy values
+
+pdf_days <- c(3,7,10,14,21)
+
+warn <- 'none'
+
+```
+
+```{r function_info_gain_master}
+
+# calculate kld for continuous probability distributions
+
+# define variables for testing-----------------------
+
+# date_ranges_entire <- list(c('2020-11-01', '2020-11-30'))
+# home_num <- '004'
+# data <- omni_hourly_data
+# monitor_season <- date_ranges_entire[1]
+# metric <- 'voc'
+# all_time <- TRUE
+# warn <- 'none'
+# room <- 'living'
+# season_avail_limit <- 0
+# 
+# 
+# # remove variables after done testing
+# rm(tested_sample_sequence,
+#    date_ranges_entire,
+# home_num,
+# monitor_season,
+# monitor_period,
+# metric,
+# days,
+# days2,
+# all_time,
+# data,
+# data_season,
+# data_year,
+# entire,
+# date_col_season,
+# date_col_year,
+# all_dates_season,
+# all_dates_year,
+# room,
+# season_avail_limit
+# )
+
+# entropy function hourly data ----------------------------
+
+    
+# function to calculate scaled entropy for a house
+# during multiple different time periods
+info.gain.table <- function(
+  home_num, metric,
+  
+  # date range of entire monitoring period
+  # in the form: list(
+  #                    c('YYYY-MM-DD', 'YYYY-MM-DD'),
+  #                    c('YYYY-MM-DD', 'YYYY-MM-DD')
+  #                  )
+  # data in start and end day included
+  date_ranges_entire,
+  sample_length, # sampling period lengths (days)
+season_avail_limit = 0, # only use data from a sensor if it has at least this fraction of data available (0 means no periods are omitted if they have any data)
+all_time = TRUE, # if TRUE, compare each short sampling period to entire monitoring year of home
+data = omni_hourly_data) {
+  
+  output <<- na.result(NA) # clear error output in case it was triggered previously
+  warn <<- 'none'# clear warning output in case it was triggered previously
+  
+  if(metric %in% c('pm25', 'voc')) {
+    # define LOD of metric to be 1/2 minimum detected (non-zero) value
+    LOD <- data %>%
+      filter(!!sym(metric)!=0) %>%
+      pull(all_of(metric))%>%
+      min()
+  }
+  
+  
+  # function to find scaled_entropy for samples in a given monitor season
+  
+  info.gain.season <- function(monitor_season) {
+    
+    
+    # must unlist the listed range that is used in lapply funnction
+    monitor_season <- unlist(monitor_season)
+    
+    # stop if monitoring season is empty
+    if(is_empty(monitor_season)) {
+      output <<- na.result('likely_no_cluster')
+      stop()
+    } 
+    
+    
+    #define label for later use in table
+    period_label <- paste(as.Date(monitor_season[1]), '-',
+                          as.Date(monitor_season[2]))
+    
+    # warn that times will be rounded to full day for entire monitoring period
+    
+    if(
+      any( c(
+        second(as.POSIXct(monitor_season[1])),
+        minute(as.POSIXct(monitor_season[1])),
+        hour(as.POSIXct(monitor_season[1])),
+        
+        second(as.POSIXct(monitor_season[2])),
+        minute(as.POSIXct(monitor_season[2])),
+        hour(as.POSIXct(monitor_season[2]))) > 0
+      )
+    ) {
+      output <<- na.result('incorrect_date',
+                           period_label)
+      stop()
+    }
+    
+    #     # make column of all dates (increments ofhour) within year
+    # # including all locations
+    # all_dates_year <- seq.POSIXt(
+    #   from = as.POSIXct(
+    #     data %>%
+    #   filter(home == home_num &
+    #            location %in% c('living', 'bedroom', 'kitchen'))%>%
+    #     pull(datehour) %>% min(), tz = 'UTC'),
+    # 
+    #   to =  as.POSIXct( data %>%
+    #   filter(home == home_num &
+    #            location %in% c('living', 'bedroom', 'kitchen'))%>%
+    #     pull(datehour) %>% max(), tz = 'UTC'),
+    #   by = '5 min')
+    
+    # make column of all dates (increments ofhour) within season
+    # including all locations
+    all_dates_season <- seq.POSIXt(
+      from = as.POSIXct(monitor_season[1],tz = 'UTC'),
+      to =  floor_date(as.POSIXct( monitor_season[2],
+                                   tz = 'UTC')+24*60*60-1,
+                       unit = 'hour'), by = 'hour')
+    
+    # make df for recorded values in season for given location
+    data <-   data %>%
+      select(datehour, home, location, all_of(metric))%>%
+      filter(home == home_num,location %in% locations_indoor) %>%
+      # choose season date range
+      filter(
+        datehour >= ymd(monitor_season[1]) &
+          datehour <= ymd(monitor_season[2])
+      )
+    
+    if(metric %in% c('pm25', 'voc')) {
+      # convert 0 values to LOD/2 in to allow for log-normal distrib. estimation
+      data <- data %>%
+        mutate_at(all_of(metric), function(x) ifelse(x==0, LOD/2, x))
+    }
+    
+    # check data availability for entire season for each room
+    # and define which rooms have enough data
+    rooms_with_data <- data %>%
+      group_by(location) %>%
+      summarize(n_avail = n()/length(all_dates_season)) %>%
+      filter(n_avail > season_avail_limit) %>%
+      pull(location)
+    
+    # give error if not all three rooms have enough data
+    if(length(rooms_with_data) < 3){
+      output <<- na.result(paste0('only_data_',paste0(rooms_with_data,
+                                                      collapse = '_')))
+      stop()
+    }
+    
+    
+    data_wide <- data %>%
+      pivot_wider(names_from = c(location),
+                  values_from = all_of(metric))
+    
+    # function to be applied to each room individually
+    # to determine covariance matrix, variance of each room, and relative mutual info
+    
+    # note location of missing values across all room data sets
+    # so the variance can be corrected
+    # in the mutual information calculation
+    missing_indeces <- lapply(rooms_with_data, function(x) {
+      data_wide %>% pull(x) %>% is.na() %>% which()
+    }) %>%
+      unlist()
+    
+    #remove incolmplete rows and take log
+    data_wide_complete_log <- if(is_empty(missing_indeces)) {
+      data_wide%>%
+        mutate_if(is.numeric, log)
+    } else{
+      data_wide %>% slice(-c(missing_indeces)) %>%
+        mutate_if(is.numeric, log)
+    }
+    
+    # make matrix with cov function
+    #NOTE: if a value is missing from one data set, the function will delete that value from all data-sets when calculating variance and covariance
+    
+    
+    info_gain_rooms <- 
+      map(rooms_with_data,
+          function(room){
+            
+            other_rooms <- rooms_with_data[-which(rooms_with_data == room)]
+            
+            ## make complement data set by averaging each measurment between to rooms
+            ## and find the covariance between these two rooms
+            data_complement <- data_wide_complete_log %>%
+              select(all_of(other_rooms))%>%
+              mutate(mean = rowMeans(.)) %>% pull(mean)
+            
+            cov_complement <- cov(data_wide_complete_log %>% pull(other_rooms[1]),
+                                  data_wide_complete_log %>% pull(other_rooms[2]))
+            
+            cov_matrix <- cov(
+              matrix(c(data_wide_complete_log %>% pull(room),
+                       data_complement), ncol = 2), 
+              use = 'complete.obs')
+            
+            cov_determinant <- det(cov_matrix)
+            
+            mean_room <- mean(data_wide_complete_log %>% pull(room))
+            variance_room <- var(data_wide_complete_log %>% pull(room))
+            
+                        mean_complement <- mean(data_complement)
+            variance_complement <- (
+              var(data_wide_complete_log %>% pull(other_rooms[1])) +
+                var(data_wide_complete_log %>% pull(other_rooms[2])) +
+                2*cov_complement
+            )/length(other_rooms)^2            
+            
+            info_gain <-
+              0.5*(
+          variance_room/variance_complement-1-log( cov_determinant/variance_complement^2)+((mean_room-mean_complement)^2)/variance_complement
+              )
+            
+            list('info_gain' = info_gain,
+                 'location' = room,
+                 'monitor_season' = period_label,
+                 # amount of data points  for which all three rooms were available
+                 'n_data_avail' = nrow(data_wide_complete_log) 
+            )
+          }
+      ) %>%
+      bind_rows()
+    
+    # add no error note, and warning if triggered
+    c(
+      info_gain_rooms,
+      list(
+        'error' = rep('none', nrow(info_gain_rooms)),
+        'warn' = rep(warn, nrow(info_gain_rooms))
+      )
+    )
+    
+    
+  }%>%
+    # if season results in an error, return the error message in a df
+    tryCatch(error = function(e) output)
+  
+  # info_gain for all specified date ranges  
+  info_gain_data_season <- lapply(date_ranges_entire, info.gain.season)
+  
+  
+  # bind all into a dataframe
+  bind_rows(info_gain_data_season) %>%
+    mutate(
+      home = home_num,
+      metric = metric,
+      period_compare = ifelse(all_time == TRUE, 'year', 'season'))
+}
+
+ 
+
+
+# test function--------------------------
+
+# start <- Sys.time()
+# 
+# test<- info.gain.table('004', 'pm25',
+# 
+#                            date_ranges_entire = list(
+#                              c('2020-12-01', '2020-12-31'),
+#                                                      c('2020-11-01',
+#                                                        '2020-11-30')),
+#                            all_time = TRUE)
+# end <- Sys.time()
+# run2 <- end- start
+
+```
+
+```{r functions_csv_creation}
+
+# make functions to look up starting and ending date of
+# energy cluster period based on home
+ pick.start <- function(x_home, x_cluster) {
+   energy_cluster_df %>%
+   filter(home == x_home & cluster_type == x_cluster) %>%
+   pull(start_date) %>% as.character()
+ }
+ 
+  pick.end <- function(x_home, x_cluster) {
+   energy_cluster_df %>%
+   filter(home == x_home & cluster_type == x_cluster) %>%
+   pull(end_date) %>% as.character()
+  }
+  
+  # fun to pick minimum sample length to test based on metric
+  pick.sample.min <- function(x_metric) {
+    lag_summary_df %>%
+      # use the pooled median of all clusters
+      filter(metric == x_metric, energy_cluster == 'total') %>%
+      pull(median)
+  }
+  
+  # # test functions
+   # pick.start('006', 'heat')
+  # pick.end('004', 'heat')
+```
+
+
+```{r data_maker, eval = FALSE}
+
+all_time_choice <- TRUE
+
+info_gain_df <-  
+  
+  lapply(metrics_all, function(x_metric) {
+    
+    lapply(clusters_all, function(x_cluster) {
+      
+      lapply(homes_all, function(x_home) {
+        
+        start_date <- pick.start(x_home, x_cluster)
+        end_date <- pick.end(x_home, x_cluster)
+        
+        
+        
+        info.gain.table(
+          x_home, metric = x_metric,
+          date_ranges_entire = list(c(start_date,
+                                      end_date)),
+          all_time = all_time_choice) %>%
+          # add in column for energy_cluster
+          mutate(energy_cluster = x_cluster) 
+      }
+      ) %>%
+        bind_rows()
+      
+    }
+    ) %>%
+      bind_rows()
+  }
+  ) %>%
+  bind_rows()
+
+
+# make csv of all data
+write_csv(info_gain_df, file =
+            paste0('./csv_created/representativeness_data/info_gain_',
+                   Sys.Date(), '.csv'))
+
+
+
+```
+
+# Plotting
+
+```{r import_info_gain_data}
+info_gain_df <- read_csv('./csv_created/representativeness_data/info_gain.csv')
+
+```
+
+
+```{r omissions_cleaning}
+# remove na spec values from runs
+info_gain_df_clean <- info_gain_df%>% 
+  filter(period_compare == 'year', # only comparing sample to whole mon. period
+         !is.na(info_gain)) # with insufficient data in cluster/year/no cluster
+
+```
+
+
+```{r create_rep_df}
+
+represent_df <- info_gain_df_clean %>%
+  group_by(home) %>%
+  mutate(info_gain_max = max(info_gain)) %>%
+  ungroup() %>%
+  mutate(represent = info_gain/info_gain_max)
+
+
+unwanted_scaled_na <- represent_df %>%
+  filter(represent %>% is.na())
+
+```
+
+### `r unwanted_scaled_na %>% nrow()` unexpected missing values in representativity data
+
+```{r plot_spec_rooms}
+ggplot(represent_df, aes(x = location, y = represent))+
+  geom_boxplot(outlier.shape = NA)+
+  geom_jitter( aes(color = energy_cluster), width = 0.1)
+```
+
+# Testing
+* NOTE: PROBABLY OLD FUNCTION
+
+```{r testing_function_specificty_master, eval = FALSE}
+
+# # calculate kld for continuous probability distributions
+# 
+# # define variables for testing-----------------------
+# 
+# date_ranges_entire <- list(c('2020-12-02','2021-04-23'))
+# tested_sample_sequence <- seq(1,5,2)
+# home_num <- '009'
+# data <- omni_data 
+# monitor_season <- date_ranges_entire[1]
+# metric <- 'voc'
+# days <- 1
+# days2 <- 1
+# all_time <- TRUE
+# warn <- 'none'
+# room <- 'living'
+# # 
+# # 
+# # # remove variables after done testing
+# # rm(tested_sample_sequence,
+# #    date_ranges_entire,
+# # home_num,
+# # monitor_season,
+# # monitor_period,
+# # metric,
+# # days,
+# # days2,
+# # all_time,
+# # data,
+# # data_season,
+# # data_year,
+# # entire,
+# # date_col_season,
+# # date_col_year,
+# # all_dates_season,
+# # all_dates_year,
+# # room
+# # )
+# 
+# # entropy function minutely data ----------------------------
+# 
+#     
+# # function to calculate scaled entropy for a house
+# # during multiple different time periods
+# specificity.table <- function(
+#   home_num, metric,
+#   
+#   # date range of entire monitoring period
+#   # in the form: list(
+#   #                    c('YYYY-MM-DD', 'YYYY-MM-DD'),
+#   #                    c('YYYY-MM-DD', 'YYYY-MM-DD')
+#   #                  )
+#   # data in start and end day included
+#   date_ranges_entire,
+#   sample_length, # sampling period lengths (days)
+#   location_type, # sensor location (living, bedroom, or kitchen)
+#   all_time = FALSE, # if TRUE, compare each short sampling period to entire monitoring year of home
+#   data = omni_data) {
+#   
+#   output <<- na.result(NA) # clear error output in case it was triggered previously
+#   warn <<- 'none'# clear warning output in case it was triggered previously
+#   
+#   if(metric %in% c('pm25', 'voc')) {
+#     # define LOD of metric to be 1/2 minimum detected (non-zero) value
+#     LOD <- data %>%
+#       filter(!!sym(metric)!=0) %>%
+#       pull(all_of(metric))%>%
+#       min()
+#   }
+#   
+#   
+#   # function to find scaled_entropy for samples in a given monitor season
+#   
+#   scaled.entropy.season <- function(monitor_season) {
+#     
+#     
+#     # must unlist the listed range that is used in lapply funnction
+#     monitor_season <- unlist(monitor_season)
+#     
+#     # stop if monitoring season is empty
+#     if(is_empty(monitor_season)) {
+#       output <<- na.result('likely_no_cluster')
+#       stop()
+#     } 
+#     
+# 
+#     #define label for later use in table
+#     period_label <- paste(as.Date(monitor_season[1]), '-',
+#                           as.Date(monitor_season[2]))
+#     
+#     # warn that times will be rounded to full day for entire monitoring period
+# 
+#     if(
+#         any( c(
+#         second(as.POSIXct(monitor_season[1])),
+#         minute(as.POSIXct(monitor_season[1])),
+#         hour(as.POSIXct(monitor_season[1])),
+#         
+#         second(as.POSIXct(monitor_season[2])),
+#         minute(as.POSIXct(monitor_season[2])),
+#         hour(as.POSIXct(monitor_season[2]))) > 0
+#     )
+#     ) {
+#       output <<- na.result('incorrect_date',
+#                            period_label)
+#       stop()
+#     }
+# 
+#     #     # make column of all dates (increments of 5 min) within year
+#     # # including all locations
+#     # all_dates_year <- seq.POSIXt(
+#     #   from = as.POSIXct(
+#     #     data %>%
+#     #   filter(home == home_num &
+#     #            location %in% c('living', 'bedroom', 'kitchen'))%>%
+#     #     pull(datetime) %>% min(), tz = 'UTC'),
+#     # 
+#     #   to =  as.POSIXct( data %>%
+#     #   filter(home == home_num &
+#     #            location %in% c('living', 'bedroom', 'kitchen'))%>%
+#     #     pull(datetime) %>% max(), tz = 'UTC'),
+#     #   by = '5 min')
+#     
+#     # make column of all dates (increments of 5 min) within season
+#     # including all locations
+#     all_dates_season <- seq.POSIXt(
+#       from = as.POSIXct(monitor_season[1],tz = 'UTC'),
+#       to =  floor_date(as.POSIXct( monitor_season[2],
+#                                    tz = 'UTC')+24*60*60-1,
+#                        unit = '5 min'), by = '5 min')
+# 
+#                   # make df for recorded values in season for given location
+#     data <-   data %>%
+#       select(datetime, home, location, all_of(metric))%>%
+#       filter(home == home_num,location %in% locations_indoor) %>%
+#       # choose season date range
+#       filter(
+#         datetime >= ymd(monitor_season[1]) &
+#           datetime <= ymd(monitor_season[2])
+#       )
+#     
+#         if(metric %in% c('pm25', 'voc')) {
+#       # convert 0 values to LOD/2 in to allow for log-normal distrib. estimation
+#       data <- data %>%
+#         mutate_at(all_of(metric), function(x) ifelse(x==0, LOD/2, x))
+#     }
+#     
+#         # check data availability for entire season for each room
+#     # and define which rooms have enough data
+#     rooms_with_data <- data %>%
+#       group_by(location) %>%
+#       summarize(n_avail = n()/length(all_dates_season)) %>%
+#       filter(n_avail >=0.75) %>%
+#       pull(location)
+#     
+#     # give error if not all three rooms have enough data
+#     if(length(rooms_with_data) < 3){
+#             output <<- na.result(paste0('only_data_',paste0(rooms_with_data,
+#                                         collapse = '_')))
+#       stop()
+#     }
+# 
+# 
+#     data_wide <- data %>%
+#       pivot_wider(names_from = c(location),
+#                   values_from = all_of(metric))
+#     
+#     # function to be applied to each room individually
+#     # to determine covariance matrix, variance of each room, and relative mutual info
+# 
+#       # note location of missing values across all room data sets
+#     # so the variance can be corrected
+#     # in the mutual information calculation
+#     missing_indeces <- lapply(rooms_with_data, function(x) {
+#       data_wide %>% pull(x) %>% is.na() %>% which()
+#     }) %>%
+#       unlist()
+#     
+#     #remove incolmplete rows and take log
+#         data_wide_complete_log <- data_wide %>% slice(-c(missing_indeces)) %>%
+#           mutate_if(is.numeric, log)
+# 
+#     # make matrix with cov function
+# #NOTE: if a value is missing from one data set, the function will delete that value from all data-sets when calculating variance and covariance
+#         
+#         
+#         function(room){
+#           
+#           
+#         }
+#         
+#         # Note: Need to move inside room funciton
+#         
+#         other_rooms <- rooms_with_data[-which(rooms_with_data == room)]
+#         
+#         # using three data sets---------------
+#         ## Note the determinant of this matrix is independent of the order 
+#         ## of the room data vectors
+#         cov_matrix <- cov(
+#           matrix(c(data_wide_complete_log %>% pull(rooms_with_data[1]),
+#                    data_wide_complete_log %>% pull(rooms_with_data[2]),
+#                    data_wide_complete_log %>% pull(rooms_with_data[3])), ncol = 3), 
+#           use = 'complete.obs')
+#         
+#         cov_determinant <- det(cov_matrix)
+#         
+#         
+#         variance_room <- var(data_wide_complete_log %>% pull(room))
+#         variance_complement <- var(c(data_wide_complete_log %>% pull(other_rooms[1]),
+#                                      data_wide_complete_log %>% pull(other_rooms[2])
+#         ))
+#         specificity <-
+#           -0.5*log( cov_determinant/ (variance_room*variance_complement) )
+#         
+#         # using two data sets (room and complement)---------------
+#         
+#                 # make compliment data set by averaging each measurment between to rooms
+#         data_comp <- data_wide_complete_log %>% select(all_of(other_rooms))%>%
+#           mutate(mean = rowMeans(.)) %>% pull(mean)
+#           
+#         
+#         #### usiing covariance matrix method
+# 
+#         cov_matrix2 <- cov(
+#           matrix(c(data_wide_complete_log %>% pull(room),
+#                    data_comp), ncol = 2), 
+#           use = 'complete.obs')
+#         
+#         cov_determinant2 <- det(cov_matrix2)
+#         
+#         variance_room <- var(data_wide_complete_log %>% pull(room))
+#         variance_complement2 <- var(data_comp)
+#         specificity2 <-
+#           -0.5*log( cov_determinant2/ (variance_room*variance_complement2) )
+#         
+#         #### using correlation method
+#         
+#         r_value <- cor.test(data_wide_complete_log %>% pull(room),
+#                             data_comp)$estimate
+#         # result from Osses formula
+#         specificity3 <- -0.5*log((1-(r_value^2)))
+#         
+#         # gut check that mutual info is Inf for two identical data sets-----
+#         
+#         cov_matrix4 <- cov(
+#          matrix(c(data_wide_complete_log %>% pull(room),
+#                    data_wide_complete_log %>% pull(room)),ncol = 2), 
+#           use = 'complete.obs')
+#         
+#         cov_determinant4 <- det(cov_matrix4)
+#         
+#         variance_room <- var(data_wide_complete_log %>% pull(room))
+#         specificity4 <-
+#           -0.5*log( cov_determinant4/ (variance_room*variance_room) )
+# 
+#       
+#         
+#     # make a fitted distribution for data assuming log-normal distribution
+#     entire_fit <- fitdistrplus::fitdist(pull(entire, metric),
+#                                         "lnorm", method = 'mle') %>%
+#       suppressWarnings() %>%
+#       tryCatch(
+#         error = function(e)   {
+#           output <<- na.result( 'no_fit_lnorm_entire',
+#                                 period_label
+#           )
+#           stop()
+#         }
+#       ) 
+#     
+#     # extract mean and variance of logarithmic fit
+#     mean_entire <- entire_fit$estimate['meanlog']
+#     variance_entire <- (entire_fit$estimate['sdlog'])^2
+# 
+#     # function to take a running window of all short sampling periods possible
+#     # within the longer montirong period
+#     
+#     # for testing
+#     # y<- all_dates_season[(159*24*12):((159+days)*24*12)]
+#     
+#     a <-
+#       runner(all_dates_season,
+#              k = sample_length*24*12, # number of 5-min periods in short sampling period
+#              # only evaluate windows that start at 12AM
+#              # and windows that are full (ignore partial windows at start)
+#              at = seq(sample_length*24*12, length(all_dates_season), 24*12),
+#              f = function(y) { # y = window, vector (length = k) of specified days per iteration
+#                
+#                # filter out only given room 
+#                # and the days specified by the days in window y
+#                sample <- data_season %>%
+#                  filter( location == location_type & datetime %in% y)
+#                
+#                # omit sampling period if missing more than
+#                # 25 % of sampling period
+#                if(nrow(sample) < 0.75 * sample_length*24*12) {
+#                  
+#                  a <- rep(NA, 2) %>% as.integer()
+#                  
+#                  
+#                  
+#                  # if not missing 25% of sampling period...
+#                } else {
+#                  
+#                  # fit a lognormal distribution to sample and extract
+#                  # logmean and logsd values
+#                  sample_fit <- fitdistrplus::fitdist(pull(sample, metric),
+#                                                      "lnorm", method = 'mle') %>%
+#                    suppressWarnings() %>% # warnings not a problem in this case
+#                    tryCatch(
+#                      error = function(e)   {
+#                        # if error because log dist cannot be fit
+#                        # warn that a sample was not fit, but keep code running
+#                        warn <<- paste0('missing_logfit_sample_length_', sample_length)
+#                        
+#                        list('estimate' = c('meanlog' = NA,
+#                                            'sdlog' = NA) )
+#                      }
+#                    ) 
+#                  
+#                  a <- c(sample_fit$estimate['meanlog'], sample_fit$estimate['sdlog'])
+#                  
+#                }
+#                
+#                # return values for one running window
+#                a <- as.data.frame(a)
+#                colnames(a) <- y[1] # give name to column just to suppress "new name" message
+#                
+#                a
+#              }
+#       )
+#     
+#     # bind all elements of list into a dataframe
+#     a <- bind_cols(a)
+#     
+#     n_samples_possible <- ncol(a)
+#     # omit columns that have NA values (didn't have enough data)
+#     if(ncol(a)>1) a <- a[ , colSums(is.na(a)) == 0]
+#     
+#     # count number of sampling periods created (columns)
+#     n_samples <- ncol(a)
+#     
+#     # calculate proportion of samples that had sufficient data
+#     # for given short sampling frame length
+#     n_samp_avail <- n_samples/n_samples_possible
+#     
+#     # apply KLD between the each short sample period and
+#     # the season or entire monitoring period individually
+#     
+#     a <- lapply(colnames(a), function(x) {
+#       
+#       a <- a %>% pull(x)
+#       
+#       mean_sample <- a[1]
+#       variance_sample <- (a[2])^2
+#       
+#       # find kld value
+#       # from formula from Osses paper
+#       0.5*(variance_sample/variance_entire-1-log(variance_sample/variance_entire)+
+#              ((mean_sample-mean_entire)^2)/variance_entire)
+#       
+#     })
+#     
+#     # return all calculated kld values
+#     list('kld' = unlist(a),
+#          'n_samp_avail' = rep(n_samp_avail, length(unlist(a))))
+#     
+# 
+#     
+#     # apply function to find scaled_entropy dataframe for
+#     # sampling period of length "days2" to range of days in tested_sample_sequence
+#     entropy_data_list <- lapply(
+#       tested_sample_sequence,
+#       function (
+#         days2 # length of short sampling period
+#       ) {
+#         
+#         
+#         # calculate  KLD for all
+#         # short sampling period of length "days2"
+#         a <- kld.period(days2)
+#         
+#         a <- list(
+#           'kld' = a[['kld']], # entropy value
+#           'sample_length' = rep(sample_length, length(a[[1]])),
+#           'monitor_season' = rep(period_label, length(a[[1]])),
+#           'n_samp_avail' = a[['n_samp_avail']],
+#           'error' = rep('none', length(a[[1]])),
+#             'warn' = rep(warn, length(a[[1]])) # return wrnaing if there was one triggered
+#         )
+#         a
+#         
+#       }
+#     )  
+# 
+#     # bind all into a dataframe
+#     a <- bind_rows(entropy_data_list)
+#     
+#     a # return all scaled_entropy values for one date range
+#     
+#   }%>%
+#     # if season results in an error, return the error message in a df
+#     tryCatch(error = function(e) output)
+#   
+#   # find scaled_entropy for all short smpling lengths in all apecified time ranges
+#   
+#   a <- lapply(date_ranges_entire, scaled.entropy.season)
+#   
+#   
+#   # bind all into a dataframe
+#   entropy_data_season <- bind_rows(a) %>%
+#     mutate(method = 'shape',
+#            home = home_num,
+#            metric = metric,
+#            location = location_type,
+#            period_compare = ifelse(all_time == TRUE, 'year', 'season'))
+#   
+#   
+#   entropy_data_season  # scaled_entropy for all specified date ranges
+#   
+# }
+# 
+#  
+# 
+# 
+# # test function--------------------------
+# 
+# # start <- Sys.time()
+# # 
+# # test<- entropy.table.shape('004', 'pm25',
+# # 
+# #                            date_ranges_entire = list(
+# #                              c('2020-12-01', '2020-12-31'),
+# #                                                      c('2020-11-01',
+# #                                                        '2020-11-30')),
+# #                            tested_sample_sequence = c(4,5),
+# #                            location_type = 'living',
+# #                            all_time = TRUE)
+# # end <- Sys.time()
+# # run2 <- end- start
+
+```
+
+# Old FUnctions
+
+```{r function_specificty_minutely_master, eval = FALSE}
+
+# # calculate kld for continuous probability distributions
+# 
+# # define variables for testing-----------------------
+# 
+# date_ranges_entire <- list(c('2020-11-01', '2020-11-30'))
+# home_num <- '004'
+# data <- omni_data
+# monitor_season <- date_ranges_entire[1]
+# metric <- 'voc'
+# all_time <- TRUE
+# warn <- 'none'
+# room <- 'living'
+# season_avail_limit <- 0
+# 
+# 
+# # remove variables after done testing
+# rm(tested_sample_sequence,
+#    date_ranges_entire,
+# home_num,
+# monitor_season,
+# monitor_period,
+# metric,
+# days,
+# days2,
+# all_time,
+# data,
+# data_season,
+# data_year,
+# entire,
+# date_col_season,
+# date_col_year,
+# all_dates_season,
+# all_dates_year,
+# room,
+# season_avail_limit
+# )
+# 
+# # entropy function minutely data ----------------------------
+# 
+# 
+# # function to calculate scaled entropy for a house
+# # during multiple different time periods
+# specificity.table <- function(
+#   home_num, metric,
+# 
+#   # date range of entire monitoring period
+#   # in the form: list(
+#   #                    c('YYYY-MM-DD', 'YYYY-MM-DD'),
+#   #                    c('YYYY-MM-DD', 'YYYY-MM-DD')
+#   #                  )
+#   # data in start and end day included
+#   date_ranges_entire,
+#   sample_length, # sampling period lengths (days)
+# season_avail_limit = 0, # only use data from a sensor if it has at least this fraction of data available (0 means no periods are omitted if they have any data)
+# all_time = TRUE, # if TRUE, compare each short sampling period to entire monitoring year of home
+#   data = omni_data) {
+# 
+#   output <<- na.result(NA) # clear error output in case it was triggered previously
+#   warn <<- 'none'# clear warning output in case it was triggered previously
+# 
+#   if(metric %in% c('pm25', 'voc')) {
+#     # define LOD of metric to be 1/2 minimum detected (non-zero) value
+#     LOD <- data %>%
+#       filter(!!sym(metric)!=0) %>%
+#       pull(all_of(metric))%>%
+#       min()
+#   }
+# 
+# 
+#   # function to find scaled_entropy for samples in a given monitor season
+# 
+#   specifity.season <- function(monitor_season) {
+# 
+# 
+#     # must unlist the listed range that is used in lapply funnction
+#     monitor_season <- unlist(monitor_season)
+# 
+#     # stop if monitoring season is empty
+#     if(is_empty(monitor_season)) {
+#       output <<- na.result('likely_no_cluster')
+#       stop()
+#     }
+# 
+# 
+#     #define label for later use in table
+#     period_label <- paste(as.Date(monitor_season[1]), '-',
+#                           as.Date(monitor_season[2]))
+# 
+#     # warn that times will be rounded to full day for entire monitoring period
+# 
+#     if(
+#         any( c(
+#         second(as.POSIXct(monitor_season[1])),
+#         minute(as.POSIXct(monitor_season[1])),
+#         hour(as.POSIXct(monitor_season[1])),
+# 
+#         second(as.POSIXct(monitor_season[2])),
+#         minute(as.POSIXct(monitor_season[2])),
+#         hour(as.POSIXct(monitor_season[2]))) > 0
+#     )
+#     ) {
+#       output <<- na.result('incorrect_date',
+#                            period_label)
+#       stop()
+#     }
+# 
+#     #     # make column of all dates (increments of 5 min) within year
+#     # # including all locations
+#     # all_dates_year <- seq.POSIXt(
+#     #   from = as.POSIXct(
+#     #     data %>%
+#     #   filter(home == home_num &
+#     #            location %in% c('living', 'bedroom', 'kitchen'))%>%
+#     #     pull(datetime) %>% min(), tz = 'UTC'),
+#     #
+#     #   to =  as.POSIXct( data %>%
+#     #   filter(home == home_num &
+#     #            location %in% c('living', 'bedroom', 'kitchen'))%>%
+#     #     pull(datetime) %>% max(), tz = 'UTC'),
+#     #   by = '5 min')
+# 
+#     # make column of all dates (increments of 5 min) within season
+#     # including all locations
+#     all_dates_season <- seq.POSIXt(
+#       from = as.POSIXct(monitor_season[1],tz = 'UTC'),
+#       to =  floor_date(as.POSIXct( monitor_season[2],
+#                                    tz = 'UTC')+24*60*60-1,
+#                        unit = '5 min'), by = '5 min')
+# 
+#                   # make df for recorded values in season for given location
+#     data <-   data %>%
+#       select(datetime, home, location, all_of(metric))%>%
+#       filter(home == home_num,location %in% locations_indoor) %>%
+#       # choose season date range
+#       filter(
+#         datetime >= ymd(monitor_season[1]) &
+#           datetime <= ymd(monitor_season[2])
+#       )
+# 
+#         if(metric %in% c('pm25', 'voc')) {
+#       # convert 0 values to LOD/2 in to allow for log-normal distrib. estimation
+#       data <- data %>%
+#         mutate_at(all_of(metric), function(x) ifelse(x==0, LOD/2, x))
+#     }
+# 
+#         # check data availability for entire season for each room
+#     # and define which rooms have enough data
+#     rooms_with_data <- data %>%
+#       group_by(location) %>%
+#       summarize(n_avail = n()/length(all_dates_season)) %>%
+#       filter(n_avail > season_avail_limit) %>%
+#       pull(location)
+# 
+#     # give error if not all three rooms have enough data
+#     if(length(rooms_with_data) < 3){
+#             output <<- na.result(paste0('only_data_',paste0(rooms_with_data,
+#                                         collapse = '_')))
+#       stop()
+#     }
+# 
+# 
+#     data_wide <- data %>%
+#       pivot_wider(names_from = c(location),
+#                   values_from = all_of(metric))
+# 
+#     # function to be applied to each room individually
+#     # to determine covariance matrix, variance of each room, and relative mutual info
+# 
+#       # note location of missing values across all room data sets
+#     # so the variance can be corrected
+#     # in the mutual information calculation
+#     missing_indeces <- lapply(rooms_with_data, function(x) {
+#       data_wide %>% pull(x) %>% is.na() %>% which()
+#     }) %>%
+#       unlist()
+# 
+#     #remove incolmplete rows and take log
+#     data_wide_complete_log <- if(is_empty(missing_indeces)) {
+#       data_wide%>%
+#         mutate_if(is.numeric, log)
+#     } else{
+#       data_wide %>% slice(-c(missing_indeces)) %>%
+#         mutate_if(is.numeric, log)
+#     }
+# 
+#         # make matrix with cov function
+#         #NOTE: if a value is missing from one data set, the function will delete that value from all data-sets when calculating variance and covariance
+# 
+# 
+#         specificity_rooms <-
+#           map(rooms_with_data,
+#               function(room){
+# 
+#                 other_rooms <- rooms_with_data[-which(rooms_with_data == room)]
+# 
+#                 ## make compliment data set by averaging each measurment between to rooms
+#                 data_comp <- data_wide_complete_log %>% select(all_of(other_rooms))%>%
+#                   mutate(mean = rowMeans(.)) %>% pull(mean)
+# 
+#                 cov_matrix <- cov(
+#                   matrix(c(data_wide_complete_log %>% pull(room),
+#                            data_comp), ncol = 2),
+#                   use = 'complete.obs')
+# 
+#                 cov_determinant <- det(cov_matrix)
+# 
+#                 variance_room <- var(data_wide_complete_log %>% pull(room))
+#                 variance_complement <- var(data_comp)
+#                 specificity <-
+#                   -0.5*log( cov_determinant/ (variance_room*variance_complement) )
+# 
+#                 list('specificity' = specificity,
+#                      'location' = room,
+#                      'monitor_season' = period_label,
+#                      # amount of data points  for which all three rooms were available
+#                      'n_data_avail' = nrow(data_wide_complete_log)
+#                 )
+#               }
+#           ) %>%
+#           bind_rows()
+# 
+#         # add no error note, and warning if triggered
+#          c(
+#           specificity_rooms,
+#           list(
+#             'error' = rep('none', nrow(specificity_rooms)),
+#             'warn' = rep(warn, nrow(specificity_rooms))
+#           )
+#          )
+# 
+# 
+#   }%>%
+#     # if season results in an error, return the error message in a df
+#     tryCatch(error = function(e) output)
+# 
+# # specificity for all specified date ranges
+#   specifity_data_season <- lapply(date_ranges_entire, specifity.season)
+# 
+# 
+#   # bind all into a dataframe
+# bind_rows(specifity_data_season) %>%
+#     mutate(
+#            home = home_num,
+#            metric = metric,
+#            period_compare = ifelse(all_time == TRUE, 'year', 'season'))
+# }
+# 
+# 
+# 
+# 
+# # test function--------------------------
+# 
+# # start <- Sys.time()
+# # 
+# # test<- specificity.table('004', 'pm25',
+# # 
+# #                            date_ranges_entire = list(
+# #                              c('2020-12-01', '2020-12-31'),
+# #                                                      c('2020-11-01',
+# #                                                        '2020-11-30')),
+# #                            all_time = TRUE)
+# # end <- Sys.time()
+# # run2 <- end- start
+
+```
