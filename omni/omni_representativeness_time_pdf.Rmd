@@ -35,7 +35,7 @@ library(ggpubr) # for tesing log-normality
 ```
 
 ```{r import_omni_minute_data}
-omni_data<- read_csv('./csv_created/omni_all_locations.csv')
+# omni_data<- read_csv('./csv_created/omni_all_locations.csv')
 
 # # remove all variables but omni_data
 # rm(list=setdiff(ls(), "omni_data"))
@@ -49,7 +49,7 @@ omni_data<- read_csv('./csv_created/omni_all_locations.csv')
 ```
 
 ```{r import_omni_hourly_data}
-# omni_hourly_data<- read_csv('./csv_created/omni_hourly_data.csv')
+omni_hourly_data<- read_csv('./csv_created/omni_hourly_data.csv')
 
 ```
 
@@ -118,18 +118,17 @@ na.result <- function(error, season = NA, sample_days = NA, samp_avail = NA) {
 ```
 
 
-```{r function_pdf_time_master}
 
+```{r function_pdf_time_hourly_master}
 # calculate kld for continuous probability distributions
 
 # define variables for testing-----------------------
 
 # date_ranges_entire <- list(c('2020-12-02','2021-04-23'))
 # tested_sample_sequence <- seq(3,28,4)
-# sample_days_min <- 3
 # home_num <- '010'
 # location_type <- 'living'
-# data <- omni_data
+# data <- omni_hourly_data
 # monitor_season <- date_ranges_entire[1]
 # metric <- 'pm25'
 # days <- 16
@@ -158,396 +157,7 @@ na.result <- function(error, season = NA, sample_days = NA, samp_avail = NA) {
 # all_dates_year
 # )
 
-# entropy function minutely data ----------------------------
-
-    
-# function to calculate scaled entropy for a house
-# during multiple different time periods
-entropy.table.time <- function(
-  home_num, metric,
-  
-  # date range of entire monitoring period
-  # in the form: list(
-  #                    c('YYYY-MM-DD', 'YYYY-MM-DD'),
-  #                    c('YYYY-MM-DD', 'YYYY-MM-DD')
-  #                  )
-  # data in start and end day included
-  date_ranges_entire,
-  tested_sample_sequence, # sequence of tested short sampling period lengths (in days)
-  location_type, # sensor location (living, bedroom, or kitchen)
-  all_time = TRUE, # if TRUE, compare each short sampling period to entire monitoring year of home
-    longterm_avail_limit = 0, # only use data from a long-term period if it has at least this fraction of data available (0 means no periods are omitted if they have any data)
-  sample_avail_limit = 0, # only use data from a sample period if it has at least this fraction of data available (0 means no periods are omitted if they have any data)
-  data = omni_data) {
-  
-  output <<- na.result(NA) # clear error output in case it was triggered previously
-    warn <<- 'none'# clear warning output in case it was triggered previously
-
-  if(metric %in% c('pm25', 'voc')) {
-    # define LOD of metric to be 1/2 minimum detected (non-zero) value
-    LOD <- data %>%
-      filter(!!sym(metric)!=0) %>%
-      pull(all_of(metric))%>%
-      min()
-  }
-  
-  
-  # function to find scaled_entropy for samples in a given monitor season
-  
-  scaled.entropy.season <- function(monitor_season) {
-    
-    
-    # must unlist the listed range that is used in lapply funnction
-    monitor_season <- unlist(monitor_season)
-    
-    # stop if monitoring season is empty
-    if(is_empty(monitor_season)) {
-      output <<- na.result('likely_no_cluster')
-      stop()
-    }
-    
-    
-    #define label for later use in table
-    period_label <- paste(as.Date(monitor_season[1]), '-',
-                          as.Date(monitor_season[2]))
-    
-    # warn that times will be rounded to full day for entire monitoring period
-    
-    if(
-      any( c(
-        second(as.POSIXct(monitor_season[1])),
-        minute(as.POSIXct(monitor_season[1])),
-        hour(as.POSIXct(monitor_season[1])),
-        
-        second(as.POSIXct(monitor_season[2])),
-        minute(as.POSIXct(monitor_season[2])),
-        hour(as.POSIXct(monitor_season[2]))) > 0
-      )
-    ) {
-      output <<- na.result('incorrect_date',
-                           period_label)
-      stop()
-    }
-    
-    
-    # make df of entire monitoring period (approx. a year)
-    # recorded from given location
-    data_year <- data %>%
-      filter(home == home_num & location == location_type)
-    
-    
-    if(metric %in% c('pm25', 'voc')) {
-      # convert 0 values to LOD/2 in to allow for log-normal distrib. estimation
-      data_year <- data_year %>%
-        mutate_at(all_of(metric), function(x) ifelse(x==0, LOD/2, x))
-    }
-    
-    
-    # make column of all dates (increments of 5 min) within sampling year
-    # including all locations
-    all_dates_year <- seq.POSIXt(
-      from = as.POSIXct(
-        data %>%
-          filter(home == home_num &
-                   location %in% c('living', 'bedroom', 'kitchen'))%>%
-          pull(datetime) %>% min(), tz = 'UTC'),
-      
-      to =  as.POSIXct( data %>%
-                          filter(home == home_num &
-                                   location %in% c('living', 'bedroom', 'kitchen'))%>%
-                          pull(datetime) %>% max(), tz = 'UTC'),
-      by = '5 min')
-    
-    
-    #calculate missingness of data in year for given location
-    year_data_avail <-
-      length(data_year %>% pull(datetime) %>% unique())/
-      length(all_dates_year)
-    
-    
-    
-    
-    # make df for recorded values in season for given location
-    data_season <- data_year %>%
-      # choose season date range
-      filter(
-        datetime >= ymd(monitor_season[1]) &
-          datetime <= ymd(monitor_season[2])
-      )
-    
-    
-    # make column of all dates (increments of 5 min) within season
-    all_dates_season <- seq.POSIXt(from = as.POSIXct( monitor_season[1], tz = 'UTC'),
-                                   to =  floor_date(as.POSIXct( monitor_season[2],
-                                                                tz = 'UTC')+24*60*60-1,
-                                                    unit = '5 min'),
-                                   by = '5 min')
-    
-    
-    # calculate missingness of data points in the season
-    season_data_avail <-
-      length(data_season %>% pull(datetime) %>% unique())/
-      length(all_dates_season)
-    
-    
-    if(all_time == TRUE) {
-      
-      # stop if missing 25% of data in year
-      if(year_data_avail < longterm_avail_limit) {
-        output <<- na.result(
-          paste0('year_missing_',
-                 signif((1-year_data_avail)*100, 2),
-                 '%'),
-          period_label
-        )
-        stop()
-      }
-      
-      entire <- data_year
-      
-    } else {
-      
-      # stop if missing 25% of data in season
-      if(season_data_avail < longterm_avail_limit) {
-        output <<- na.result(
-          paste0('season_missing_',
-                 signif((1-season_data_avail)*100, 2),
-                 '%'),
-          period_label
-        )
-        stop()
-      }
-      
-      entire <- data_season
-    }
-    
-    entire <- entire %>%
-      group_by(day_time = hour(datetime)*3600 + minute(datetime)*60) %>%
-      summarise_at(all_of(metric), list(mean = ~mean(., na.rm = TRUE)),
-                   .groups = 'drop') %>%
-      pull(mean)
-    
-    # ensure no na values
-    if(any(is.na(entire))) {
-      output <<- na.result('na_in_entire', period_label)
-      stop()
-    }
-    
-    
-    
-    # stop if a 5_min period of day is completely missing data
-    if(length(entire) < 24*60/5) {
-      output <<- na.result('missing_hour', period_label)
-      stop()
-    }
-    
-    
-    # function to take a running window of all short sampling periods possible
-    # within the longer montirong period,
-    
-    kld.period <- function(days) { # days = number of days in short samping period
-      
-      # for testing
-      # y<- all_dates_season[(159*24*12):((159+28)*24*12)]
-      
-      a <-
-        runner(
-          all_dates_season,
-          k = days*24*60/5, # number of 5-min periods in short sampling period
-          # only evaluate windows that start at 12AM
-          # and windows that are full (ignore partial windows at start)
-          at = seq(days*24*60/5, length(all_dates_season), 24*60/5),
-          f = function(y) { # y = window, vector (length = k) of specified days per iteration
-            
-            # filter out only given room
-            # and the days specified by the days in window y
-            sample <- data_season %>%
-              filter( location == location_type & datetime %in% y)
-            
-            # omit sampling period if missing more than
-            # 25 % of sampling period
-            if(nrow(sample) < sample_avail_limit * days*24*60/5) {
-              
-              a <- rep(NA, 24*60/5) %>% as.integer()
-              
-              
-              
-              # if not missing 25% of sampling period...
-            } else {
-              
-              a <- sample %>%
-                group_by(day_time = hour(datetime)*3600 + minute(datetime)*60) %>%
-                summarise_at(all_of(metric), list(mean = ~mean(., na.rm = TRUE)),
-                             .groups = 'drop') %>%
-                pull(mean)
-              
-              # ensure no na values
-              if(any(is.na(a))) {
-                output <<- na.result('na_in_sample', period_label)
-                stop()
-              }
-              
-              # omit sampling period if there is not an avg value
-              # for all 5-min period bins in the period
-              if(length(a)<24*60/5) {
-                a <- rep(NA, 24*60/5) %>% as.integer()
-                
-              }
-            }  
-            
-            # return values for one running window
-            a <- as.data.frame(a)
-            colnames(a) <- y[1] # give name to column just to suppress "new name" message
-            
-            a
-          }
-        )
-      
-      # bind all elements of list into a dataframe
-      a <- bind_cols(a)
-
-      n_samples_possible <- ncol(a)
-      # omit columns that have NA values (didn't have enough data)
-      if(ncol(a)>1) a <- a[ , colSums(is.na(a)) == 0]
-      
-      # count number of sampling periods created (columns)
-      n_samples <- ncol(a)
-      
-      # calculate proportion of samples that had sufficient data
-      # for given short sampling frame length
-      n_samp_avail <- n_samples/n_samples_possible
-      
-      
-      a <- lapply(colnames(a), function(x) {
-        a %>%
-          pull(x) %>%
-          kld(entire)
-      })
-      
-      # return all calculated kld values
-            list('kld' = unlist(a),
-           'n_samp_avail' = rep(n_samp_avail, length(unlist(a))))
-      
-    }
-    # # test kld.period function
-    # test <- kld.period(16)
-    
-    
-    # apply function to find scaled_entropy dataframe for
-    # sampling period of length "days2" to range of days in tested_sample_sequence
-    entropy_data_list <- lapply(
-      tested_sample_sequence,
-      function (
-        days2 # length of short sampling period
-      ) {
-        
-        
-        # calculate  KLD for all
-        # short sampling period of length "days2"
-        a <- kld.period(days2)
-        
-        a <- list(
-          'kld' = a[['kld']], # entropy value
-          'sample_length' = rep(days2, length(a[[1]])),
-          'monitor_season' = rep(period_label, length(a[[1]])),
-          'n_samp_avail' = a[['n_samp_avail']],
-          'error' = rep('none', length(a[[1]])),
-          'warn' = rep('none', length(a[[1]])) # return wrnaing if there was one triggered
-
-        )
-        a
-      }
-    )
-    
-    
-    # bind all into a dataframe
-    a <- bind_rows(entropy_data_list)
-    
-    a # scaled_entropy for one date range
-    
-  }  %>%
-    # if season results in an error, return the error message in a df
-    tryCatch(error = function(e) output)
-  
-  # find scaled_entropy for all short smpling lengths in all apecified time ranges
-  
-  a <- lapply(date_ranges_entire, scaled.entropy.season)
-  
-  
-  # bind all into a dataframe
-  entropy_data_season <- bind_rows(a) %>%
-    mutate(method = 'time',
-           home = home_num,
-           metric = metric,
-           location = location_type,
-           period_compare = ifelse(all_time == TRUE, 'year', 'season'))
-  
-  
-  entropy_data_season  # scaled_entropy for all specified date ranges
-  
-}
-
- 
-
-
-# test function--------------------------
-
-# start <- Sys.time()
-# 
-# test<- entropy.table.time('004', 'pm25',
-# 
-#                            date_ranges_entire = list(
-#                              c('2020-12-01', '2020-12-31'),
-#                                                      c('2020-11-01',
-#                                                        '2020-11-30')),
-#                            tested_sample_sequence = c(4,5),
-#                            location_type = 'living',
-#                            all_time = TRUE)
-# 
-# end <- Sys.time()
-# run2 <- end- start
-
-```
-
-```{r function_pdf_time_hourly_master}
-# calculate kld for continuous probability distributions
-
-# define variables for testing-----------------------
-
-date_ranges_entire <- list(c('2020-12-02','2021-04-23'))
-tested_sample_sequence <- seq(3,28,4)
-home_num <- '010'
-location_type <- 'living'
-data <- omni_hourly_data
-monitor_season <- date_ranges_entire[1]
-metric <- 'pm25'
-days <- 16
-days2 <- 16
-all_time <- TRUE
-# 
-# 
-# # remove variables after done testing
-# rm(tested_sample_sequence,
-#    date_ranges_entire,
-# sample_days_min,
-# home_num,
-# monitor_season,
-# monitor_period,
-# metric,
-# days,
-# days2,
-# all_time,
-# data,
-# data_season,
-# data_year,
-# entire,
-# date_col_season,
-# date_col_year,
-# all_dates_season,
-# all_dates_year
-# )
-
-# entropy function minutely data ----------------------------
+# entropy function hourly data ----------------------------
 
     
 # function to calculate scaled entropy for a house
@@ -622,8 +232,8 @@ entropy.table.hourly <- function(
     # recorded from given location
     data_year <- data %>%
       filter(home == home_num & location == location_type) %>%
-      mutate(hour = hour(datetime),
-             datehour = floor_date(datetime, unit = 'hour'))
+      mutate(hour = hour(datehour),
+             datehour = floor_date(datehour, unit = 'hour'))
     
     
     
@@ -641,12 +251,12 @@ entropy.table.hourly <- function(
         data %>%
           filter(home == home_num &
                    location %in% c('living', 'bedroom', 'kitchen'))%>%
-          pull(datetime) %>% min(), tz = 'UTC'),
+          pull(datehour) %>% min(), tz = 'UTC'),
       
       to =  as.POSIXct( data %>%
                           filter(home == home_num &
                                    location %in% c('living', 'bedroom', 'kitchen'))%>%
-                          pull(datetime) %>% max(), tz = 'UTC'),
+                          pull(datehour) %>% max(), tz = 'UTC'),
       by = 'hour')
     
     
@@ -662,8 +272,8 @@ entropy.table.hourly <- function(
     data_season <- data_year %>%
       # choose season date range
       filter(
-        datetime >= ymd(monitor_season[1]) &
-          datetime <= ymd(monitor_season[2])
+        datehour >= ymd(monitor_season[1]) &
+          datehour <= ymd(monitor_season[2])
       )
     
     
@@ -752,7 +362,7 @@ entropy.table.hourly <- function(
             # filter out only given room
             # and the days specified by the days in window y
             sample <- data_season %>%
-              filter( location == location_type & datetime %in% y)
+              filter( location == location_type & datehour %in% y)
             
             # omit sampling period if missing more than
             # 25 % of sampling period
@@ -948,54 +558,19 @@ pdf_days <- c(3,7,10,14,21)
 
 ## Distribution Time: Assume Log-normal distribution
 
+### Hourly Data
 
+```{r data_maker_hourly, eval = FALSE}
 
-```{r data_maker, eval = FALSE}
-
-# test function for one home--------------
-      all_time_choice <- TRUE
-clust <- c('heat') # can do multiple
-met <- 'voc'
-loc <- 'bedroom'
-test <- lapply(clust, function(cluster_type) {
-  
-  rep_data <-  lapply('011', function(x_home) {
-    
-    start_date <- pick.start(x_home, cluster_type)
-    end_date <- pick.end(x_home, cluster_type)
-    sample_min <- pick.sample.min(met)
-    sample_max <- if_else(
-      as.numeric(as.Date(end_date) - as.Date(start_date))>=28,
-      28,
-      as.numeric(as.Date(end_date) - as.Date(start_date))
-    )
-    
-    entropy.table.time(
-      x_home, metric = met,
-      date_ranges_entire = list(c(start_date,
-                                  end_date)),
-      tested_sample_sequence =
-        c(1,3,5),
-      location_type = loc,
-      all_time = all_time_choice) %>%
+# test function for multiple homes
       
-      # add in column for energy_cluster
-      mutate(energy_cluster = cluster_type) 
-  }
-  ) %>%
-    bind_rows()
-}
-) %>%
-  bind_rows()
-  
-  
-      # make csvs for all homes--------------------
+      # make csvs--------------------
 
 all_time_choice <- TRUE
 clust <- c('heat', 'shoulder', 'ac') # can do multiple
 
 
-met <- 'pm25'
+met <- 'voc'
 
 loc <- 'living'
 lapply(clust, function(cluster_type) {
@@ -1011,12 +586,12 @@ lapply(clust, function(cluster_type) {
       as.numeric(as.Date(end_date) - as.Date(start_date))
     )
     
-    entropy.table.time(
+    entropy.table.hourly(
       x_home, metric = met,
       date_ranges_entire = list(c(start_date,
                                   end_date)),
       tested_sample_sequence =
-        seq(3,sample_max,4),
+        c(1, seq(3,27,4)),
       location_type = loc,
       all_time = all_time_choice) %>%
       
@@ -1027,9 +602,9 @@ lapply(clust, function(cluster_type) {
     bind_rows()
   
   # give a variable name to the created data
-  assign(paste(met, loc, cluster_type, 'rep_data_time_pdf', sep = '_'),
+  assign(paste(met, loc, cluster_type, 'rep_data_time_hourly_pdf', sep = '_'),
          rep_data,
-         envir = .GlobalEnv) 
+         envir = .GlobalEnv)
 }
 )
 
@@ -1047,12 +622,12 @@ lapply(clust, function(cluster_type) {
       as.numeric(as.Date(end_date) - as.Date(start_date))
     )
     
-    entropy.table.time(
+    entropy.table.hourly(
       x_home, metric = met,
       date_ranges_entire = list(c(start_date,
                                   end_date)),
       tested_sample_sequence =
-        seq(3,sample_max,4),
+        c(1, seq(3,27,4)),
       location_type = loc,
       all_time = all_time_choice) %>%
       
@@ -1063,108 +638,11 @@ lapply(clust, function(cluster_type) {
     bind_rows()
   
   # give a variable name to the created data
-  assign(paste(met, loc, cluster_type, 'rep_data_time_pdf', sep = '_'),
+  assign(paste(met, loc, cluster_type, 'rep_data_time_hourly_pdf', sep = '_'),
          rep_data,
-         envir = .GlobalEnv) 
+         envir = .GlobalEnv)
 }
 )
-
-loc <- 'bedroom'
-lapply(clust, function(cluster_type) {
-  
-  rep_data <-  lapply(homes_all, function(x_home) {
-    
-    start_date <- pick.start(x_home, cluster_type)
-    end_date <- pick.end(x_home, cluster_type)
-    sample_min <- pick.sample.min(met)
-    sample_max <- if_else(
-      as.numeric(as.Date(end_date) - as.Date(start_date))>=28,
-      28,
-      as.numeric(as.Date(end_date) - as.Date(start_date))
-    )
-    
-    entropy.table.time(
-      x_home, metric = met,
-      date_ranges_entire = list(c(start_date,
-                                  end_date)),
-      tested_sample_sequence =
-        seq(3,sample_max,4),
-      location_type = loc,
-      all_time = all_time_choice) %>%
-      
-      # add in column for energy_cluster
-      mutate(energy_cluster = cluster_type) 
-  }
-  ) %>%
-    bind_rows()
-  
-  # give a variable name to the created data
-  assign(paste(met, loc, cluster_type, 'rep_data_time_pdf', sep = '_'),
-         rep_data,
-         envir = .GlobalEnv) 
-}
-)
-
-
-entropy_time_pdf_df <- bind_rows(
-  # pm25_bedroom_heat_rep_data_time_pdf,
-  # pm25_living_heat_rep_data_time_pdf,
-  # pm25_kitchen_heat_rep_data_time_pdf,
-  # pm25_bedroom_shoulder_rep_data_time_pdf,
-  # pm25_living_shoulder_rep_data_time_pdf,
-  # pm25_kitchen_shoulder_rep_data_time_pdf,
-  # pm25_bedroom_ac_rep_data_time_pdf,
-  # pm25_living_ac_rep_data_time_pdf,
-  # pm25_kitchen_ac_rep_data_time_pdf,
-  voc_bedroom_heat_rep_data_time_pdf,
-  voc_living_heat_rep_data_time_pdf,
-  voc_kitchen_heat_rep_data_time_pdf,
-  voc_bedroom_shoulder_rep_data_time_pdf,
-  voc_living_shoulder_rep_data_time_pdf,
-  voc_kitchen_shoulder_rep_data_time_pdf,
-  voc_bedroom_ac_rep_data_time_pdf,
-  voc_living_ac_rep_data_time_pdf,
-  voc_kitchen_ac_rep_data_time_pdf
-)
-
-# rm(voc_bedroom_heat_rep_data_time_pdf,
-#   voc_living_heat_rep_data_time_pdf,
-#   voc_kitchen_heat_rep_data_time_pdf,
-#   voc_bedroom_shoulder_rep_data_time_pdf,
-#   voc_living_shoulder_rep_data_time_pdf,
-#   voc_kitchen_shoulder_rep_data_time_pdf,
-#   voc_bedroom_ac_rep_data_time_pdf,
-#   voc_living_ac_rep_data_time_pdf,
-#   voc_kitchen_ac_rep_data_time_pdf)
-
-# # to bind new to old data
-# a_old <- read_csv('./csv_created/representativeness_data/rep_data_time_pdf_2021-06-25.csv')
-# 
-# a <- bind_rows(a_old, entropy_time_pdf_df)
-# 
-# write_csv(a, file =
-#             paste0('./csv_created/representativeness_data/rep_data_time_pdf_',
-#                    Sys.Date(), '.csv'))
-
-# # make csv of all data
-# write_csv(entropy_time_pdf_df, file =
-#             paste0('./csv_created/representativeness_data/rep_data_time_pdf_', Sys.Date(), '.csv'))
-# 
-
-```
-
-
-```{r data_maker_hourly, eval = FALSE}
-
-# test function for multiple homes
-      
-      # make csvs--------------------
-
-all_time_choice <- TRUE
-clust <- c('heat', 'shoulder', 'ac') # can do multiple
-
-
-met <- 'voc'
 
 loc <- 'bedroom'
 lapply(clust, function(cluster_type) {
@@ -1185,7 +663,7 @@ lapply(clust, function(cluster_type) {
       date_ranges_entire = list(c(start_date,
                                   end_date)),
       tested_sample_sequence =
-        seq(sample_min,sample_max,4),
+        c(1, seq(3,27,4)),
       location_type = loc,
       all_time = all_time_choice) %>%
       
@@ -1223,13 +701,634 @@ entropy_time_hourly_pdf_df <- bind_rows(
   voc_kitchen_ac_rep_data_time_hourly_pdf
 )
 
+# rm(
+#   pm25_bedroom_heat_rep_data_time_hourly_pdf,
+#   pm25_living_heat_rep_data_time_hourly_pdf,
+#   pm25_kitchen_heat_rep_data_time_hourly_pdf,
+#   pm25_bedroom_shoulder_rep_data_time_hourly_pdf,
+#   pm25_living_shoulder_rep_data_time_hourly_pdf,
+#   pm25_kitchen_shoulder_rep_data_time_hourly_pdf,
+#   pm25_bedroom_ac_rep_data_time_hourly_pdf,
+#   pm25_living_ac_rep_data_time_hourly_pdf,
+#   pm25_kitchen_ac_rep_data_time_hourly_pdf,
+#   voc_bedroom_heat_rep_data_time_hourly_pdf,
+#   voc_living_heat_rep_data_time_hourly_pdf,
+#   voc_kitchen_heat_rep_data_time_hourly_pdf,
+#   voc_bedroom_shoulder_rep_data_time_hourly_pdf,
+#   voc_living_shoulder_rep_data_time_hourly_pdf,
+#   voc_kitchen_shoulder_rep_data_time_hourly_pdf,
+#   voc_bedroom_ac_rep_data_time_hourly_pdf,
+#   voc_living_ac_rep_data_time_hourly_pdf,
+#   voc_kitchen_ac_rep_data_time_hourly_pdf
+# )
+
 
 
 # make csv of all data
 write_csv(entropy_time_hourly_pdf_df, file =
-            paste0('./csv_created/representativeness_data/rep_data_time_hourly_pdf_', Sys.Date(), '.csv'))
+            paste0('./csv_created/representativeness_data/rep_data_time_hourly_pdf_',
+                   Sys.Date(), '.csv'))
 
 
 
 ```
+
+
+### minutely data
+```{r function_pdf_time_minutely_master}
+
+# calculate kld for continuous probability distributions
+
+# # define variables for testing-----------------------
+# 
+# # date_ranges_entire <- list(c('2020-12-02','2021-04-23'))
+# # tested_sample_sequence <- seq(3,28,4)
+# # sample_days_min <- 3
+# # home_num <- '010'
+# # location_type <- 'living'
+# # data <- omni_data
+# # monitor_season <- date_ranges_entire[1]
+# # metric <- 'pm25'
+# # days <- 16
+# # days2 <- 16
+# # all_time <- TRUE
+# # 
+# # 
+# # # remove variables after done testing
+# # rm(tested_sample_sequence,
+# #    date_ranges_entire,
+# # sample_days_min,
+# # home_num,
+# # monitor_season,
+# # monitor_period,
+# # metric,
+# # days,
+# # days2,
+# # all_time,
+# # data,
+# # data_season,
+# # data_year,
+# # entire,
+# # date_col_season,
+# # date_col_year,
+# # all_dates_season,
+# # all_dates_year
+# # )
+# 
+# # entropy function minutely data ----------------------------
+# 
+#     
+# # function to calculate scaled entropy for a house
+# # during multiple different time periods
+# entropy.table.time <- function(
+#   home_num, metric,
+#   
+#   # date range of entire monitoring period
+#   # in the form: list(
+#   #                    c('YYYY-MM-DD', 'YYYY-MM-DD'),
+#   #                    c('YYYY-MM-DD', 'YYYY-MM-DD')
+#   #                  )
+#   # data in start and end day included
+#   date_ranges_entire,
+#   tested_sample_sequence, # sequence of tested short sampling period lengths (in days)
+#   location_type, # sensor location (living, bedroom, or kitchen)
+#   all_time = TRUE, # if TRUE, compare each short sampling period to entire monitoring year of home
+#     longterm_avail_limit = 0, # only use data from a long-term period if it has at least this fraction of data available (0 means no periods are omitted if they have any data)
+#   sample_avail_limit = 0, # only use data from a sample period if it has at least this fraction of data available (0 means no periods are omitted if they have any data)
+#   data = omni_data) {
+#   
+#   output <<- na.result(NA) # clear error output in case it was triggered previously
+#     warn <<- 'none'# clear warning output in case it was triggered previously
+# 
+#   if(metric %in% c('pm25', 'voc')) {
+#     # define LOD of metric to be 1/2 minimum detected (non-zero) value
+#     LOD <- data %>%
+#       filter(!!sym(metric)!=0) %>%
+#       pull(all_of(metric))%>%
+#       min()
+#   }
+#   
+#   
+#   # function to find scaled_entropy for samples in a given monitor season
+#   
+#   scaled.entropy.season <- function(monitor_season) {
+#     
+#     
+#     # must unlist the listed range that is used in lapply funnction
+#     monitor_season <- unlist(monitor_season)
+#     
+#     # stop if monitoring season is empty
+#     if(is_empty(monitor_season)) {
+#       output <<- na.result('likely_no_cluster')
+#       stop()
+#     }
+#     
+#     
+#     #define label for later use in table
+#     period_label <- paste(as.Date(monitor_season[1]), '-',
+#                           as.Date(monitor_season[2]))
+#     
+#     # warn that times will be rounded to full day for entire monitoring period
+#     
+#     if(
+#       any( c(
+#         second(as.POSIXct(monitor_season[1])),
+#         minute(as.POSIXct(monitor_season[1])),
+#         hour(as.POSIXct(monitor_season[1])),
+#         
+#         second(as.POSIXct(monitor_season[2])),
+#         minute(as.POSIXct(monitor_season[2])),
+#         hour(as.POSIXct(monitor_season[2]))) > 0
+#       )
+#     ) {
+#       output <<- na.result('incorrect_date',
+#                            period_label)
+#       stop()
+#     }
+#     
+#     
+#     # make df of entire monitoring period (approx. a year)
+#     # recorded from given location
+#     data_year <- data %>%
+#       filter(home == home_num & location == location_type)
+#     
+#     
+#     if(metric %in% c('pm25', 'voc')) {
+#       # convert 0 values to LOD/2 in to allow for log-normal distrib. estimation
+#       data_year <- data_year %>%
+#         mutate_at(all_of(metric), function(x) ifelse(x==0, LOD/2, x))
+#     }
+#     
+#     
+#     # make column of all dates (increments of 5 min) within sampling year
+#     # including all locations
+#     all_dates_year <- seq.POSIXt(
+#       from = as.POSIXct(
+#         data %>%
+#           filter(home == home_num &
+#                    location %in% c('living', 'bedroom', 'kitchen'))%>%
+#           pull(datetime) %>% min(), tz = 'UTC'),
+#       
+#       to =  as.POSIXct( data %>%
+#                           filter(home == home_num &
+#                                    location %in% c('living', 'bedroom', 'kitchen'))%>%
+#                           pull(datetime) %>% max(), tz = 'UTC'),
+#       by = '5 min')
+#     
+#     
+#     #calculate missingness of data in year for given location
+#     year_data_avail <-
+#       length(data_year %>% pull(datetime) %>% unique())/
+#       length(all_dates_year)
+#     
+#     
+#     
+#     
+#     # make df for recorded values in season for given location
+#     data_season <- data_year %>%
+#       # choose season date range
+#       filter(
+#         datetime >= ymd(monitor_season[1]) &
+#           datetime <= ymd(monitor_season[2])
+#       )
+#     
+#     
+#     # make column of all dates (increments of 5 min) within season
+#     all_dates_season <- seq.POSIXt(from = as.POSIXct( monitor_season[1], tz = 'UTC'),
+#                                    to =  floor_date(as.POSIXct( monitor_season[2],
+#                                                                 tz = 'UTC')+24*60*60-1,
+#                                                     unit = '5 min'),
+#                                    by = '5 min')
+#     
+#     
+#     # calculate missingness of data points in the season
+#     season_data_avail <-
+#       length(data_season %>% pull(datetime) %>% unique())/
+#       length(all_dates_season)
+#     
+#     
+#     if(all_time == TRUE) {
+#       
+#       # stop if missing 25% of data in year
+#       if(year_data_avail < longterm_avail_limit) {
+#         output <<- na.result(
+#           paste0('year_missing_',
+#                  signif((1-year_data_avail)*100, 2),
+#                  '%'),
+#           period_label
+#         )
+#         stop()
+#       }
+#       
+#       entire <- data_year
+#       
+#     } else {
+#       
+#       # stop if missing 25% of data in season
+#       if(season_data_avail < longterm_avail_limit) {
+#         output <<- na.result(
+#           paste0('season_missing_',
+#                  signif((1-season_data_avail)*100, 2),
+#                  '%'),
+#           period_label
+#         )
+#         stop()
+#       }
+#       
+#       entire <- data_season
+#     }
+#     
+#     entire <- entire %>%
+#       group_by(day_time = hour(datetime)*3600 + minute(datetime)*60) %>%
+#       summarise_at(all_of(metric), list(mean = ~mean(., na.rm = TRUE)),
+#                    .groups = 'drop') %>%
+#       pull(mean)
+#     
+#     # ensure no na values
+#     if(any(is.na(entire))) {
+#       output <<- na.result('na_in_entire', period_label)
+#       stop()
+#     }
+#     
+#     
+#     
+#     # stop if a 5_min period of day is completely missing data
+#     if(length(entire) < 24*60/5) {
+#       output <<- na.result('missing_hour', period_label)
+#       stop()
+#     }
+#     
+#     
+#     # function to take a running window of all short sampling periods possible
+#     # within the longer montirong period,
+#     
+#     kld.period <- function(days) { # days = number of days in short samping period
+#       
+#       # for testing
+#       # y<- all_dates_season[(159*24*12):((159+28)*24*12)]
+#       
+#       a <-
+#         runner(
+#           all_dates_season,
+#           k = days*24*60/5, # number of 5-min periods in short sampling period
+#           # only evaluate windows that start at 12AM
+#           # and windows that are full (ignore partial windows at start)
+#           at = seq(days*24*60/5, length(all_dates_season), 24*60/5),
+#           f = function(y) { # y = window, vector (length = k) of specified days per iteration
+#             
+#             # filter out only given room
+#             # and the days specified by the days in window y
+#             sample <- data_season %>%
+#               filter( location == location_type & datetime %in% y)
+#             
+#             # omit sampling period if missing more than
+#             # 25 % of sampling period
+#             if(nrow(sample) < sample_avail_limit * days*24*60/5) {
+#               
+#               a <- rep(NA, 24*60/5) %>% as.integer()
+#               
+#               
+#               
+#               # if not missing 25% of sampling period...
+#             } else {
+#               
+#               a <- sample %>%
+#                 group_by(day_time = hour(datetime)*3600 + minute(datetime)*60) %>%
+#                 summarise_at(all_of(metric), list(mean = ~mean(., na.rm = TRUE)),
+#                              .groups = 'drop') %>%
+#                 pull(mean)
+#               
+#               # ensure no na values
+#               if(any(is.na(a))) {
+#                 output <<- na.result('na_in_sample', period_label)
+#                 stop()
+#               }
+#               
+#               # omit sampling period if there is not an avg value
+#               # for all 5-min period bins in the period
+#               if(length(a)<24*60/5) {
+#                 a <- rep(NA, 24*60/5) %>% as.integer()
+#                 
+#               }
+#             }  
+#             
+#             # return values for one running window
+#             a <- as.data.frame(a)
+#             colnames(a) <- y[1] # give name to column just to suppress "new name" message
+#             
+#             a
+#           }
+#         )
+#       
+#       # bind all elements of list into a dataframe
+#       a <- bind_cols(a)
+# 
+#       n_samples_possible <- ncol(a)
+#       # omit columns that have NA values (didn't have enough data)
+#       if(ncol(a)>1) a <- a[ , colSums(is.na(a)) == 0]
+#       
+#       # count number of sampling periods created (columns)
+#       n_samples <- ncol(a)
+#       
+#       # calculate proportion of samples that had sufficient data
+#       # for given short sampling frame length
+#       n_samp_avail <- n_samples/n_samples_possible
+#       
+#       
+#       a <- lapply(colnames(a), function(x) {
+#         a %>%
+#           pull(x) %>%
+#           kld(entire)
+#       })
+#       
+#       # return all calculated kld values
+#             list('kld' = unlist(a),
+#            'n_samp_avail' = rep(n_samp_avail, length(unlist(a))))
+#       
+#     }
+#     # # test kld.period function
+#     # test <- kld.period(16)
+#     
+#     
+#     # apply function to find scaled_entropy dataframe for
+#     # sampling period of length "days2" to range of days in tested_sample_sequence
+#     entropy_data_list <- lapply(
+#       tested_sample_sequence,
+#       function (
+#         days2 # length of short sampling period
+#       ) {
+#         
+#         
+#         # calculate  KLD for all
+#         # short sampling period of length "days2"
+#         a <- kld.period(days2)
+#         
+#         a <- list(
+#           'kld' = a[['kld']], # entropy value
+#           'sample_length' = rep(days2, length(a[[1]])),
+#           'monitor_season' = rep(period_label, length(a[[1]])),
+#           'n_samp_avail' = a[['n_samp_avail']],
+#           'error' = rep('none', length(a[[1]])),
+#           'warn' = rep('none', length(a[[1]])) # return wrnaing if there was one triggered
+# 
+#         )
+#         a
+#       }
+#     )
+#     
+#     
+#     # bind all into a dataframe
+#     a <- bind_rows(entropy_data_list)
+#     
+#     a # scaled_entropy for one date range
+#     
+#   }  %>%
+#     # if season results in an error, return the error message in a df
+#     tryCatch(error = function(e) output)
+#   
+#   # find scaled_entropy for all short smpling lengths in all apecified time ranges
+#   
+#   a <- lapply(date_ranges_entire, scaled.entropy.season)
+#   
+#   
+#   # bind all into a dataframe
+#   entropy_data_season <- bind_rows(a) %>%
+#     mutate(method = 'time',
+#            home = home_num,
+#            metric = metric,
+#            location = location_type,
+#            period_compare = ifelse(all_time == TRUE, 'year', 'season'))
+#   
+#   
+#   entropy_data_season  # scaled_entropy for all specified date ranges
+#   
+# }
+# 
+#  
+# 
+# 
+# # test function--------------------------
+# 
+# # start <- Sys.time()
+# # 
+# # test<- entropy.table.time('004', 'pm25',
+# # 
+# #                            date_ranges_entire = list(
+# #                              c('2020-12-01', '2020-12-31'),
+# #                                                      c('2020-11-01',
+# #                                                        '2020-11-30')),
+# #                            tested_sample_sequence = c(4,5),
+# #                            location_type = 'living',
+# #                            all_time = TRUE)
+# # 
+# # end <- Sys.time()
+# # run2 <- end- start
+
+```
+
+
+```{r data_maker_minutely, eval = FALSE}
+# 
+# # test function for one home--------------
+#       all_time_choice <- TRUE
+# clust <- c('heat') # can do multiple
+# met <- 'voc'
+# loc <- 'bedroom'
+# test <- lapply(clust, function(cluster_type) {
+#   
+#   rep_data <-  lapply('011', function(x_home) {
+#     
+#     start_date <- pick.start(x_home, cluster_type)
+#     end_date <- pick.end(x_home, cluster_type)
+#     sample_min <- pick.sample.min(met)
+#     sample_max <- if_else(
+#       as.numeric(as.Date(end_date) - as.Date(start_date))>=28,
+#       28,
+#       as.numeric(as.Date(end_date) - as.Date(start_date))
+#     )
+#     
+#     entropy.table.time(
+#       x_home, metric = met,
+#       date_ranges_entire = list(c(start_date,
+#                                   end_date)),
+#       tested_sample_sequence =
+#         c(1,3,5),
+#       location_type = loc,
+#       all_time = all_time_choice) %>%
+#       
+#       # add in column for energy_cluster
+#       mutate(energy_cluster = cluster_type) 
+#   }
+#   ) %>%
+#     bind_rows()
+# }
+# ) %>%
+#   bind_rows()
+#   
+#   
+#       # make csvs for all homes--------------------
+# 
+# all_time_choice <- TRUE
+# clust <- c('heat', 'shoulder', 'ac') # can do multiple
+# 
+# 
+# met <- 'pm25'
+# 
+# loc <- 'living'
+# lapply(clust, function(cluster_type) {
+#   
+#   rep_data <-  lapply(homes_all, function(x_home) {
+#     
+#     start_date <- pick.start(x_home, cluster_type)
+#     end_date <- pick.end(x_home, cluster_type)
+#     sample_min <- pick.sample.min(met)
+#     sample_max <- if_else(
+#       as.numeric(as.Date(end_date) - as.Date(start_date))>=28,
+#       28,
+#       as.numeric(as.Date(end_date) - as.Date(start_date))
+#     )
+#     
+#     entropy.table.time(
+#       x_home, metric = met,
+#       date_ranges_entire = list(c(start_date,
+#                                   end_date)),
+#       tested_sample_sequence =
+#         seq(3,sample_max,4),
+#       location_type = loc,
+#       all_time = all_time_choice) %>%
+#       
+#       # add in column for energy_cluster
+#       mutate(energy_cluster = cluster_type) 
+#   }
+#   ) %>%
+#     bind_rows()
+#   
+#   # give a variable name to the created data
+#   assign(paste(met, loc, cluster_type, 'rep_data_time_pdf', sep = '_'),
+#          rep_data,
+#          envir = .GlobalEnv) 
+# }
+# )
+# 
+# loc <- 'kitchen'
+# lapply(clust, function(cluster_type) {
+#   
+#   rep_data <-  lapply(homes_all, function(x_home) {
+#     
+#     start_date <- pick.start(x_home, cluster_type)
+#     end_date <- pick.end(x_home, cluster_type)
+#     sample_min <- pick.sample.min(met)
+#     sample_max <- if_else(
+#       as.numeric(as.Date(end_date) - as.Date(start_date))>=28,
+#       28,
+#       as.numeric(as.Date(end_date) - as.Date(start_date))
+#     )
+#     
+#     entropy.table.time(
+#       x_home, metric = met,
+#       date_ranges_entire = list(c(start_date,
+#                                   end_date)),
+#       tested_sample_sequence =
+#         seq(3,sample_max,4),
+#       location_type = loc,
+#       all_time = all_time_choice) %>%
+#       
+#       # add in column for energy_cluster
+#       mutate(energy_cluster = cluster_type) 
+#   }
+#   ) %>%
+#     bind_rows()
+#   
+#   # give a variable name to the created data
+#   assign(paste(met, loc, cluster_type, 'rep_data_time_pdf', sep = '_'),
+#          rep_data,
+#          envir = .GlobalEnv) 
+# }
+# )
+# 
+# loc <- 'bedroom'
+# lapply(clust, function(cluster_type) {
+#   
+#   rep_data <-  lapply(homes_all, function(x_home) {
+#     
+#     start_date <- pick.start(x_home, cluster_type)
+#     end_date <- pick.end(x_home, cluster_type)
+#     sample_min <- pick.sample.min(met)
+#     sample_max <- if_else(
+#       as.numeric(as.Date(end_date) - as.Date(start_date))>=28,
+#       28,
+#       as.numeric(as.Date(end_date) - as.Date(start_date))
+#     )
+#     
+#     entropy.table.time(
+#       x_home, metric = met,
+#       date_ranges_entire = list(c(start_date,
+#                                   end_date)),
+#       tested_sample_sequence =
+#         seq(3,sample_max,4),
+#       location_type = loc,
+#       all_time = all_time_choice) %>%
+#       
+#       # add in column for energy_cluster
+#       mutate(energy_cluster = cluster_type) 
+#   }
+#   ) %>%
+#     bind_rows()
+#   
+#   # give a variable name to the created data
+#   assign(paste(met, loc, cluster_type, 'rep_data_time_pdf', sep = '_'),
+#          rep_data,
+#          envir = .GlobalEnv) 
+# }
+# )
+# 
+# 
+# entropy_time_pdf_df <- bind_rows(
+#   # pm25_bedroom_heat_rep_data_time_pdf,
+#   # pm25_living_heat_rep_data_time_pdf,
+#   # pm25_kitchen_heat_rep_data_time_pdf,
+#   # pm25_bedroom_shoulder_rep_data_time_pdf,
+#   # pm25_living_shoulder_rep_data_time_pdf,
+#   # pm25_kitchen_shoulder_rep_data_time_pdf,
+#   # pm25_bedroom_ac_rep_data_time_pdf,
+#   # pm25_living_ac_rep_data_time_pdf,
+#   # pm25_kitchen_ac_rep_data_time_pdf,
+#   voc_bedroom_heat_rep_data_time_pdf,
+#   voc_living_heat_rep_data_time_pdf,
+#   voc_kitchen_heat_rep_data_time_pdf,
+#   voc_bedroom_shoulder_rep_data_time_pdf,
+#   voc_living_shoulder_rep_data_time_pdf,
+#   voc_kitchen_shoulder_rep_data_time_pdf,
+#   voc_bedroom_ac_rep_data_time_pdf,
+#   voc_living_ac_rep_data_time_pdf,
+#   voc_kitchen_ac_rep_data_time_pdf
+# )
+# 
+# # rm(voc_bedroom_heat_rep_data_time_pdf,
+# #   voc_living_heat_rep_data_time_pdf,
+# #   voc_kitchen_heat_rep_data_time_pdf,
+# #   voc_bedroom_shoulder_rep_data_time_pdf,
+# #   voc_living_shoulder_rep_data_time_pdf,
+# #   voc_kitchen_shoulder_rep_data_time_pdf,
+# #   voc_bedroom_ac_rep_data_time_pdf,
+# #   voc_living_ac_rep_data_time_pdf,
+# #   voc_kitchen_ac_rep_data_time_pdf)
+# 
+# # # to bind new to old data
+# # a_old <- read_csv('./csv_created/representativeness_data/rep_data_time_pdf_2021-06-25.csv')
+# # 
+# # a <- bind_rows(a_old, entropy_time_pdf_df)
+# # 
+# # write_csv(a, file =
+# #             paste0('./csv_created/representativeness_data/rep_data_time_pdf_',
+# #                    Sys.Date(), '.csv'))
+# 
+# # # make csv of all data
+# # write_csv(entropy_time_pdf_df, file =
+# #             paste0('./csv_created/representativeness_data/rep_data_time_pdf_', Sys.Date(), '.csv'))
+# # 
+
+```
+
+
 
