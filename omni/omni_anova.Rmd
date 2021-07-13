@@ -34,11 +34,9 @@ library(rstatix)
 
 ```{r data_import, eval = FALSE}
 
-export_date <- '2021-06-07'
-
 ##Import CSV with Real Time Data
-omni_data<- read_csv(paste0('../output/omni_clean/',
-                         'omni_all_locations_', export_date, '.csv'))
+omni_data<- read_csv(paste0('./csv_created/',
+                         'omni_all_locations.csv'))
 
 
 ```
@@ -275,7 +273,7 @@ ggqqplot(data_metric, 'mean', facet.by = 'location',
 
 ```
 
-```{r plot_assumption_normality, fig.width=10.5, fig.height=8}
+```{r plot_assumption_normality, fig.width=10.5, fig.height=8, eval = FALSE}
 # make qqplots for all homes/locations/metrics
 map(homes_all, function(x) qqplotter(hm = x, met = 'pm25',
                                         log.trans = TRUE)) %>%
@@ -335,7 +333,7 @@ levene.tester <- function(data = omni_avg_data, hm, met, log.trans = FALSE){
 ```
 
 
-```{r df_assumption_variances}
+```{r df_assumption_variances, eval = FALSE}
 
 # test variances for all homes/locations/metrics
 map(homes_all, function(x) levene.tester(hm = x, met = 'pm25',
@@ -354,10 +352,12 @@ map(homes_all, function(x) levene.tester(hm = x, met = 'co2',
 ```
 
 
-# Sum of Squares  
+# ANOVA Test  
 
-```{r function_sum_squares, eval = FALSE}
-
+```{r function_anova_homemade, eval = FALSE}
+# hm <- '001'
+# met <- 'pm25'
+# log.trans <- TRUE
 sum.square<- function(data = omni_avg_data, hm, met,
                               log.trans = FALSE) {
   
@@ -366,6 +366,7 @@ sum.square<- function(data = omni_avg_data, hm, met,
   filter(home == hm & location %in% locations_indoor & metric == met) %>%
     filter(!is.na(mean))%>%
         mutate(mean = if(log.trans == TRUE) {log(mean)} else mean)
+  
 
   # grand mean of all data
   grand_mean <- data_metric %>%
@@ -391,17 +392,26 @@ sum.square<- function(data = omni_avg_data, hm, met,
     group_by(location) %>%
          # sum of squares between each data point at a location
   # and that location's mean
-    summarise_at(vars(mean), list(ss.within = function(x) {sum((x-mean(x))^2)})) %>%
+    summarise_at(vars(mean), list(ss.residual = function(x) {sum((x-mean(x))^2)})) %>%
     ungroup() %>%
     t() %>% # transpose
      as.data.frame()
    
    colnames(a) <- a[1,]
    
+   k <- ncol(a) # define k based on how many rooms have data
+
    a[-1,] %>%
-     rename_all(function(x) paste0('within_',x))%>%
+     rename_all(function(x) paste0('residual_',x))%>%
      mutate_all(as.numeric) %>%
-    mutate(between = ss_between, home = hm, metric = met)
+    mutate(ss_residual = rowSums(.), df_residual = grand_n - k,
+           msr = ss_residual/df_residual,
+           ss_between = ss_between, df_between = k-1,
+           msb = ss_between/df_between,
+           f_stat = msb/msr,
+           f_crit = qf(p=.05, df1=df_between, df2=df_residual, lower.tail=FALSE),
+           null_result = ifelse(f_stat>f_crit, 'reject', 'accept'),
+           home = hm, metric = met)
   
 
   }
@@ -413,9 +423,9 @@ sum.square<- function(data = omni_avg_data, hm, met,
 
 ```
 
-```{r df_sum_squares, eval = FALSE}
+```{r df_anova_homemade, eval = FALSE}
 
-# test variances for all homes/locations/metrics
+# test variances for all homes/locations/metrics-------------------
 ss_df2 <- map(metrics_all, function(x_metric) {
   
   map(homes_all, function(x_home) {
@@ -428,15 +438,72 @@ ss_df2 <- map(metrics_all, function(x_metric) {
   bind_rows()
 
 # write results into csv
-write_csv(ss_df, paste0('./csv_created/sum_squares_', Sys.Date(),'.csv'))
+# write_csv(ss_df, paste0('./csv_created/sum_squares_', Sys.Date(),'.csv'))
 
-# find when within-group ss is less than between group ss
-ss_test <- ss_df %>%
-  filter(within_bedroom<between |
-         within_kitchen<between | 
-           within_living<between )
+```
+
+```{r df_anova}
+
+# using aov and anova (not Anova)----------------------------------
+r_anova <- map(metrics_all, function(x_metric) {
+  
+  map(homes_all, function(x_home) {
+    df <- omni_avg_data %>% filter(home == x_home, metric == x_metric,
+                                    location %in% locations_indoor,
+                                       !is.na(mean))
+model <- aov(log(mean)~location, df)
+a <- anova(model) 
+
+list(f_stat = a[['F value']][1],
+     p_val = a[['Pr(>F)']][1],
+     null_result = ifelse(a[['Pr(>F)']][1]<0.05, 'reject', 'accept'),
+     home = x_home, metric = x_metric)
+
+  })%>% tryCatch(error = function(e) {
+  list(f_stat =NA,
+       p_val = NA)
+    })%>% bind_rows()
+}) %>% bind_rows()
+     
+
+r_anova
+
+# # compare to homemade func
+# test <- full_join(ss_df2 %>% select(f_stat, null_result,home, metric), r_anova,
+#                   by = c('home', 'metric'))%>%
+#   mutate(ifelse(null_result.x == null_result.y, TRUE, FALSE))
 
 
+# # test with Anova func # notice type =3 makes much diff results--------------
+# 
+# r_anova <- map(metrics_all, function(x_metric) {
+#   
+#   map(homes_all, function(x_home) {
+#     df <- omni_avg_data %>% filter(home == x_home, metric == x_metric,
+#                                     location %in% locations_indoor,
+#                                        !is.na(mean))
+# model <- lm(log(mean)~location, df)
+# a <- Anova(model, type = 2) 
+# 
+# list(f_stat = a[['F value']][1],
+#      p_val = a[['Pr(>F)']][1],
+#      null_result = ifelse(a[['Pr(>F)']][1]<0.05, 'reject', 'accept'),
+#      home = x_home, metric = x_metric)
+# 
+#   })%>% tryCatch(error = function(e) {
+#   list(f_stat =NA,
+#        p_val = NA)
+#     })%>% bind_rows()
+# }) %>% bind_rows()
+#      
+# # compare to homemade func
+# test <- full_join(ss_df2 %>% select(f_stat, null_result,home, metric), r_anova,
+#                   by = c('home', 'metric'))%>%
+#   mutate(ifelse(null_result.x == null_result.y, TRUE, FALSE))
+```
+
+```{r plot_anova}
+a <- r_anova %>% filter(!is.na(p_val))
 
 ```
 
