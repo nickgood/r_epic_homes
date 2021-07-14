@@ -169,7 +169,7 @@ out %>% group_by(g) %>% count()
 ```
 
 
-```{r fig_omni_vs_filter, fig.width=1.5, fig.height=1.5}
+```{r fig_omni_vs_filter, fig.width=4.5, fig.height=4.5}
 ggplot(out, aes(x = conc, y = pm25_omni, color = location)) +
   geom_point() +
   #geom_smooth(method = "lm", formula = "y ~ x", se = FALSE) +
@@ -331,7 +331,10 @@ ggplot(bc %>% filter(!(location == "bedroom")), aes(x = location, y = bc)) +
 # Write Data
 
 ```{r}
-# write_rds(bc, "../output/bc/bc.rds")
-# write_rds(pm25, "../output/pm25/pm25.rds")
+# write_rds(bc, paste0("../output/bc/bc_",
+# Sys.Date(),".rds"))
+# write_rds(pm25, paste0("../output/pm25/pm25_",
+# Sys.Date(),".rds"))
+
 ```
 
