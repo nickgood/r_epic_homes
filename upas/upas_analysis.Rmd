@@ -28,7 +28,7 @@ source("../functions_epic.R")
 grav_meta <- read_sheet("18_J7ZQgnuji-r6ovpTjmlvdz3xUGBYzy0u_ACadLG-c",
                         sheet = "metadata")
 
-meta <- read_rds("../output/upas/upas_summary.rds")
+meta <- read_rds("../drive_sync/epic_homes/r_epic_homes/output/upas/upas_summary.rds")
 
 upas_log <- read_sheet("1PnPjgbYWljb5oXoSCBqpJb2pi7gU0Kzre5lx4H-3i70",
                        sheet = "upas", col_types = "c")
@@ -143,7 +143,7 @@ data <- pm25 %>%
   filter(!grepl("blank", location)) %>%
   na.omit() %>%
   mutate(pattern = paste("^omni.*", id_home, location, sep = "_"),
-         files = map2("../output/omni", pattern, list.files, full.names = TRUE),
+         files = map2("../drive_sync/epic_homes/r_epic_homes/output/omni", pattern, list.files, full.names = TRUE),
          start_ = as.Date(start) - 1,
          end_ = as.Date(end) + 1,
          dates = map2(start_, end_, seq.Date, by = "day"),
@@ -196,7 +196,7 @@ broom::tidy(model, conf.int = TRUE) %>%
 * read data
 
 ```{r}
-files <- list.files("../../data/filters/soot_scan_csv", full.names = TRUE, pattern = ".csv$")
+files <- list.files("../drive_sync/epic_homes/data/filters/soot_scan_csv", full.names = TRUE, pattern = ".csv$")
 
 data_bc <- map(files, read_csv, col_types = cols(.default = "c")) %>%
   bind_rows() %>%
@@ -331,7 +331,7 @@ ggplot(bc %>% filter(!(location == "bedroom")), aes(x = location, y = bc)) +
 # Write Data
 
 ```{r}
-write_rds(bc, "../output/bc/bc.rds")
-write_rds(pm25, "../output/pm25/pm25.rds")
+# write_rds(bc, "../output/bc/bc.rds")
+# write_rds(pm25, "../output/pm25/pm25.rds")
 ```
 
