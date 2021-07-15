@@ -325,9 +325,11 @@ data = omni_hourly_data) {
             
             ## make complement data set by averaging each measurment between to rooms
             ## and find the covariance between these two rooms
-            data_complement <- data_wide_complete_log %>% select(all_of(other_rooms))%>%
+            data_complement <- data_wide_complete_log %>%
+              select(all_of(other_rooms))%>%
               mutate(mean = rowMeans(.)) %>% pull(mean)
-                        cov_complement <- cov(data_wide_complete_log %>% pull(other_rooms[1]),
+            
+            cov_complement <- cov(data_wide_complete_log %>% pull(other_rooms[1]),
                                   data_wide_complete_log %>% pull(other_rooms[2]))
             
             cov_matrix <- cov(
@@ -340,10 +342,10 @@ data = omni_hourly_data) {
             variance_room <- var(data_wide_complete_log %>% pull(room))
             variance_complement <- (
               var(data_wide_complete_log %>% pull(other_rooms[1])) +
-              var(data_wide_complete_log %>% pull(other_rooms[2])) +
-              2*cov_complement
+                var(data_wide_complete_log %>% pull(other_rooms[2])) +
+                2*cov_complement
             )/length(other_rooms)^2
-
+            
             mutual_info <-
               -0.5*log( cov_determinant/ (variance_room*variance_complement) )
             
