@@ -271,12 +271,13 @@ map(c('017'), function(x_home) {
 
 folder_date <- '2021-07-14'
 
-# make single csv file merging all homes/location csv files
-pattern <- paste0(".*omni_.*.rds$")
-files <- list.files(paste0("./csv_created/omni_clean/omni_raw_", folder_date),
+# make single csv file merging all homes/location rds files
+# that have digits in them
+pattern <- paste0("[0-9]*.rds$")
+files <- list.files(paste0("./csv_created/omni_raw_", folder_date),
                     pattern = pattern, full.names = TRUE)
 
-a<- map(files, function(x) {
+omni_data<- map(files, function(x) {
   read_rds(x) %>%
     select(!contains('X1')) # remove X1 for dataframes that have rownames
 }
@@ -285,7 +286,7 @@ a<- map(files, function(x) {
       filter(rowSums(is.na(.)) != ncol(.)) # omit a row if every value is NA
 
 
-write_rds(a, paste0('./csv_created/pre-calibration/omni_all_locations_',
+write_rds(omni_data, paste0('./csv_created/pre-calibration/omni_all_locations_raw_',
                        Sys.Date(), '.rds'))
 
 
@@ -297,25 +298,35 @@ write_rds(a, paste0('./csv_created/pre-calibration/omni_all_locations_',
 ```{r import_all_data, eval = TRUE}
 
 omni_data <- read_rds(paste0('./csv_created/pre-calibration/omni_all_locations_raw_',
-'2021-07-07.rds'))
+'2021-07-14.rds'))
 
 ```
 
 
 ```{r clean_data_further}
 
- # remove unneeded columns
-omni_data_clean <- omni_data %>%
-      select(-c(timestamp, score, filename))
 
-# find and remove (average) duplicates--------------------
+ # remove unneeded columns
+omni_data_clean <- omni_data
+# find and remove (average) duplicates
+
+# test <- omni_data %>%
+#     filter(!(home=='003' & location == 'outdoor'&
+#              between(datetime, ymd_hms('2021-03-21 17:59:00'),
+#                      ymd_hms('2021-03-23 23:59:59')) &
+#                      temp >15))
+# test2 <- test %>% filter(home=='003', location == 'outdoor')
 
 
 # clean duplicates from sensor overlaps----------
  
- # remove home 003 outdoor for now...
+ # remove home 003 outdoor from March 21 to March 23
+# when temp was above 15 (from overlap with living room sensor)
 omni_data_clean <- omni_data_clean %>%
-    filter(!(home=='003' & location == 'outdoor'))
+    filter(!(home=='003' & location == 'outdoor'&
+             between(datetime, ymd_hms('2021-03-21 17:59:00'),
+                     ymd_hms('2021-03-23 23:59:59')) &
+                     temp >15))
 
   # average dupicates in home 009 living due to sensor overlap
  a <- omni_data_clean %>%
@@ -382,6 +393,10 @@ duplicates_no_daylight <-  duplicates %>%
  if(nrow(duplicates_no_daylight)>0) {
 stop('duplicates outside of daylight savings time exist')}
  
+ test <- omni_data %>%
+   filter(home == '007', location == 'kitchen')
+ 
+ test2 <- read_rds('./csv_created/omni_raw_2021-07-14/003_outdoor.rds')
 # method 2---------
 #   # find duplicates by date logged for each sensor
 #   duplicates <- omni_data %>%
