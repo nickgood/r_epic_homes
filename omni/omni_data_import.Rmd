@@ -75,7 +75,7 @@ clean_data <- function(x){
 
 # 001 Outdoor
 
-```{r}
+```{r, eval = FALSE}
 
 id_home <- "001"
 location <- "outdoor"
@@ -83,7 +83,7 @@ pattern = paste0(".*", id_home, "_", location, ".*.rds$")
 files <- list.files("../output/omni", pattern = pattern, full.names = TRUE)
 ```
 
-```{r}
+```{r, eval = FALSE}
 data <- map(files, clean_data) %>%
   bind_rows() %>%
   mutate_at(vars(contains("time")), ymd_hms) %>%
@@ -92,19 +92,19 @@ data <- map(files, clean_data) %>%
 
 ```
 
-```{r fig_pm25, fig.width=10, fig.height= 5}
+```{r fig_pm25, fig.width=10, fig.height= 5, eval = FALSE}
 timeVariation(data %>% rename(date = datetime),
               pollutant = "pm25",
               ylab = "pm2.5 (ug/m3)")
 ```
 
-```{r fig_co2, fig.width=10, fig.height= 5}
+```{r fig_co2, fig.width=10, fig.height= 5, eval = FALSE}
 timeVariation(data %>% rename(date = datetime),
               pollutant = "co2",
               ylab = "CO2 (ppmV)")
 ```
 
-```{r fig_temp, fig.width=10, fig.height= 5}
+```{r fig_temp, fig.width=10, fig.height= 5, eval = FALSE}
 timeVariation(data %>% rename(date = datetime) %>% filter(temp < 45),
               pollutant = "temp",
               ylab = "Temperature (oC)")
@@ -115,6 +115,64 @@ timeVariation(data %>% rename(date = datetime) %>% filter(temp < 45),
 # Search for files that cause errors when reading in
 
 ```{r error_file_search, eval = FALSE}
+
+# home 003 kitchen gives error: column 'timestamp' does not exist
+id_home <- "002"
+location <- "kitchen"
+pattern = paste0(".*", id_home, "_", location, ".*.rds$")
+files <- list.files("../drive_sync/epic_homes/r_epic_homes/output/omni", pattern = pattern, full.names = TRUE)
+
+data <- map(files, clean_data) %>%
+  bind_rows() %>%
+  mutate_at(vars(contains("time")), ymd_hms) %>%
+  filter(rowSums(is.na(.)) != ncol(.)) %>% # omit a row if every value is NA
+  mutate(home = id_home, location = location) # add home and location id
+
+
+test <- data %>%
+  filter(timestamp %>% is.na())
+clean_data <- function(x){
+  #print(x)
+  f <- read_rds(x)
+  
+  # make blank dataframe for files with no data
+  # or specific error message
+  blank_df <- 
+    tibble(timestamp = NA_character_,
+          co2 = NA_real_,
+          voc = NA_real_,
+          temp = NA_real_,
+          lux = NA_real_,
+          humid = NA_real_,
+          pm25 = NA_real_,
+          score = NA_real_,
+          spl_a  = NA_real_,    
+          datetime = NA_character_,
+          filename = NA_character_)
+  
+  # insert blank dataframe if connection error occurs on a day
+  if(grepl("upstream connect error or disconnect/reset before headers.",
+           f, fixed = TRUE)) blank_df
+  
+  else if(length(f$data) > 0){
+  data_long <- as_tibble(f) %>%
+  unnest_wider(data) %>%
+  select(-indices) %>%
+  mutate(df = map(sensors, ~ .x %>% map_df(magrittr::extract, c("comp", "value")))) %>%
+  unnest(df) %>%
+  select(-sensors, -score) %>%
+  pivot_wider(names_from = "comp", values_from = "value") %>%
+  mutate(datetime = format(as.POSIXct(strptime(timestamp,format = "%FT%H:%M:%S",tz = "GMT")),
+                          tz = "US/Mountain",
+                          usetz = TRUE),
+         filename = x)
+  
+    # insert blank dataframe if no data is recorded on a day
+ } else blank_df
+}
+
+
+
 
 
 # columns change on 2021-01-27_2021-01-28 to include pm10est? cause error in kitchen007
@@ -131,7 +189,7 @@ timeVariation(data %>% rename(date = datetime) %>% filter(temp < 45),
       colnames()
   }
     
-  home <- '009'
+  home <- '003'
 
   lapply(c('living', 'bedroom', 'kitchen', 'outdoor', 'garage'), col.check,
          hm = home)
@@ -174,9 +232,11 @@ folder_dated <- paste0('./csv_created/omni_raw_', Sys.Date(),'/')
 
 ifelse(!dir.exists(file.path(folder_dated)), dir.create(file.path(folder_dated)), FALSE)
 
-write_csv(data, paste0(folder_dated, id_home, '_', location,
-                       '.csv'))
-}
+write_rds(data, paste0(folder_dated, id_home, '_', location,
+                       '.rds'))
+
+} %>% tryCatch(error = function(e) paste('error for', location, id_home,
+                                         '\nremove tryCatch and re-run to see error'))
 
 
 ```
@@ -184,24 +244,40 @@ write_csv(data, paste0(folder_dated, id_home, '_', location,
 ```{r make_data_individuals, eval = FALSE}
 
 # # test for just one sensor
-# lapply('outdoor', data.maker, id_home = '003')
+# map('outdoor', data.maker, id_home = '003')
 
 locations_all <- c( 'bedroom', 'living', 'kitchen', 'garage', 'outdoor')
 
+# # make files for one home for all locations
+# map(locations_all, data.maker, id_home = '002')
 
-# make files for one home for all locations
-lapply(locations_all, data.maker, id_home = '007')
+# make files for homes for all locations
+
+
+
+map(c('017'), function(x_home) {
+  map(c(locations_all), function(x_location) {
+    data.maker(id_home = x_home, location = x_location)
+    })
+})
+
+# test a file
+# test <- read_rds('./csv_created/omni_raw_2021-07-14/004_living.rds')
+
 ```
 
 
 ```{r function_data_merger, eval = FALSE}
 
+folder_date <- '2021-07-14'
+
 # make single csv file merging all homes/location csv files
-pattern <- paste0(".*omni_.*.csv$")
-files <- list.files("./csv_created/omni_clean/", pattern = pattern, full.names = TRUE)
+pattern <- paste0(".*omni_.*.rds$")
+files <- list.files(paste0("./csv_created/omni_clean/omni_raw_", folder_date),
+                    pattern = pattern, full.names = TRUE)
 
 a<- map(files, function(x) {
-  read_csv(x) %>%
+  read_rds(x) %>%
     select(!contains('X1')) # remove X1 for dataframes that have rownames
 }
 ) %>%
@@ -209,8 +285,8 @@ a<- map(files, function(x) {
       filter(rowSums(is.na(.)) != ncol(.)) # omit a row if every value is NA
 
 
-write_csv(a, paste0('./csv_created/omni_all_locations_',
-                       Sys.Date(), '.csv'))
+write_rds(a, paste0('./csv_created/pre-calibration/omni_all_locations_',
+                       Sys.Date(), '.rds'))
 
 
 ```
@@ -220,13 +296,13 @@ write_csv(a, paste0('./csv_created/omni_all_locations_',
 
 ```{r import_all_data, eval = TRUE}
 
-omni_data <- read_csv(paste0('./csv_created/omni_all_locations_raw_',
-'2021-07-07.csv'))
+omni_data <- read_rds(paste0('./csv_created/pre-calibration/omni_all_locations_raw_',
+'2021-07-07.rds'))
 
 ```
 
 
-```{r}
+```{r clean_data_further}
 
  # remove unneeded columns
 omni_data_clean <- omni_data %>%
@@ -350,8 +426,9 @@ stop('duplicates outside of daylight savings time exist')}
 
   omni_data_clean <- omni_data_clean %>%
   mutate(temp = ifelse(temp > 100, NA, temp))
-  
-write_csv(omni_data_clean, paste0('./csv_created/omni_all_locations_', Sys.Date(), '.csv'))
+
+# write data------------------- 
+write_rds(omni_data_clean, paste0('./csv_created/pre-calibration/omni_all_locations_pre-cal_', Sys.Date(), '.rds'))
 
 
 ```
@@ -360,7 +437,7 @@ write_csv(omni_data_clean, paste0('./csv_created/omni_all_locations_', Sys.Date(
 # create data of multiple resolutions from cleaned data
 
 
-```{r hourly_data_csv}
+```{r hourly_data_rds}
 
 omni_hourly_data <- omni_data_clean %>%
   group_by(datehour = floor_date(datetime, unit = 'hour'),
@@ -368,12 +445,12 @@ omni_hourly_data <- omni_data_clean %>%
   summarise_if(is.numeric, list(mean), na.rm = TRUE) %>%
   ungroup()
 
-write_csv(omni_hourly_data, paste0('./csv_created/omni_hourly_data_',
-Sys.Date(),'.csv'))
+write_rds(omni_hourly_data, paste0('./csv_created/pre-calibration/omni_hourly_data_pre-cal_',
+Sys.Date(),'.rds'))
 
 ```
 
-```{r daily_data_csv}
+```{r daily_data_rds}
 
   omni_daily_data <- omni_data_clean %>%
   group_by(dateday = floor_date(datetime, unit = 'day'),
@@ -381,10 +458,73 @@ Sys.Date(),'.csv'))
   summarise_if(is.numeric, list(mean), na.rm = TRUE) %>%
   ungroup()
 
-write_csv(omni_daily_data, paste0('./csv_created/omni_daily_data_',
-Sys.Date(),'.csv'))
+write_rds(omni_daily_data, paste0('./csv_created/pre-calibration/omni_daily_data_pre-cal_',
+Sys.Date(),'.rds'))
 
 ```
+
+# calibrate data with filter concentrations
+
+```{r import_filter_data}
+filter_data <- read_rds('../output_2021-07-14/pm25/pm25_2021-07-14.rds')
+```
+
+
+```{r create_correction_factor}
+
+# add correciton factor to real-time pm2.5 data
+blank_data <- filter_data %>%
+  filter(location == 'blank') %>%
+  select(visit, id_home, d_mass_blank = d_mass)
+
+filter_data_correct <- filter_data %>%
+    filter(location != 'blank') %>%
+  left_join(blank_data, by = c('visit', 'id_home')) %>%
+  mutate(conc_correct = if_else(duration >= 24, ((d_mass-d_mass_blank)*1000)/(volume/1000),
+                                NA_real_))%>%
+  # duplicate results for livingroom to all indoor rooms
+  select(id_home, location, conc_correct) %>%
+  pivot_wider(names_from = location, values_from = conc_correct) %>%
+  mutate(kitchen = living, bedroom = living) %>%
+  pivot_longer(cols = -c(id_home) , names_to = 'location', values_to = 'conc_correct')
+  
+
+
+# omni_data_cal <- 
+#   # read in uncalibrated data
+#   read_csv(paste0('./csv_created/pre-calibration/omni_all_locations_pre-cal.csv')) %>%
+#   left_join(
+#     #calculate TWA for pm2.5 for each home/location
+#     group_by(., home, location) %>%
+#       summarise_at(vars(pm25), funs(twa = mean, n_hours = n()/(60/5),
+#       )) %>%
+#       # match filter-based concentration to TWA for each home/location
+#       left_join(filter_data_correct, by = c('home' = 'id_home', 'location')) %>%
+#       mutate(grav_cf = twa/conc_correct)
+#   )
+
+omni_data_precal <- 
+  # read in uncalibrated data
+  read_csv(paste0('./csv_created/pre-calibration/omni_all_locations_pre-cal.csv'))
+
+# make datafrae of corrrection factors
+grav_cf_df <- omni_data_precal %>%
+  #calculate TWA for pm2.5 for each home/location
+  group_by(home, location) %>%
+  summarise_at(vars(pm25), funs(twa = mean, n_hours = n()/(60/5),
+                                )) %>%
+  # match filter-based concentration to TWA for each home/location
+  left_join(filter_data_correct, by = c('home' = 'id_home', 'location')) %>%
+  mutate(grav_cf = twa/conc_correct)
+
+omni_data_cal <- omni_data_precal %>%
+  left_join(grav_cf_df, by = c('home', 'location')) %>%
+  mutate(pm25 = pm25/grav_cf)
+
+
+ 
+```
+
 
 # try to ignore files that have been downloaded before (beta code)
 
