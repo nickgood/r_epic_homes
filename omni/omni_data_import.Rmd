@@ -310,14 +310,6 @@ omni_data <- read_rds(paste0('./csv_created/pre-calibration/omni_all_locations_r
 omni_data_clean <- omni_data
 # find and remove (average) duplicates
 
-# test <- omni_data %>%
-#     filter(!(home=='003' & location == 'outdoor'&
-#              between(datetime, ymd_hms('2021-03-21 17:59:00'),
-#                      ymd_hms('2021-03-23 23:59:59')) &
-#                      temp >15))
-# test2 <- test %>% filter(home=='003', location == 'outdoor')
-
-
 # clean duplicates from sensor overlaps----------
  
  # remove home 003 outdoor from March 21 to March 23
@@ -354,6 +346,33 @@ b <- omni_data_clean %>%
 omni_data_clean <- bind_rows(a,b)
  
 
+
+# average duplicates from pm10_est addition------------
+
+# from april 7 to april 15 there are some identical values
+# just take average
+
+
+test <- omni_data_clean %>% 
+  group_by_at(vars(-pm10)) %>% 
+  filter( n()>1) %>%
+  ungroup() 
+##separate out data in time range
+##delete duplicates
+## put the singles back in
+ a <- omni_data_clean %>%
+    filter(!between(datetime, ymd_hms('2021-04-07 00:00:00'),
+                     ymd_hms('2021-04-15 23:59:59')))
+
+
+b <- omni_data_clean %>%
+  filter(between(datetime, ymd_hms('2021-04-07 00:00:00'),
+                     ymd_hms('2021-04-15 23:59:59'))) %>%
+    group_by(datetime, home, location) %>% 
+    summarise_if(is.numeric, list(mean), na.rm = TRUE, .groups = 'drop')
+
+omni_data_clean <- bind_rows(a,b)
+
 # average duplicates from daylight savings------------
 
 # label duplicate rows
@@ -380,6 +399,7 @@ avg_daylight <-  duplicates %>%
   summarise_if(is.numeric, mean) %>%
   ungroup()
 
+
 duplicates_no_daylight <-  duplicates %>%
   filter(!between(datetime, ymd_hms("2020-10-31 23:59:00"),
                                 ymd_hms("2020-11-01 01:59:00"))) 
@@ -388,7 +408,7 @@ duplicates_no_daylight <-  duplicates %>%
   # combine rows into dataframe without duplicates
  omni_data_clean <- bind_rows(unique,duplicates_no_daylight,avg_daylight)
   
- # test to ensure no duplicates are remaining (should be no rows)
+ # test to ensure no duplicates are remaining (should be no rows)----------
  
  if(nrow(duplicates_no_daylight)>0) {
 stop('duplicates outside of daylight savings time exist')}
