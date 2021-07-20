@@ -27,6 +27,8 @@ library(ggplot2)
 library(readr)
 library(googlesheets4)
 library(lubridate)
+library(data.table)
+
 ```
 
 ```{r}
@@ -305,7 +307,6 @@ omni_data <- read_rds(paste0('./csv_created/pre-calibration/omni_all_locations_r
 
 ```{r clean_data_further}
 
-
  # remove unneeded columns
 omni_data_clean <- omni_data
 # find and remove (average) duplicates
@@ -347,19 +348,11 @@ omni_data_clean <- bind_rows(a,b)
  
 
 
-# average duplicates from pm10_est addition------------
+# delete duplicates from pm10_est addition------------
 
-# from april 7 to april 15 there are some identical values
-# just take average
+# from april 7 to april 15 there are some nearly identical values
+# in all cols except pm10_est (see range calculation below)
 
-
-test <- omni_data_clean %>% 
-  group_by_at(vars(-pm10)) %>% 
-  filter( n()>1) %>%
-  ungroup() 
-##separate out data in time range
-##delete duplicates
-## put the singles back in
  a <- omni_data_clean %>%
     filter(!between(datetime, ymd_hms('2021-04-07 00:00:00'),
                      ymd_hms('2021-04-15 23:59:59')))
@@ -367,29 +360,43 @@ test <- omni_data_clean %>%
 
 b <- omni_data_clean %>%
   filter(between(datetime, ymd_hms('2021-04-07 00:00:00'),
-                     ymd_hms('2021-04-15 23:59:59'))) %>%
-    group_by(datetime, home, location) %>% 
-    summarise_if(is.numeric, list(mean), na.rm = TRUE, .groups = 'drop')
+                     ymd_hms('2021-04-15 23:59:59')))
 
-omni_data_clean <- bind_rows(a,b)
+# calculate range of values on duplicate timestamps over pm10_est issue date range
+# b_range <- b %>%
+#     group_by(datetime, home, location) %>% 
+#   summarise_if(is.numeric, list(range = function(x) max(x)-min(x))) %>%
+#   ungroup()
+
+b <- b %>%
+    group_by(datetime, home, location) %>%
+  summarise_if(is.numeric, mean, na.rm = TRUE, .groups = 'drop')
+
+# test <- b %>% filter(home == '001', location == 'garage')
+
+# merge and detlete pm10_est col
+omni_data_clean <- bind_rows(a,b) %>%
+  select(-pm10_est)
+
 
 # average duplicates from daylight savings------------
 
-# label duplicate rows
-omni_data_clean <- omni_data_clean %>% 
-  group_by(datetime, home, location) %>% 
-  mutate(duplicate = n()>1) %>%
-  ungroup() 
+# use data.table to count duplicates
+b_dt <- omni_data_clean %>%  data.table()
+
+a <-  (b_dt[, count:= .N,
+            by = omni_data_clean %>% select(c(datetime, home, location)) ]) %>%
+  as.data.frame()
 
 # unique rows
-unique<- omni_data_clean %>%
-  filter(duplicate == FALSE) %>%
-  select(-duplicate)
+unique<- a %>%
+  filter(count == 1) %>%
+  select(-count)
 
 # duplicate rows
-duplicates<- omni_data_clean %>%
-  filter(duplicate == TRUE)%>%
-  select(-duplicate)
+duplicates<- a %>%
+  filter(count >1) %>%
+  select(-count)
 
 # average duplicates that are from daylight savings
 avg_daylight <-  duplicates %>%
@@ -412,11 +419,7 @@ duplicates_no_daylight <-  duplicates %>%
  
  if(nrow(duplicates_no_daylight)>0) {
 stop('duplicates outside of daylight savings time exist')}
- 
- test <- omni_data %>%
-   filter(home == '007', location == 'kitchen')
- 
- test2 <- read_rds('./csv_created/omni_raw_2021-07-14/003_outdoor.rds')
+
 # method 2---------
 #   # find duplicates by date logged for each sensor
 #   duplicates <- omni_data %>%
@@ -465,7 +468,7 @@ stop('duplicates outside of daylight savings time exist')}
 # write data------------------- 
 write_rds(omni_data_clean, paste0('./csv_created/pre-calibration/omni_all_locations_pre-cal_', Sys.Date(), '.rds'))
 
-
+ 
 ```
 
 
@@ -540,26 +543,62 @@ filter_data_correct <- filter_data %>%
 
 omni_data_precal <- 
   # read in uncalibrated data
-  read_csv(paste0('./csv_created/pre-calibration/omni_all_locations_pre-cal.csv'))
+  read_rds(paste0('./csv_created/pre-calibration/omni_all_locations_pre-cal.rds'))
 
-# make datafrae of corrrection factors
+# make dataframe of corrrection factors
 grav_cf_df <- omni_data_precal %>%
   #calculate TWA for pm2.5 for each home/location
   group_by(home, location) %>%
   summarise_at(vars(pm25), funs(twa = mean, n_hours = n()/(60/5),
                                 )) %>%
+  ungroup() %>%
   # match filter-based concentration to TWA for each home/location
   left_join(filter_data_correct, by = c('home' = 'id_home', 'location')) %>%
-  mutate(grav_cf = twa/conc_correct)
+  mutate(
+    grav_cf = twa/conc_correct,
+         # fill in NA values with median correction factor
+         grav_cf = ifelse(is.na(conc_correct), median(grav_cf, na.rm = TRUE),
+                          grav_cf)
+  )
+  
 
 omni_data_cal <- omni_data_precal %>%
   left_join(grav_cf_df, by = c('home', 'location')) %>%
   mutate(pm25 = pm25/grav_cf)
 
 
- 
+# make rds file
+write_rds(omni_data_cal, paste0('./csv_created/omni_calibrated_',
+Sys.Date(),'.rds'))
 ```
 
+
+```{r hourly_cal_data_rds}
+
+omni_hourly_data <- omni_data_cal %>%
+  group_by(datehour = floor_date(datetime, unit = 'hour'),
+           home, location) %>%
+  summarise_if(is.numeric, list(mean), na.rm = TRUE) %>%
+  ungroup()
+
+# make rds file
+write_rds(omni_hourly_data, paste0('./csv_created/omni_hourly_calibrated_',
+Sys.Date(),'.rds'))
+
+```
+
+```{r daily_cal_data_rds}
+
+  omni_daily_data <- omni_data_cal %>%
+  group_by(dateday = floor_date(datetime, unit = 'day'),
+           home, location) %>%
+  summarise_if(is.numeric, list(mean), na.rm = TRUE) %>%
+  ungroup()
+
+write_rds(omni_daily_data, paste0('./csv_created/omni_daily_calibrated_',
+Sys.Date(),'.rds'))
+
+```
 
 # try to ignore files that have been downloaded before (beta code)
 
