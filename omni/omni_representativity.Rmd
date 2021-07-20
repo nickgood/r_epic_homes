@@ -34,7 +34,7 @@ library(ggpubr) # for tesing log-normality
 
 ```
 
-```{r import_omni_minute_data}
+```{r import_omni_minute_data, eval = FALSE}
 # omni_data<- read_csv('./csv_created/omni_all_locations.csv')
 # 
 # zero_test <- omni_data %>%
@@ -47,7 +47,7 @@ library(ggpubr) # for tesing log-normality
 
 ```
 
-```{r import_omni_hourly_data}
+```{r import_omni_hourly_data, eval = FALSE}
 omni_hourly_data<- read_csv('./csv_created/omni_hourly_data.csv')
 
 ```
