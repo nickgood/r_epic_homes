@@ -41,7 +41,7 @@ threedig <- function(x) {
 home.list <- function(x) sapply(x, threedig)
 ```
 
-```{r data_import, eval = TRUE}
+```{r data_import, eval = FALSE}
 data <- read_rds("../drive_sync/epic_homes/r_epic_homes/output/sense/sense_all.rds")
 ```
 
@@ -262,7 +262,7 @@ heating threshold set at `r heat_percentile_thresh` percentile for daily % time 
 ac threshold set at `r ac_usage_thresh`% for daily % time on
 
 ## Tier 3 Homes
-```{r plot_manual_cluster_tier3, eval = TRUE, fig.width=8, fig.height=1}
+```{r plot_manual_cluster_tier3, eval = FALSE, fig.width=8, fig.height=1}
 
 
 
@@ -296,7 +296,7 @@ home_012 <- cluster.manual(hm, c('furnace','ac'))
 ```
 
 ## Tier 2 Homes
-```{r plot_manual_cluster_tier2, eval = TRUE, fig.width=8, fig.height=1}
+```{r plot_manual_cluster_tier2, eval = FALSE, fig.width=8, fig.height=1}
 
 hm <- '004'
 # no AC
@@ -330,7 +330,7 @@ cluster.manual.heat(hm, c('furnace'))
 ```
 
 ## Tier 1 Homes
-```{r plot_manual_cluster_tier1, eval = TRUE, fig.width=8, fig.height=1}
+```{r plot_manual_cluster_tier1, eval = FALSE, fig.width=8, fig.height=1}
 
 
 hm <- '006'
