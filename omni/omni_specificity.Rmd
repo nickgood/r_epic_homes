@@ -553,7 +553,7 @@ ggplot(a, (aes(x = home, y = rank)))+
 
 
 # Testing
-* NOTE: PROBABLY OLD FUNCTION
+* NOTE: MAY BE OLD FUNCTION
 ```{r master_func_testing}
 
 # define variables for testing-----------------------
@@ -751,7 +751,30 @@ data = omni_hourly_data) {
             
             
             other_rooms <- rooms_with_data[-which(rooms_with_data == room)]
+           ## Try mutinformation func----------------------- 
+            # use with normally dist data and compare with Osses formula---------
+            room_norm <- runif(10000, -2.3, 7)
+             complement_norm <- runif(10000, -2.5, 7.2)
+             
+             # calculate from infotheo R package
+            mut_info1 <- mutinformation(discretize(room_norm, nbins = 100),
+                                        discretize(complement_norm, nbins = 100))
+
+             #estimate using Osses Normal formula
+             variance_room <- var(room_norm)
+             variance_complement <- var(complement_norm)
+             
+            cov_matrix <- cov(
+              matrix(c(room_norm, complement_norm), ncol = 2))
             
+            cov_determinant <- det(cov_matrix)
+            
+            
+              mut_info2 <- -0.5*log( cov_determinant/
+                                       (variance_room*variance_complement) )
+            
+            
+
             # look at function source code----------------------
             getAnywhere(mutinformation())
             getAnywhere(entropy())
