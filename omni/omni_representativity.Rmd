@@ -48,7 +48,7 @@ library(ggpubr) # for tesing log-normality
 ```
 
 ```{r import_omni_hourly_data, eval = FALSE}
-omni_hourly_data<- read_csv('./csv_created/omni_hourly_data.csv')
+omni_hourly_data<- read_rds('./csv_created/omni_hourly_calibrated.rds')
 
 ```
 
@@ -321,38 +321,50 @@ data = omni_hourly_data) {
     info_gain_rooms <- 
       map(rooms_with_data,
           function(room){
-            
+
             other_rooms <- rooms_with_data[-which(rooms_with_data == room)]
             
             ## make complement data set by averaging each measurment between to rooms
             ## and find the covariance between these two rooms
-            data_complement <- data_wide_complete_log %>%
-              select(all_of(other_rooms))%>%
-              mutate(mean = rowMeans(.)) %>% pull(mean)
+            # calculate info gain based on Osses Equation 4
+            cov_mat_all <- cov(matrix(c(
+              data_wide_complete_log %>% pull(room),
+              data_wide_complete_log %>% pull(other_rooms[1]),
+              data_wide_complete_log %>% pull(other_rooms[2])
+            ), ncol = 3))
             
-            cov_complement <- cov(data_wide_complete_log %>% pull(other_rooms[1]),
-                                  data_wide_complete_log %>% pull(other_rooms[2]))
+            cov_mat_complement <- cov(matrix(c(
+              data_wide_complete_log %>% pull(other_rooms[1]),
+              data_wide_complete_log %>% pull(other_rooms[2])
+            ), ncol = 2))
             
-            cov_matrix <- cov(
-              matrix(c(data_wide_complete_log %>% pull(room),
-                       data_complement), ncol = 2), 
-              use = 'complete.obs')
+            cov_complement <- cov(
+              data_wide_complete_log %>% pull(other_rooms[1]),
+              data_wide_complete_log %>% pull(other_rooms[2])
+            )
             
-            cov_determinant <- det(cov_matrix)
-            
-            mean_room <- mean(data_wide_complete_log %>% pull(room))
             variance_room <- var(data_wide_complete_log %>% pull(room))
             
-                        mean_complement <- mean(data_complement)
-            variance_complement <- (
+            mean_room <- mean(data_wide_complete_log %>% pull(room))
+            
+            variance_complement <-
+              (
               var(data_wide_complete_log %>% pull(other_rooms[1])) +
                 var(data_wide_complete_log %>% pull(other_rooms[2])) +
                 2*cov_complement
-            )/length(other_rooms)^2            
+            )/
+              length(other_rooms)^2 
             
+            mean_complement <-mean( c(
+              data_wide_complete_log %>% pull(other_rooms[1]),
+              data_wide_complete_log %>% pull(other_rooms[2])
+            ) )
+
             info_gain <-
               0.5*(
-          variance_room/variance_complement-1-log( cov_determinant/variance_complement^2)+((mean_room-mean_complement)^2)/variance_complement
+                sum(diag(solve(cov_mat_complement)*variance_room))-1-
+                  log(det(cov_mat_all)/det(cov_mat_complement)^2)+
+                  ((mean_room-mean_complement)^2)/cov_complement
               )
             
             list('info_gain' = info_gain,
