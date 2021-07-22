@@ -752,14 +752,17 @@ data = omni_hourly_data) {
             
             other_rooms <- rooms_with_data[-which(rooms_with_data == room)]
            ## Try mutinformation func----------------------- 
-            # use with normally dist data and compare with Osses formula---------
-            room_norm <- runif(10000, -2.3, 7)
-             complement_norm <- runif(10000, -2.5, 7.2)
+            # use with 2 normally dist vectors and compare with Osses formula---------
+            room_norm <- runif(10000000, -2.3, 7)
+             complement_norm <- runif(10000000, -2.5, 7.2)
+             all_norm <- c(room_norm)
              
              # calculate from infotheo R package
-            mut_info1 <- mutinformation(discretize(room_norm, nbins = 100),
+            mut_info1 <- mutinformation(discretize(room_norm, nbins = 1000),
+                                        discretize(complement_norm, nbins = 1000))
+            # try with less bins in calc
+            mut_info1b <- mutinformation(discretize(room_norm, nbins = 100),
                                         discretize(complement_norm, nbins = 100))
-
              #estimate using Osses Normal formula
              variance_room <- var(room_norm)
              variance_complement <- var(complement_norm)
@@ -773,7 +776,32 @@ data = omni_hourly_data) {
               mut_info2 <- -0.5*log( cov_determinant/
                                        (variance_room*variance_complement) )
             
-            
+              # use with 3 normally dist vectors and compare with Osses formula---------
+              room_norm <- runif(10000, -2.3, 7)
+             complement1_norm <- runif(10000, -2.5, 7.2)
+             complement2_norm <- runif(10000, -2.0, 7.1)
+             complementall_norm <- matrix(c(complement1_norm, complement2_norm),
+                                          ncol = 2)
+             allrooms_norm <- matrix(c(room_norm, complementall_norm), ncol = 3)
+             
+             # calculate from infotheo R package
+             ## try with complement matrix
+            mut_info1 <- mutinformation(discretize(room_norm),
+                                        discretize(complementall_norm))
+             ## try with complement vector
+            mut_info1b <- mutinformation(discretize(room_norm),
+                                        discretize(c(
+                                          complement1_norm,
+                                          complement2_norm
+                                        )))
+
+             #estimate using Osses Normal formula
+            cov_all <- cov(allrooms_norm)
+             cov_complement <- cov(complementall_norm)
+             variance_room <- var(room_norm)
+             
+             mut_info2 <- -0.5*log( det(cov_all)/
+                                       (variance_room*det(cov_complement)))
 
             # look at function source code----------------------
             getAnywhere(mutinformation())
