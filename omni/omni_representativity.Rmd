@@ -125,6 +125,22 @@ pdf_days <- c(3,7,10,14,21)
 
 warn <- 'none'
 
+# color blind pallette
+# check http://www.cookbook-r.com/Graphs/Colors_(ggplot2)/#a-colorblind-friendly-palette
+cbbPalette <- c('black' = "#000000",
+                'light_orange' = "#E69F00",
+                'light_blue' = "#56B4E9",
+                'green' = "#009E73",
+                'yellow' = "#F0E442",
+                'dark_blue' = "#0072B2",
+                'dark_orange' = "#D55E00",
+                'purple' = "#CC79A7"
+                )
+# define colors for energy clusters
+energy_colors <- c(cbbPalette['green'],
+                   cbbPalette['purple'],
+                   cbbPalette['light_orange'])%>% unname()
+
 ```
 
 ```{r function_info_gain_master}
@@ -133,8 +149,8 @@ warn <- 'none'
 
 # define variables for testing-----------------------
 
-# date_ranges_entire <- list(c('2020-11-01', '2020-11-30'))
-# home_num <- '004'
+# date_ranges_entire <- list(c('2020-08-26', '2020-12-01'))
+# home_num <- '011'
 # data <- omni_hourly_data
 # monitor_season <- date_ranges_entire[1]
 # metric <- 'voc'
@@ -342,7 +358,7 @@ data = omni_hourly_data) {
               data_wide_complete_log %>% pull(other_rooms[1]),
               data_wide_complete_log %>% pull(other_rooms[2])
             )
-            
+
             variance_room <- var(data_wide_complete_log %>% pull(room))
             
             mean_room <- mean(data_wide_complete_log %>% pull(room))
@@ -362,9 +378,12 @@ data = omni_hourly_data) {
 
             info_gain <-
               0.5*(
-                sum(diag(solve(cov_mat_complement)*variance_room))-1-
-                  log(det(cov_mat_all)/det(cov_mat_complement)^2)+
-                  ((mean_room-mean_complement)^2)/cov_complement
+                variance_room/variance_complement-1-
+                  log(
+                    det(cov_mat_all)/
+                        (det(cov_mat_complement)*variance_complement)
+                    )+
+                  ((mean_room-mean_complement)^2)/variance_complement
               )
             
             list('info_gain' = info_gain,
@@ -531,12 +550,13 @@ unwanted_scaled_na <- represent_df %>%
 ### `r unwanted_scaled_na %>% nrow()` unexpected missing values in representativity data
 
 ```{r plot_rep_rooms}
+
 ggplot(represent_df, aes(x = location, y = represent))+
   geom_boxplot(outlier.shape = NA)+
   geom_jitter( aes(color = energy_cluster), width = 0.1)+
   facet_wrap(vars(metric), labeller = labeller.metrics)+
   scale_color_manual(breaks = c('ac', 'shoulder', 'heat'),
-                     values = c('blue', 'green', 'red'),
+                     values = energy_colors,
                      name = 'Season')
 ```
 
@@ -563,7 +583,7 @@ ggplot(a, (aes(x = home, y = rank)))+
     xintercept = seq(1.5,length(a %>% pull(home)%>%as.factor%>% levels)-0.5, 1),
     color = 'grey')+ # insert lines between homes
   scale_color_manual(breaks = c('ac', 'shoulder', 'heat'),
-                     values = c('blue', 'green', 'red'),
+                     values = energy_colors,
                      name = 'Season')
 
 

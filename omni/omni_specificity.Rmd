@@ -126,6 +126,22 @@ pdf_days <- c(3,7,10,14,21)
 
 warn <- 'none'
 
+# color blind pallette
+# check http://www.cookbook-r.com/Graphs/Colors_(ggplot2)/#a-colorblind-friendly-palette
+cbbPalette <- c('black' = "#000000",
+                'light_orange' = "#E69F00",
+                'light_blue' = "#56B4E9",
+                'green' = "#009E73",
+                'yellow' = "#F0E442",
+                'dark_blue' = "#0072B2",
+                'dark_orange' = "#D55E00",
+                'purple' = "#CC79A7"
+                )
+# define colors for energy clusters
+energy_colors <- c(cbbPalette['green'],
+                   cbbPalette['purple'],
+                   cbbPalette['light_orange'])%>% unname()
+
 ```
 
 ```{r function_mutual_info_master}
@@ -468,6 +484,7 @@ write_csv(mutual_info_df, file =
 
 
 
+
 ```
 
 # Plotting
@@ -509,7 +526,7 @@ ggplot(spec_df, aes(x = location, y = specificity))+
   geom_jitter( aes(color = energy_cluster), width = 0.1)+
   facet_wrap(vars(metric), labeller = labeller.metrics)+
   scale_color_manual(breaks = c('ac', 'shoulder', 'heat'),
-                     values = c('blue', 'green', 'red'),
+                     values = energy_colors,
                      name = 'Season')
 ```
 
@@ -536,7 +553,7 @@ ggplot(a, (aes(x = home, y = rank)))+
     xintercept = seq(1.5,length(a %>% pull(home)%>%as.factor%>% levels)-0.5, 1),
     color = 'grey')+ # insert lines between homes
   scale_color_manual(breaks = c('ac', 'shoulder', 'heat'),
-                     values = c('blue', 'green', 'red'),
+                     values = energy_colors,
                      name = 'Season')
 
 
