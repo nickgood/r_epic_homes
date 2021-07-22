@@ -1,0 +1,1494 @@
+---
+title: "omni_hourly_correlation"
+author: "Andrew Purgiel"
+date: "7/22/2021"
+output: html_document
+---
+---
+title: "omni_hourly_correlation"
+author: "Andrew Purgiel"
+date: "1/13/2021"
+output: html_document
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.path = 'figures/',
+  warning = FALSE,
+  message = FALSE,
+  echo = FALSE,
+  fig.width = 10, fig.height = 3,
+  cache = FALSE)
+```
+
+---
+
+```{r libraries}
+library(dplyr)
+library(purrr)
+library(tidyr)
+library(openair)
+library(ggplot2)
+library(readr)
+library(googlesheets4)
+library(lubridate)
+```
+
+```{r data_import}
+omni_hourly_data <- read_rds('./csv_created/omni_hourly_calibrated.rds')
+```
+
+
+```{r define_functions}
+
+##Define a char vector of home numbers using a number vector,
+##ex: x <- home.list(c(1:15)) for homes 1-15
+threedig <- function(x) {
+  if (nchar(x) == 1) {a <- paste0('00', x)
+  return(a)
+  }
+  
+  if (nchar(x) == 2) {a<- paste0('0', x)
+  return(a)
+  }
+  else return(a)
+}
+
+home.list <- function(x) sapply(x, threedig)
+
+
+ # function to extract a legend from one plot for use in whole plot grid
+ # reference: https://stackoverflow.com/questions/13649473/add-a-common-legend-for-combined-ggplots
+ g_legend<-function(a.gplot){
+    tmp <- ggplot_gtable(ggplot_build(a.gplot))
+    leg <- which(sapply(tmp$grobs, function(x) x$name) == "guide-box")
+    legend <- tmp$grobs[[leg]]
+    return(legend)}
+
+
+ 
+ # between-room correlation functions--------------------------------------
+
+ 
+# hourly correlation between two rooms
+ room.hourly.plot <- function(data, hm, rmlist,
+                              metric, method) { 
+   
+   ##function to find the correlation between room pair (y)
+   ##in a home at a given hour (x)
+   r.coeff.hour <- function(x,y) {
+     a <-
+       
+       ##data from room 1
+       data %>%
+       filter(home == hm & room == y[1]) %>%
+       
+       ##join with data from room 2 based on timestamp
+       full_join(
+         data %>%
+           filter(home == hm & room == y[2]),
+         by = 'date',
+         suffix = c('.1','.2'))
+     
+     ##make an hour column and filter data by hour of day
+     a$hour <- a$date %>%
+       hour()
+     
+     a <- a %>%
+       filter(hour == x)
+     
+     ##calculate R coefficient of choice for room at the filtered hour
+     b <- tryCatch(cor.test(a %>% pull(paste0(metric, '.1')),
+                            a %>% pull(paste0(metric, '.2')),
+                            method = method)$estimate,
+                   error = function(e) NA)
+     
+     ##find p-value
+     
+     c <- tryCatch(cor.test(a %>% pull(paste0(metric, '.1')),
+                            a %>% pull(paste0(metric, '.2')),
+                            method = method)$p.value,
+                   error = function(e) NA)
+     
+     
+     return(cbind(b,c))
+     
+   }
+   
+   
+   
+   ##find correlation between room pair (z) by hour
+   cor.tab.hour <- function (z) {
+     
+     a <- sapply(c(0:23), r.coeff.hour,
+                            y = z)
+     
+     tibble('hour' = c(0:23),
+            
+            ##make a column for correlation coefficient values
+            'col1' = a[1,],
+            
+            ##make a column for correlation p-values
+            'col2' = a[2,]) %>%
+       
+       ##rename columns with names of compared rooms
+       mutate(!!paste0(z[1],'-', z[2]) := col1,
+              !!paste0(z[1],'-', z[2], '_p') := col2) %>%
+       select(-col1, -col2)
+   }
+   
+   ##find correlations and pvalues for each room pair
+   a <- lapply(rmlist, cor.tab.hour) %>%
+     
+     ##megre all results into one table
+     reduce(full_join, by = 'hour')
+   
+   ##make a melted table to prepare for plot
+   a <-
+     ##melt all the r-value columns
+     a %>%
+     as.data.frame() %>%
+     select(hour, !ends_with('_p')) %>%
+     melt(id.vars = 'hour') %>%
+     mutate(r = value) %>%
+     select(-value) %>%
+     
+     ##join with melted columns of p values
+     full_join(
+       a %>%
+         as.data.frame() %>%
+         select(hour, ends_with('_p')) %>%
+         ##remove the '_p' from the id of the p-values
+         rename_at(.vars = vars(ends_with('_p')),
+                   .funs = ~sub('_p', "", .))%>%
+         melt(id.vars = 'hour') %>%
+         mutate(p = value) %>%
+         select(-value),
+       by = c('hour','variable')
+     )
+   
+   ##from
+   ##https://www.rdocumentation.org/packages/ggplot2/versions/1.0.1/topics/scale_colour_gradient2
+   
+   ggplot(a, aes(hour, r)) + 
+     ggtitle(paste('Home', hm, metric))+
+     geom_point(aes(size = ifelse(p < 0.05, 3, 1),
+                    color = variable))+ 
+     scale_size_identity() +
+     coord_cartesian(ylim = c(0,1))+
+     ylab(paste(method, 'correlation coefficient'))+
+     theme_bw()+
+     theme(axis.text.x = element_text(size = medium),
+           axis.title.x = element_text(size = medium),
+           axis.title.y = element_text(size = medium),
+           axis.text.y = element_text(size = medium),
+           plot.title = element_text(size = large, hjust = 0.5),
+           legend.title = element_text(size = xsmall),
+           legend.text = element_text(size = xsmall))+
+     scale_color_discrete(name = 'Location Correlation')
+ }
+ 
+ 
+ 
+ 
+ ##function to plot in a grid
+ plot.grid.rooms <- function (data, hms, rmlist, metric, method,
+                        ncolumn) {
+    plots <- lapply(hms, room.hourly.plot,
+                    data = data, metric = metric,
+                    rmlist = rmlist,
+                    method = 'spearman'
+                    )
+    
+    ##omit NULL values (from homes or rooms without valid data)
+    plots <- plots[!sapply(plots, is.null)]
+    
+    legend <- g_legend(plots[[1]]) # extract legend from first plot
+    
+    # omit labels and such from plots
+    plots <- lapply(plots,
+                    function(myplot) {
+                       
+#                        # change existing title
+# # https://stackoverflow.com/questions/41940000/modifying-ggplot-objects-after-creation
+# myplot<- ggplot_build(myplot)
+# 
+# myplot$plot$labels$title <-
+#    sub('.*Home ', '',myplot$plot$labels$title) %>% # extract characters after 'Home'
+#    substr(1,3) # extract first three remaining characters (home number)
+# 
+# # convert back to a ggplot object
+# myplot <- ggplot_gtable(myplot)
+# myplot <- as_ggplot(myplot)
+
+# change all other labels
+                       myplot+
+      theme(
+         axis.text.x = element_text(size = xsmall),
+            axis.text.y = element_text(size = xsmall),
+           axis.title.x = element_blank(),
+           axis.title.y = element_blank(),
+           plot.title = element_text(size = xsmall, hjust = 0.5),
+           legend.title = element_text(size = xsmall),
+           legend.text = element_text(size = xsmall),
+           legend.position = 'none')
+                       
+                       
+                    }
+    )
+      
+    # arrange all plots
+    # reference: https://stackoverflow.com/questions/10706753/how-do-i-arrange-a-variable-list-of-plots-using-grid-arrange
+    grid.arrange(arrangeGrob(grobs = plots),
+                 legend, # add in legend
+                 nrow=2, # one row for all plots, one row for legend
+                 heights=c(10, 1), # second height is for legend
+                 top = metric
+    )
+ }
+ 
+ 
+ 
+ 
+# between-metric correlation functions--------------------------------------
+ 
+ # data <- rtdata
+ # hm <- '008'
+ # rm <- 'living'
+ # metric_pair_list <- list(c('co2', 'voc'), c('co2','light'))
+ # hr <- 5
+ # method <- 'pearson'
+ 
+  data <- 'asdfas'
+ hm <- 'asdfas'
+ rm <- 'agasdfsdaf'
+ metric_pair_list <- 'asdfasdfavgae'
+ hr <- 'dfghdfg'
+ method <- 'asvfadsfbawerb'
+ 
+
+
+    # hourly correlation between two metrics
+ metric.hourly.plot <- function(data, hm, rm,
+                              metric_pair_list, method
+                              ) { 
+   
+   ##function to find the correlation between metric pair
+   ##in a home at a given hour 
+   r.coeff.hour <- function(metric_pair1, hr) {
+     a <-
+       
+       ##data from specified room in one home
+       data %>%
+       filter( room == rm & home == hm) %>%
+     ##make an hour column and filter data by hour of day
+     mutate(hour = hour(date)) %>%
+       filter(hour == hr)
+     
+     # run correlation test with method of choice,
+     # return NAs if not enough data fro an hour
+     a <- tryCatch(cor.test(a %>% pull(all_of(metric_pair1[1])),
+                            a %>% pull(all_of(metric_pair1[2])),
+                            method = method),
+                   error = function(e) list(estimate = NA, p.value = NA))
+     
+     ##calculate R coefficient of choice for room at the filtered hour
+     b <- a$estimate
+     
+     ##find p-value
+     
+     c <- a$p.value
+     
+     
+     return(cbind(b,c))
+     
+   }
+   
+
+   
+   ##find correlation between metric pair (z) by hour
+   cor.tab.hour <- function (metric_pair2) {
+     
+     a <- sapply(c(0:23), r.coeff.hour,
+                            metric_pair1 = metric_pair2)
+     
+     tibble('hour' = c(0:23),
+            
+            ##make a column for correlation coefficient values
+            'col1' = a[1,],
+            
+            ##make a column for correlation p-values
+            'col2' = a[2,]) %>%
+       
+       ##rename columns with names of compared rooms
+       mutate(!!paste0(metric_pair2[1],'-', metric_pair2[2]) := col1,
+              !!paste0(metric_pair2[1],'-', metric_pair2[2], '_p') := col2) %>%
+       select(-col1, -col2)
+   }
+   
+   ##find correlations and pvalues for each metric pair
+   a <- lapply(metric_pair_list, cor.tab.hour) %>%
+     
+     ##megre all results into one table
+     reduce(full_join, by = 'hour')
+   
+   ##make a melted table to prepare for plot
+   a <-
+     ##melt all the r-value columns
+     a %>%
+     as.data.frame() %>%
+     select(hour, !ends_with('_p')) %>%
+     melt(id.vars = 'hour') %>%
+     mutate(r = value) %>%
+     select(-value) %>%
+     
+     ##join with melted columns of p values
+     full_join(
+       a %>%
+         as.data.frame() %>%
+         select(hour, ends_with('_p')) %>%
+         ##remove the '_p' from the id of the p-values
+         rename_at(.vars = vars(ends_with('_p')),
+                   .funs = ~sub('_p', "", .))%>%
+         melt(id.vars = 'hour') %>%
+         mutate(p = value) %>%
+         select(-value),
+       by = c('hour','variable')
+     )
+   
+   ##from
+   ##https://www.rdocumentation.org/packages/ggplot2/versions/1.0.1/topics/scale_colour_gradient2
+      ggplot(a, aes(hour, r)) + 
+     ggtitle(paste('Home', hm, rm))+
+     geom_point(aes(size = ifelse(p < 0.05, 3, 1),
+                    color = variable))+ 
+     scale_size_identity() +
+     coord_cartesian(ylim = c(0,1))+
+     ylab(paste(method, 'correlation coefficient'))+
+     theme_bw()+
+     theme(axis.text.x = element_text(size = medium),
+           axis.title.x = element_text(size = medium),
+           axis.title.y = element_text(size = medium),
+           axis.text.y = element_text(size = medium),
+           plot.title = element_text(size = large, hjust = 0.5),
+           legend.title = element_text(size = xsmall),
+           legend.text = element_text(size = xsmall))+
+     scale_color_discrete(name = 'Metric Correlation')
+   
+   
+ }
+ 
+ ##function to plot in a grid
+ plot.grid.metrics <- function (data, hms, rm, metric_pair_list, method,
+                        ncolumn) {
+    plots <- lapply(hms, metric.hourly.plot,
+                    data = data, rm = rm,
+                    metric_pair_list = metric_pair_list,
+                    method = 'spearman'
+                    )
+    
+    ##omit NULL values (from homes or rooms without valid data)
+    plots <- plots[!sapply(plots, is.null)]
+    
+    legend <- g_legend(plots[[1]]) # extract legend from first plot
+    
+    # omit labels and such from plots
+    plots <- lapply(plots,
+                    function(myplot) {
+                       
+#                        # change existing title
+# # https://stackoverflow.com/questions/41940000/modifying-ggplot-objects-after-creation
+# myplot<- ggplot_build(myplot)
+# 
+# myplot$plot$labels$title <-
+#    sub('.*Home ', '',myplot$plot$labels$title) %>% # extract characters after 'Home'
+#    substr(1,3) # extract first three remaining characters (home number)
+# 
+# # convert back to a ggplot object
+# myplot <- ggplot_gtable(myplot)
+# myplot <- as_ggplot(myplot)
+
+# change all other labels
+                       myplot+
+      theme(
+         axis.text.x = element_text(size = xsmall),
+            axis.text.y = element_text(size = xsmall),
+           axis.title.x = element_blank(),
+           axis.title.y = element_blank(),
+           plot.title = element_text(size = xsmall, hjust = 0.5),
+           legend.title = element_text(size = xsmall),
+           legend.text = element_text(size = xsmall),
+           legend.position = 'none')
+                       
+                       
+                    }
+    )
+      
+    # arrange all plots
+    # reference: https://stackoverflow.com/questions/10706753/how-do-i-arrange-a-variable-list-of-plots-using-grid-arrange
+    grid.arrange(arrangeGrob(grobs = plots),
+                 legend, # add in legend
+                 nrow=2, # one row for all plots, one row for legend
+                 heights=c(10, 1), # second height is for legend
+                 top = rm
+    )
+ }
+ 
+
+###############
+ 
+ 
+ 
+
+#  # testing methods
+#  start <- Sys.time()
+# metric.hourly.plot(hourly, '008', 'living',
+#                              list(c('co2', 'voc'), c('co2','light')), 'spearman',
+#                    simple = TRUE)
+#  end <- Sys.time()
+# 
+#  run_time2 <- end - start
+# 
+#  all.equal(test1, test2)
+
+```
+
+```{r define_variables, include = FALSE}
+
+#define list of homes for analysis
+all_homes <- home.list(1:16)
+
+some_homes <- home.list(c(1,3,6,8,12,15))
+
+##define room pairs for comparison
+rms_1 <- c('kitchen', 'living')
+rms_2 <- c('kitchen', 'garage')
+rms_3 <- c('kitchen', 'bedroom')
+rms_4 <- c('outdoor', 'living')
+rms_5 <- c('outdoor', 'garage')
+rms_6 <- c('outdoor', 'bedroom')
+rms_7 <- c('garage', 'living')
+rms_8 <- c('garage', 'bedroom')
+rms_9 <- c('living', 'bedroom')
+
+######make lists of rooms by defining which pairs to compare
+#comparison of 'living areas'
+rms_indoor <- lapply(c(1,3,9), function(x) get(paste0('rms_', x)))
+#comparison
+rms_driver <- lapply(c(1,4,7), function(x) get(paste0('rms_', x)))
+
+##For labeling pruposes
+xsmall <- 6
+small <- 15
+medium <- 20
+large <- 26
+
+# # for looking at seasons
+# fall <- c('2020-09-21 00:00:00', '2020-12-20 23:59:59')
+# winter <- c('2020-12-21 00:00:00', '2020-3-20 23:59:59')
+# 
+# 
+# hourly_fall <- hourly%>%
+#    filter(between(as.POSIXct(date),
+#                   as.POSIXct(fall[1], format = "%Y-%m-%d %H:%M:%S", tz = "US/Mountain"),
+#                   as.POSIXct(fall[2], format = "%Y-%m-%d %H:%M:%S", tz = "US/Mountain")))
+# 
+# 
+# hourly_winter <- hourly %>%
+#    filter(between(as.POSIXct(date),
+#                   as.POSIXct(winter[1], format = "%Y-%m-%d %H:%M:%S", tz = "US/Mountain"),
+#                   as.POSIXct(winter[2], format = "%Y-%m-%d %H:%M:%S", tz = "US/Mountain")))
+
+
+```
+
+```{r functions_correlation_additional variable, eval = TRUE}
+data <- omni_hourly_data
+hm <- '008'
+rm_pair <- c('living', 'garage')
+met <- 'pm25'
+method <- 'spearman'
+hr <- 23
+
+##in a home at a given hour 
+ r.coeff.hour <- function(data, hm, rm_pair,
+                          hr, met,
+                          method = 'spearman') {
+   hour_data <-
+     data %>%
+     filter(home == hm) %>%
+     select(datehour, home, location, all_of(met)) %>%
+     pivot_wider(names_from = location, values_from = all_of(met)) %>%
+   
+      ##make an hour column and filter data by hour of day
+     mutate(hour = hour(datehour)) %>%
+     filter(hour == hr)
+   
+      ##calculate R coefficient of choice for room at the filtered hour
+   cor_results <- tryCatch(
+     {
+     a <- cor.test(hour_data %>% pull(rm_pair[1]),
+                          hour_data %>% pull(rm_pair[2]),
+                          method = method)
+     # return results
+     tibble('coeff' = a[['estimate']],
+            'p_val' = a[['p.value']],
+            'method' = method)
+     },
+                 error = function(e) {
+                   # return empty values if error
+                   tibble('coeff' = NA,
+            'p_val' = NA,
+            'method' = method)
+                 })
+    return(cor_results)
+
+    }
+ 
+
+ 
+ ##find correlation between room pair  by hour
+ cor.tab.hour <- function (data, hm, rm_pair,
+                           metric, method) {
+   tibble('hour' = c(0:23),
+          
+          ##make a column for correlation coefficient values
+          'col1' = sapply(c(0:23), r.coeff.hour,
+                          data = data,
+                          hm = hm,
+                          metric = metric,
+                          method = method,
+                          rm_pair = rm_pair)[1,],
+          
+          ##make a column for correlation p-values
+          'col2' = sapply(c(0:23),r.coeff.hour,
+                          data = data,
+                          hm = hm,
+                          metric = metric,
+                          method = method,
+                          rm_pair = rm_pair)[2,]) %>%
+     
+     ##rename columns with names of compared rooms
+     mutate(!!paste0(rm_pair[1],'-', rm_pair[2]) := col1,
+            !!paste0(rm_pair[1],'-', rm_pair[2], '_p') := col2) %>%
+     select(-col1, -col2)
+ }
+
+ 
+ 
+ 
+ 
+ ##function to create a plot of correlation between
+ ##multiple room pairs by hour
+ ##with additional variable also plotted by hour
+ 
+
+ 
+ 
+##Temp
+ room.hourly.plot.temp <- function (data, hm, rmlist, metric, method) {
+   
+   ##find correlations and pvalues for each room pair
+   a <- lapply(rmlist, cor.tab.hour,
+               data = data,
+               hm = hm,
+               metric = metric,
+               method = method) %>%
+     
+     ##megre all results into one table
+     reduce(full_join, by = 'hour')
+   
+   ##make a melted table to prepare for plot
+   a <-
+     ##melt all the r-value columns
+     a %>%
+     as.data.frame() %>%
+     select(hour, !ends_with('_p')) %>%
+     melt(id.vars = 'hour') %>%
+     mutate(r = value) %>%
+     select(-value) %>%
+     
+     ##join with melted columns of p values
+     full_join(
+       a %>%
+         as.data.frame() %>%
+         select(hour, ends_with('_p')) %>%
+         ##remove the '_p' from the id of the p-values
+         rename_at(.vars = vars(ends_with('_p')),
+                   .funs = ~sub('_p', "", .))%>%
+         melt(id.vars = 'hour') %>%
+         mutate(p = value) %>%
+         select(-value),
+       by = c('hour','variable')
+     ) %>%
+     
+     ##join with average hourly kitchen co2
+     full_join(
+       hourly %>%
+         filter(home == hm, room == 'outdoor') %>%
+         select(date, co2, temp, rh) %>%
+         mutate(hour = hour(date)) %>%
+         group_by(hour) %>%
+         summarize(co2 = mean(co2, na.rm = TRUE),
+                   temp = mean(temp, na.rm = TRUE),
+                   rh = mean(rh, na.rm = TRUE)) %>%
+         ungroup()
+     )
+   
+   
+   ##add coefficient to scale kitchen CO2 axis for two y axes
+   coeff <- 50
+   
+   
+   ggplot(a, aes(x = hour)) + 
+     ggtitle(hm)+
+     geom_point(aes(y = r, size = ifelse(p < 0.05, 3, 1),
+                    color = variable))+ 
+     ##add points for CO2 levels in kitchen
+     geom_point(aes(y = temp/coeff, shape = 'outdoor T'))+
+     scale_size_identity() +
+     coord_cartesian(ylim = c(0,1))+
+     ylab(expression("Spearman's"~rho))+
+     theme_bw()+
+     scale_color_discrete(name = 'Location Correlation')+
+     scale_y_continuous(
+       
+       # Add a second axis and specify its features
+       sec.axis = sec_axis( trans=~.*coeff,
+                            name = 'deg C')
+       )+
+     #remove label for second legend
+     scale_shape_manual(NULL, values = 16)
+ }
+ 
+ 
+
+ 
+ 
+  ##functions that omit legends and lables to plot in a grid
+
+
+ #Temp
+ room.hourly.plot.temp.simp <- function (data, hm, rmlist, metric, method) {
+   
+   ##find correlations and pvalues for each room pair
+   a <- lapply(rmlist, cor.tab.hour,
+               data = data,
+               hm = hm,
+               metric = metric,
+               method = method) %>%
+     
+     ##megre all results into one table
+     reduce(full_join, by = 'hour')
+   
+   ##make a melted table to prepare for plot
+   a <-
+     ##melt all the r-value columns
+     a %>%
+     as.data.frame() %>%
+     select(hour, !ends_with('_p')) %>%
+     melt(id.vars = 'hour') %>%
+     mutate(r = value) %>%
+     select(-value) %>%
+     
+     ##join with melted columns of p values
+     full_join(
+       a %>%
+         as.data.frame() %>%
+         select(hour, ends_with('_p')) %>%
+         ##remove the '_p' from the id of the p-values
+         rename_at(.vars = vars(ends_with('_p')),
+                   .funs = ~sub('_p', "", .))%>%
+         melt(id.vars = 'hour') %>%
+         mutate(p = value) %>%
+         select(-value),
+       by = c('hour','variable')
+     ) %>%
+     
+     ##join with average hourly kitchen co2
+     full_join(
+       hourly %>%
+         filter(home == hm, room == 'outdoor') %>%
+         select(date, co2, temp, rh) %>%
+         mutate(hour = hour(date)) %>%
+         group_by(hour) %>%
+         summarize(co2 = mean(co2, na.rm = TRUE),
+                   temp = mean(temp, na.rm = TRUE),
+                   rh = mean(rh, na.rm = TRUE)) %>%
+         ungroup()
+     )
+   
+   
+   ##add coefficient to scale kitchen CO2 axis for two y axes
+   coeff <- 50
+   
+   
+   ggplot(a, aes(x = hour)) + 
+     ggtitle(hm)+
+     geom_point(aes(y = r, size = ifelse(p < 0.05, 3, 1),
+                    color = variable))+ 
+     ##add points for CO2 levels in kitchen
+     geom_point(aes(y = temp/coeff, shape = 'outdoor T'))+
+     scale_size_identity() +
+     coord_cartesian(ylim = c(0,1))+
+     ylab(expression("Spearman's"~rho))+
+     theme_bw()+
+     theme(axis.title = element_blank(),
+           axis.text = element_blank(),
+           legend.position = 'none')+
+     scale_color_discrete(name = 'Location Correlation')+
+     scale_y_continuous(
+       
+       # Add a second axis and specify its features
+       sec.axis = sec_axis( trans=~.*coeff,
+                            name = 'deg C')
+     )+
+     #remove label for second legend
+     scale_shape_manual(NULL, values = 16)
+ }
+ 
+  ##function to plot in a grid
+ room.hourly.plot.grid <- function (data, hms, rmlist, metric, method,
+                                       func, ncolumn) {
+   plots <- lapply(hms, func,
+                   data = data, rmlist = rmlist,
+                   metric = metric, method = method)
+   
+   ##omit NULL values (from homes or rooms without valid data)
+   plots <- plots[!sapply(plots, is.null)]
+   
+   
+   do.call('grid.arrange', c(plots, ncol = ncolumn))
+ }
+
+```
+
+
+# Hourly Between-Room Correlation Plots  
+
+* plots are based on **hourly** average values
+* separate plot for each house
+* only a selection of houses
+
+
+
+## Indoor Areas  
+
+
+
+
+### room-room hourly correlation multiple homes
+
+
+```{r between_room_hour_correlations_living_plot, warning=FALSE, eval = TRUE}
+##make plot for some homes
+ ###"living areas'
+ #pm25
+ lapply(some_homes, room.hourly.plot,
+        data = hourly, rmlist = rms_indoor,
+        metric = 'pm25', 'spearman')
+
+ 
+ #voc
+ lapply(some_homes, room.hourly.plot,
+        data = hourly, rmlist = rms_indoor,
+        metric = 'voc', 'spearman')
+ 
+
+```
+
+### Possible Takeaways  
+
+* no obvious trends in PM2.5 indoor-indoor strength of directional correlations
+* VOC directional indoor-indoor correlation gets weaker in some homes late evening (8pm)
+
+### Between Room by Hour- "Interaction Areas"  
+
+```{r between_room_hour_correlations_drivers_plot, warning=FALSE, eval = TRUE}
+ ###'drivers'
+ #'pm25
+ lapply(some_homes, room.hourly.plot,
+        data = hourly, rmlist = rms_driver,
+        metric = 'pm25', 'spearman')
+  
+ #voc
+ lapply(some_homes, room.hourly.plot,
+        data = hourly, rmlist = rms_driver,
+        metric = 'voc', 'searman')
+```
+
+### All homes
+
+```{r between_room_hour_correlations_grid, warning=FALSE, eval = TRUE}
+ 
+ # test for one metric
+grid <- plot.grid.rooms(hourly, all_homes, rms_driver, 'pm25',
+          'spearman', ncolumn = 4)
+ ggsave(paste0('hourly_corr_test', Sys.Date(),'.pdf'), grid,
+          height = 8, width = 10)
+
+    
+    all_metrics <- c('pm25', 'voc', 'co2', 'temp','rh', 'light', 'noise')
+    
+    rm_pairs <- rms_driver
+    
+    # make plot grid and save for all metrics
+lapply(all_metrics, function(metric){
+   
+        grid <- plot.grid.rooms(hourly, all_homes, rm_pairs, metric,
+          'spearman', ncolumn = 4)
+ 
+ 
+    ggsave(paste0('hourly_corr_',metric,'_', Sys.Date(),'.pdf'), grid,
+          height = 8, width = 10)
+}
+)
+       
+ 
+
+
+
+
+
+```
+
+
+
+### Possible Takeaways  
+* **in many homes, PM2.5 directional correlation for garage and outdoor to livingroom peaks near 6am, trends downward until mid-night, then starts to increase again**  
+
+
+### Between Room By Hour- With Additional Variable  
+
+```{r functions_correlation_additional variable, eval = TRUE}
+
+##in a home at a given hour 
+ r.coeff.hour <- function(data, hm, rm_pair,
+                          hr, metric, method) {
+   a <-
+     
+     ##data from room 1
+     data %>%
+     filter(home == hm & room == rm_pair[1]) %>%
+     
+     ##join with data from room 2 based on timestamp
+     full_join(
+       data %>%
+         filter(home == hm & room == rm_pair[2]),
+       by = 'date',
+       suffix = c('.1','.2'))
+   
+   ##make an hour column and filter data by hour of day
+   a$hour <- a$date %>%
+     hour()
+   
+   a <- a %>%
+     filter(hour == hr)
+   
+   ##calculate R coefficient of choice for room at the filtered hour
+   b <- tryCatch(cor.test(a %>% pull(paste0(metric, '.1')),
+                          a %>% pull(paste0(metric, '.2')),
+                          method = method)$estimate,
+                 error = function(e) NA)
+   
+   ##find p-value
+   
+   c <- tryCatch(cor.test(a %>% pull(paste0(metric, '.1')),
+                          a %>% pull(paste0(metric, '.2')),
+                          method = method)$p.value,
+                 error = function(e) NA)
+   
+   
+   return(cbind(b,c))
+   
+ }
+ 
+
+ 
+ 
+ ##find correlation between room pair  by hour
+ cor.tab.hour <- function (data, hm, rm_pair,
+                           metric, method) {
+   tibble('hour' = c(0:23),
+          
+          ##make a column for correlation coefficient values
+          'col1' = sapply(c(0:23), r.coeff.hour,
+                          data = data,
+                          hm = hm,
+                          metric = metric,
+                          method = method,
+                          rm_pair = rm_pair)[1,],
+          
+          ##make a column for correlation p-values
+          'col2' = sapply(c(0:23),r.coeff.hour,
+                          data = data,
+                          hm = hm,
+                          metric = metric,
+                          method = method,
+                          rm_pair = rm_pair)[2,]) %>%
+     
+     ##rename columns with names of compared rooms
+     mutate(!!paste0(rm_pair[1],'-', rm_pair[2]) := col1,
+            !!paste0(rm_pair[1],'-', rm_pair[2], '_p') := col2) %>%
+     select(-col1, -col2)
+ }
+
+ 
+ 
+ 
+ 
+ ##function to create a plot of correlation between
+ ##multiple room pairs by hour
+ ##with additional variable also plotted by hour
+ 
+ #co2
+ room.hourly.plot.co <- function (data, hm, rmlist, metric, method) {
+   
+   ##find correlations and pvalues for each room pair
+   a <- lapply(rmlist, cor.tab.hour,
+               data = data,
+               hm = hm,
+               metric = metric,
+               method = method) %>%
+     
+     ##megre all results into one table
+     reduce(full_join, by = 'hour')
+   
+   ##make a melted table to prepare for plot
+   a <-
+     ##melt all the r-value columns
+     a %>%
+     as.data.frame() %>%
+     select(hour, !ends_with('_p')) %>%
+     melt(id.vars = 'hour') %>%
+     mutate(r = value) %>%
+     select(-value) %>%
+     
+     ##join with melted columns of p values
+     full_join(
+       a %>%
+         as.data.frame() %>%
+         select(hour, ends_with('_p')) %>%
+         ##remove the '_p' from the id of the p-values
+         rename_at(.vars = vars(ends_with('_p')),
+                   .funs = ~sub('_p', "", .))%>%
+         melt(id.vars = 'hour') %>%
+         mutate(p = value) %>%
+         select(-value),
+       by = c('hour','variable')
+     ) %>%
+     
+     ##join with average hourly kitchen co2
+     full_join(
+       hourly %>%
+         filter(home == hm, room == 'kitchen') %>%
+         select(date, co2, temp, rh) %>%
+         mutate(hour = hour(date)) %>%
+         group_by(hour) %>%
+         summarize(co2 = mean(co2, na.rm = TRUE),
+                   temp = mean(temp, na.rm = TRUE),
+                   rh = mean(rh, na.rm = TRUE)) %>%
+         ungroup()
+     )
+   
+   
+   ##add coefficient to scale kitchen CO2 axis for two y axes
+   coeff <- 2000
+   
+   
+   ggplot(a, aes(x = hour)) + 
+     ggtitle(hm)+
+     geom_point(aes(y = r, size = ifelse(p < 0.05, 3, 1),
+                    color = variable))+ 
+     ##add points for CO2 levels in kitchen
+     geom_point(aes(y = co2/coeff, shape = 'kitchen CO2'))+
+     scale_size_identity() +
+     coord_cartesian(ylim = c(0,1))+
+     ylab(expression("Spearman's"~rho))+
+     theme_bw()+
+     scale_color_discrete(name = 'Location Correlation')+
+     scale_y_continuous(
+       
+       # Add a second axis and specify its features
+       sec.axis = sec_axis( trans=~.*coeff,
+                            name = 'ppb')
+     )+
+     #remove label for second legend
+     scale_shape_manual(NULL, values = 16,
+                        label = expression('kitchen CO'[2]))
+ }
+ 
+ 
+##Temp
+ room.hourly.plot.temp <- function (data, hm, rmlist, metric, method) {
+   
+   ##find correlations and pvalues for each room pair
+   a <- lapply(rmlist, cor.tab.hour,
+               data = data,
+               hm = hm,
+               metric = metric,
+               method = method) %>%
+     
+     ##megre all results into one table
+     reduce(full_join, by = 'hour')
+   
+   ##make a melted table to prepare for plot
+   a <-
+     ##melt all the r-value columns
+     a %>%
+     as.data.frame() %>%
+     select(hour, !ends_with('_p')) %>%
+     melt(id.vars = 'hour') %>%
+     mutate(r = value) %>%
+     select(-value) %>%
+     
+     ##join with melted columns of p values
+     full_join(
+       a %>%
+         as.data.frame() %>%
+         select(hour, ends_with('_p')) %>%
+         ##remove the '_p' from the id of the p-values
+         rename_at(.vars = vars(ends_with('_p')),
+                   .funs = ~sub('_p', "", .))%>%
+         melt(id.vars = 'hour') %>%
+         mutate(p = value) %>%
+         select(-value),
+       by = c('hour','variable')
+     ) %>%
+     
+     ##join with average hourly kitchen co2
+     full_join(
+       hourly %>%
+         filter(home == hm, room == 'outdoor') %>%
+         select(date, co2, temp, rh) %>%
+         mutate(hour = hour(date)) %>%
+         group_by(hour) %>%
+         summarize(co2 = mean(co2, na.rm = TRUE),
+                   temp = mean(temp, na.rm = TRUE),
+                   rh = mean(rh, na.rm = TRUE)) %>%
+         ungroup()
+     )
+   
+   
+   ##add coefficient to scale kitchen CO2 axis for two y axes
+   coeff <- 50
+   
+   
+   ggplot(a, aes(x = hour)) + 
+     ggtitle(hm)+
+     geom_point(aes(y = r, size = ifelse(p < 0.05, 3, 1),
+                    color = variable))+ 
+     ##add points for CO2 levels in kitchen
+     geom_point(aes(y = temp/coeff, shape = 'outdoor T'))+
+     scale_size_identity() +
+     coord_cartesian(ylim = c(0,1))+
+     ylab(expression("Spearman's"~rho))+
+     theme_bw()+
+     scale_color_discrete(name = 'Location Correlation')+
+     scale_y_continuous(
+       
+       # Add a second axis and specify its features
+       sec.axis = sec_axis( trans=~.*coeff,
+                            name = 'deg C')
+       )+
+     #remove label for second legend
+     scale_shape_manual(NULL, values = 16)
+ }
+ 
+ 
+ ##RH
+ room.hourly.plot.rh <- function (data, hm, rmlist, metric, method) {
+   
+   ##find correlations and pvalues for each room pair
+   a <- lapply(rmlist, cor.tab.hour,
+               data = data,
+               hm = hm,
+               metric = metric,
+               method = method) %>%
+     
+     ##megre all results into one table
+     reduce(full_join, by = 'hour')
+   
+   ##make a melted table to prepare for plot
+   a <-
+     ##melt all the r-value columns
+     a %>%
+     as.data.frame() %>%
+     select(hour, !ends_with('_p')) %>%
+     melt(id.vars = 'hour') %>%
+     mutate(r = value) %>%
+     select(-value) %>%
+     
+     ##join with melted columns of p values
+     full_join(
+       a %>%
+         as.data.frame() %>%
+         select(hour, ends_with('_p')) %>%
+         ##remove the '_p' from the id of the p-values
+         rename_at(.vars = vars(ends_with('_p')),
+                   .funs = ~sub('_p', "", .))%>%
+         melt(id.vars = 'hour') %>%
+         mutate(p = value) %>%
+         select(-value),
+       by = c('hour','variable')
+     ) %>%
+     
+     ##join with average hourly kitchen co2
+     full_join(
+       hourly %>%
+         filter(home == hm, room == 'outdoor') %>%
+         select(date, co2, temp, rh) %>%
+         mutate(hour = hour(date)) %>%
+         group_by(hour) %>%
+         summarize(co2 = mean(co2, na.rm = TRUE),
+                   temp = mean(temp, na.rm = TRUE),
+                   rh = mean(rh, na.rm = TRUE)) %>%
+         ungroup()
+     )
+   
+   
+   ##add coefficient to scale kitchen CO2 axis for two y axes
+   coeff <- 100
+   
+   
+   ggplot(a, aes(x = hour)) + 
+     ggtitle(hm)+
+     geom_point(aes(y = r, size = ifelse(p < 0.05, 3, 1),
+                    color = variable))+ 
+     ##add points for CO2 levels in kitchen
+     geom_point(aes(y = rh/coeff, shape = 'outdoor RH'))+
+     scale_size_identity() +
+     coord_cartesian(ylim = c(0,1))+
+     ylab(expression("Spearman's"~rho))+
+     theme_bw()+
+     scale_color_discrete(name = 'Location Correlation')+
+     scale_y_continuous(
+       
+       # Add a second axis and specify its features
+       sec.axis = sec_axis( trans=~.*coeff,
+                            name = '%')
+     )+
+     #remove label for second legend
+     scale_shape_manual(NULL, values = 16)
+ }
+ 
+ 
+ 
+  ##functions that omit legends and lables to plot in a grid
+
+ #CO2
+ room.hourly.plot.co.simp <- function (data, hm, rmlist, metric, method) {
+   
+ ##find correlations and pvalues for each room pair
+ a <- lapply(rmlist, cor.tab.hour,
+             data = data,
+             hm = hm,
+             metric = metric,
+             method = method) %>%
+   
+   ##megre all results into one table
+   reduce(full_join, by = 'hour')
+ 
+ ##make a melted table to prepare for plot
+ a <-
+   ##melt all the r-value columns
+   a %>%
+   as.data.frame() %>%
+   select(hour, !ends_with('_p')) %>%
+   melt(id.vars = 'hour') %>%
+   mutate(r = value) %>%
+   select(-value) %>%
+   
+   ##join with melted columns of p values
+   full_join(
+     a %>%
+       as.data.frame() %>%
+       select(hour, ends_with('_p')) %>%
+       ##remove the '_p' from the id of the p-values
+       rename_at(.vars = vars(ends_with('_p')),
+                 .funs = ~sub('_p', "", .))%>%
+       melt(id.vars = 'hour') %>%
+       mutate(p = value) %>%
+       select(-value),
+     by = c('hour','variable')
+   ) %>%
+   
+   ##join with average hourly kitchen co2
+   full_join(
+     hourly %>%
+       filter(home == hm, room == 'kitchen') %>%
+       select(date, co2) %>%
+       mutate(hour = hour(date)) %>%
+       group_by(hour) %>%
+       summarize(co2 = mean(co2, na.rm = TRUE)) %>%
+       ungroup()
+   )
+ 
+
+ ##add coefficient to scale kitchen CO2 axis for two y axes
+ coeff <- 2000
+ 
+ 
+ ggplot(a, aes(x = hour)) + 
+   ggtitle(hm)+
+   geom_point(aes(y = r, size = ifelse(p < 0.05, 3, 1),
+                  color = variable))+ 
+   ##add points for CO2 levels in kitchen
+   geom_point(aes(y = co2/coeff))+
+   scale_size_identity() +
+   coord_cartesian(ylim = c(0,1))+
+   ylab(expression("Spearman's"~rho))+
+   theme_bw()+
+   theme(axis.title = element_blank(),
+         axis.text = element_blank(),
+         legend.position = 'none')+
+   scale_color_discrete(name = 'Location Correlation')+
+   scale_y_continuous(
+     
+     # Add a second axis and specify its features
+     sec.axis = sec_axis( trans=~.*coeff)
+   )
+ }
+ 
+ #Temp
+ room.hourly.plot.temp.simp <- function (data, hm, rmlist, metric, method) {
+   
+   ##find correlations and pvalues for each room pair
+   a <- lapply(rmlist, cor.tab.hour,
+               data = data,
+               hm = hm,
+               metric = metric,
+               method = method) %>%
+     
+     ##megre all results into one table
+     reduce(full_join, by = 'hour')
+   
+   ##make a melted table to prepare for plot
+   a <-
+     ##melt all the r-value columns
+     a %>%
+     as.data.frame() %>%
+     select(hour, !ends_with('_p')) %>%
+     melt(id.vars = 'hour') %>%
+     mutate(r = value) %>%
+     select(-value) %>%
+     
+     ##join with melted columns of p values
+     full_join(
+       a %>%
+         as.data.frame() %>%
+         select(hour, ends_with('_p')) %>%
+         ##remove the '_p' from the id of the p-values
+         rename_at(.vars = vars(ends_with('_p')),
+                   .funs = ~sub('_p', "", .))%>%
+         melt(id.vars = 'hour') %>%
+         mutate(p = value) %>%
+         select(-value),
+       by = c('hour','variable')
+     ) %>%
+     
+     ##join with average hourly kitchen co2
+     full_join(
+       hourly %>%
+         filter(home == hm, room == 'outdoor') %>%
+         select(date, co2, temp, rh) %>%
+         mutate(hour = hour(date)) %>%
+         group_by(hour) %>%
+         summarize(co2 = mean(co2, na.rm = TRUE),
+                   temp = mean(temp, na.rm = TRUE),
+                   rh = mean(rh, na.rm = TRUE)) %>%
+         ungroup()
+     )
+   
+   
+   ##add coefficient to scale kitchen CO2 axis for two y axes
+   coeff <- 50
+   
+   
+   ggplot(a, aes(x = hour)) + 
+     ggtitle(hm)+
+     geom_point(aes(y = r, size = ifelse(p < 0.05, 3, 1),
+                    color = variable))+ 
+     ##add points for CO2 levels in kitchen
+     geom_point(aes(y = temp/coeff, shape = 'outdoor T'))+
+     scale_size_identity() +
+     coord_cartesian(ylim = c(0,1))+
+     ylab(expression("Spearman's"~rho))+
+     theme_bw()+
+     theme(axis.title = element_blank(),
+           axis.text = element_blank(),
+           legend.position = 'none')+
+     scale_color_discrete(name = 'Location Correlation')+
+     scale_y_continuous(
+       
+       # Add a second axis and specify its features
+       sec.axis = sec_axis( trans=~.*coeff,
+                            name = 'deg C')
+     )+
+     #remove label for second legend
+     scale_shape_manual(NULL, values = 16)
+ }
+ 
+ 
+ ##RH
+ room.hourly.plot.rh.simp <- function (data, hm, rmlist, metric, method) {
+   
+   ##find correlations and pvalues for each room pair
+   a <- lapply(rmlist, cor.tab.hour,
+               data = data,
+               hm = hm,
+               metric = metric,
+               method = method) %>%
+     
+     ##megre all results into one table
+     reduce(full_join, by = 'hour')
+   
+   ##make a melted table to prepare for plot
+   a <-
+     ##melt all the r-value columns
+     a %>%
+     as.data.frame() %>%
+     select(hour, !ends_with('_p')) %>%
+     melt(id.vars = 'hour') %>%
+     mutate(r = value) %>%
+     select(-value) %>%
+     
+     ##join with melted columns of p values
+     full_join(
+       a %>%
+         as.data.frame() %>%
+         select(hour, ends_with('_p')) %>%
+         ##remove the '_p' from the id of the p-values
+         rename_at(.vars = vars(ends_with('_p')),
+                   .funs = ~sub('_p', "", .))%>%
+         melt(id.vars = 'hour') %>%
+         mutate(p = value) %>%
+         select(-value),
+       by = c('hour','variable')
+     ) %>%
+     
+     ##join with average hourly kitchen co2
+     full_join(
+       hourly %>%
+         filter(home == hm, room == 'outdoor') %>%
+         select(date, co2, temp, rh) %>%
+         mutate(hour = hour(date)) %>%
+         group_by(hour) %>%
+         summarize(co2 = mean(co2, na.rm = TRUE),
+                   temp = mean(temp, na.rm = TRUE),
+                   rh = mean(rh, na.rm = TRUE)) %>%
+         ungroup()
+     )
+   
+   
+   ##add coefficient to scale kitchen CO2 axis for two y axes
+   coeff <- 100
+   
+   
+   ggplot(a, aes(x = hour)) + 
+     ggtitle(hm)+
+     geom_point(aes(y = r, size = ifelse(p < 0.05, 3, 1),
+                    color = variable))+ 
+     ##add points for CO2 levels in kitchen
+     geom_point(aes(y = rh/coeff, shape = 'outdoor RH'))+
+     scale_size_identity() +
+     coord_cartesian(ylim = c(0,1))+
+     ylab(expression("Spearman's"~rho))+
+     theme_bw()+
+     theme(axis.title = element_blank(),
+           axis.text = element_blank(),
+           legend.position = 'none')+
+     scale_color_discrete(name = 'Location Correlation')+
+     scale_y_continuous(
+       
+       # Add a second axis and specify its features
+       sec.axis = sec_axis( trans=~.*coeff,
+                            name = '%')
+     )+
+     #remove label for second legend
+     scale_shape_manual(NULL, values = 16)
+ }
+ 
+ 
+ 
+ 
+ 
+ ##function to plot in a grid
+ room.hourly.plot.grid <- function (data, hms, rmlist, metric, method,
+                                       func, ncolumn) {
+   plots <- lapply(hms, func,
+                   data = data, rmlist = rmlist,
+                   metric = metric, method = method)
+   
+   ##omit NULL values (from homes or rooms without valid data)
+   plots <- plots[!sapply(plots, is.null)]
+   
+   
+   do.call('grid.arrange', c(plots, ncol = ncolumn))
+ }
+
+```
+
+#### Different continuous variables,
+#### one home examples
+
+
+```{r correlation_additional_variable, eval = TRUE}
+
+###all for one home
+
+ room.hourly.plot.co(hourly, '003', list(c('outdoor','living')),
+                     'pm25_ihs', 'pearson')
+
+ room.hourly.plot.temp(hourly, '003', list(c('outdoor','living')),
+                                            'pm25_ihs', 'pearson')
+ 
+  room.hourly.plot.rh(hourly, '003', list(c('outdoor','living')),
+                                            'pm25_ihs', 'pearson')
+```
+
+#### All homes (with Outdoor Temperature plotted as well)
+
+```{r correlation_temp_grid, eval = TRUE}
+ room.hourly.plot.grid(hourly, all_homes, list(c('outdoor', 'living')),
+                                            'pm25_ihs', 'pearson',
+                       room.hourly.plot.temp.simp, 3)
+
+```
+
+
+
+# Between-metric hourly correlation
+
+```{r between_metric_hour_correlations, warning=FALSE, eval = TRUE}
+
+
+# # test function for one room
+# grid <- plot.grid.metrics(hourly, all_homes, 'garage',
+#           list(c('co2', 'voc'), c('co2','light')),
+#           'spearman', ncolumn = 4)
+#  ggsave(paste0('hourly_corr_test', Sys.Date(),'.pdf'), grid,
+#           height = 8, width = 10)
+
+    
+    all_rooms <- c('bedroom', 'living', 'kitchen', 'garage', 'outdoor')
+    
+    metric_pairs <- list(c('co2', 'voc'), c('co2','light'), c('co2','noise'))
+    
+    # make plot grid and save for all rooms
+lapply(all_rooms, function(room){
+   
+        grid <- plot.grid.metrics(hourly, all_homes, room,
+          metric_pairs,
+          'spearman', ncolumn = 4)
+ 
+ 
+    ggsave(paste0('hourly_corr_',room,'_', Sys.Date(),'.pdf'), grid,
+          height = 8, width = 10)
+}
+)
+       
+ 
+
+
+```
+
