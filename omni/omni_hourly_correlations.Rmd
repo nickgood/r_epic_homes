@@ -505,16 +505,17 @@ large <- 26
 
 ```{r functions_correlation_additional variable, eval = TRUE}
 # define variables for testing----------------------
-data <- omni_hourly_data
-hm <- '008'
-rm_pair <- c('living', 'garage')
-rm_pair2 <- c('living', 'kitchen')
-rms_list <- list(rm_pair, rm_pair2)
-met <- 'pm25'
-method <- 'spearman'
-hr <- 23
-met_2 <- 'temp'
-loc_2 <- 'outdoor'
+
+# data <- omni_hourly_data
+# hm <- '008'
+# rm_pair <- c('living', 'garage')
+# rm_pair2 <- c('living', 'kitchen')
+# rms_list <- list(rm_pair, rm_pair2)
+# met <- 'pm25'
+# method <- 'spearman'
+# hr <- 23
+# met_2 <- 'temp'
+# loc_2 <- 'outdoor'
 
 # between room correlation plots--------------------------
 
@@ -641,24 +642,25 @@ bind_rows()
 # plot
    ggplot(a, aes(x = hour)) + 
      ggtitle(hm)+
-     geom_point(aes(y = as.numeric(coeff), size = ifelse(p_val < 0.05, 3, 1),
+     geom_point(aes(y = as.numeric(coeff),
+                    shape = ifelse(p_val < 0.05, 16, 4),
                     color = loc_pair))+
 
-     scale_size_identity() +
+     scale_shape_identity() +
      ylab(expression("Spearman's"~rho))+
       theme_bw()+
      scale_color_discrete(name = 'Location Correlation')+
       {if(!is.null(met_2)) list(
               ##add points for CO2 levels in kitchen
-     geom_point(aes(y = var_2/scale_ratio, shape = paste(loc_2, met_2)),
-                color = 'dimgray'),
+     geom_point(aes(y = var_2/scale_ratio, size = paste(loc_2, met_2)),
+                color = 'dimgray', size = 2),
         scale_y_continuous(
        # Add a second axis and specify its features
        sec.axis = sec_axis( trans=~.*scale_ratio,
                             name = unit)
        ),
      #remove label for second legend
-     scale_shape_manual(NULL, values = 16),
+     scale_size_manual(NULL, values = 2),
       geom_errorbar(aes(ymin = var_2_low/scale_ratio,
                         ymax= var_2_high/scale_ratio),
                     color = 'dimgray')
@@ -668,7 +670,7 @@ bind_rows()
  
  # # test function
  # room.hourly.plot(
- #    hm = '008',
+ #    hm = '005',
  #    rms_list = list(c('living', 'garage'), c('living', 'kitchen')),
  #    met = 'pm25', met_2 = 'co2', loc_2 = 'living')
  
@@ -741,9 +743,10 @@ bind_rows()
  #    hms = home.list(c(1,7,8,9)),
  #    rms_list = list(c('living', 'garage'), c('living', 'kitchen')),
  #    met = 'pm25',
- #    met_2 = 'temp', loc_2 = 'outdoor')
+ #    # met_2 = 'temp', loc_2 = 'outdoor'
+ #    )
  
- # between metric correlation plots---------------
+# between metric correlation plots---------------
  
  ##in a home at a given hour 
  metric.coeff.hour <- function(hm, met_pair,
@@ -866,16 +869,17 @@ bind_rows()
 # plot
    ggplot(a, aes(x = hour)) + 
      ggtitle(hm)+
-     geom_point(aes(y = as.numeric(coeff), size = ifelse(p_val < 0.05, 3, 1),
+     geom_point(aes(y = as.numeric(coeff),
+                    shape = ifelse(p_val < 0.05, 16, 4),
                     color = met_pair))+
 
-     scale_size_identity() +
+     scale_shape_identity() +
      ylab(expression("Spearman's"~rho))+
       theme_bw()+
      scale_color_discrete(name = 'Metric Correlation')+
       {if(!is.null(met_2)) list(
               ##add points for CO2 levels in kitchen
-     geom_point(aes(y = var_2/scale_ratio, shape = paste(loc_2, met_2)),
+     geom_point(aes(y = var_2/scale_ratio, size = paste(loc_2, met_2)),
                 color = 'dimgray'),
         scale_y_continuous(
        # Add a second axis and specify its features
@@ -883,20 +887,21 @@ bind_rows()
                             name = unit)
        ),
      #remove label for second legend
-     scale_shape_manual(NULL, values = 16),
+     scale_size_manual(NULL, values = 2),
       geom_errorbar(aes(ymin = var_2_low/scale_ratio,
                         ymax= var_2_high/scale_ratio),
                     color = 'dimgray')
      )}+
-     coord_cartesian(ylim = c(0,1))
+     coord_cartesian(ylim = c(-0.5,1))+
+      geom_hline(yintercept = 0, linetype = 'dashed')
  }
  
  # # test function
  # metric.hourly.plot(
- #    hm = '008',
+ #    hm = '005',
  #    mets_list = list(c('pm25', 'co2'), c('pm25', 'voc')),
  #    loc = 'living',
- # # met_2 = 'co2', loc_2 = 'living'
+ # met_2 = 'co2', loc_2 = 'living'
  # )
  
   ##functions that omit legends and lables to plot in a grid
@@ -979,18 +984,7 @@ bind_rows()
 * separate plot for each house
 * only a selection of houses
 
-
-
-
-### Possible Takeaways  
-
-* no obvious trends in PM2.5 indoor-indoor strength of directional correlations
-* VOC directional indoor-indoor correlation gets weaker in some homes late evening (8pm)
-
-
-### All homes
-
-```{r between_room_hour_correlations_grid, warning=FALSE, fig.width=10.5, fig.height=8,eval = TRUE, results='asis'}
+```{r between_room_hour_correlations_grid, warning=FALSE, fig.width=10.5, fig.height=8,eval = FALSE, results='asis'}
  
 #  # test for one metric
 # grid <- room.plot.grid(
@@ -1046,6 +1040,17 @@ lapply(metrics_all, function(x_metric){
 
 ```
 
+
+
+### Possible Takeaways  
+
+* no obvious trends in PM2.5 indoor-indoor strength of directional correlations
+* VOC directional indoor-indoor correlation gets weaker in some homes late evening (8pm)
+* **in many homes, PM2.5 directional correlation for garage and outdoor to livingroom peaks near 6am, trends downward until mid-night, then starts to increase again** 
+
+# Hourly Between-Metrics Correlation Plots  
+
+
 ```{r between_metric_hour_correlations_grid, warning=FALSE, fig.width=10.5, fig.height=8,eval = TRUE, results='asis'}
  
 #  # test for one metric
@@ -1058,7 +1063,7 @@ lapply(metrics_all, function(x_metric){
 #  # ggsave(paste0('hourly_corr_test', Sys.Date(),'.pdf'), grid,
 #  #          height = 8, width = 10)
 
-    met_pairs <- list(c('co2', 'voc'), c('co2', 'light'))
+    met_pairs <- list(c('co2', 'voc'), c('co2', 'lux'))
     
     # make plot grid and save for all metrics
 lapply(locations_indoor, function(x_location){
@@ -1099,26 +1104,7 @@ lapply(locations_indoor, function(x_location){
    )
  
 
-   # make plot grid and save for all metrics
-lapply('living', function(x_location){
-   
-       metric.plot.grid(
-    hms = homes_all,
-    mets_list = met_pairs,
-    loc = x_location,
-    # met_2 = 'temp', loc_2 = 'outdoor'
-        )
-   # insert page break between plots
-   cat("\n\n\\pagebreak\n")
-       
-   # ggsave(paste0('hourly_corr_',metric,'_', Sys.Date(),'.pdf'), grid,
-    #       height = 8, width = 10)
-}
-   )
 
 ```
 
 
-
-### Possible Takeaways  
-* **in many homes, PM2.5 directional correlation for garage and outdoor to livingroom peaks near 6am, trends downward until mid-night, then starts to increase again**  
