@@ -458,7 +458,7 @@ home.list <- function(x) sapply(x, threedig)
 #define list of homes for analysis
 homes_all <- home.list(1:17)
 
-    metrics_all <- c('pm25', 'voc', 'co2', 'temp','rh', 'light', 'noise')
+    metrics_all <- c('pm25', 'voc', 'co2', 'temp','humid', 'lux', 'spl_a')
     locations_indoor <- c('living', 'bedroom', 'kitchen')
 
 ##define room pairs for comparison
@@ -504,6 +504,7 @@ large <- 26
 ```
 
 ```{r functions_correlation_additional variable, eval = TRUE}
+# define variables for testing----------------------
 data <- omni_hourly_data
 hm <- '008'
 rm_pair <- c('living', 'garage')
@@ -600,7 +601,7 @@ loc_2 <- 'outdoor'
                                     data = omni_hourly_data) {
    
    ##find correlations and pvalues for each room pair
-   a <- map(rms_list, cor.hourly,
+   a <- map(rms_list, room.cor.hourly,
                hm = hm,
                met = met,
                method = method,
@@ -780,9 +781,9 @@ bind_rows()
 
     }
  
- # test funct
-test <- metric.coeff.hour('008', c('pm25', 'co2'),
-             23, 'living', 'spearman', omni_hourly_data)
+#  # test funct
+# test <- metric.coeff.hour('008', c('pm25', 'co2'),
+#              23, 'living', 'spearman', omni_hourly_data)
  
  
 
@@ -1043,10 +1044,6 @@ lapply(metrics_all, function(x_metric){
        
  
 
-
-
-
-
 ```
 
 ```{r between_metric_hour_correlations_grid, warning=FALSE, fig.width=10.5, fig.height=8,eval = TRUE, results='asis'}
@@ -1066,10 +1063,10 @@ lapply(metrics_all, function(x_metric){
     # make plot grid and save for all metrics
 lapply(locations_indoor, function(x_location){
    
-       room.plot.grid(
+       metric.plot.grid(
     hms = homes_all,
     mets_list = met_pairs,
-    met = x_location,
+    loc = x_location,
     # met_2 = 'temp', loc_2 = 'outdoor'
         )
    # insert page break between plots
@@ -1085,9 +1082,9 @@ lapply(locations_indoor, function(x_location){
     met_pairs <- list(c('pm25', 'co2'), c('pm25', 'voc'))
     
     # make plot grid and save for all metrics
-lapply(metrics_all, function(x_location){
+lapply(locations_indoor, function(x_location){
    
-       room.plot.grid(
+       metric.plot.grid(
     hms = homes_all,
     mets_list = met_pairs,
     loc = x_location,
@@ -1101,6 +1098,23 @@ lapply(metrics_all, function(x_location){
 }
    )
  
+
+   # make plot grid and save for all metrics
+lapply('living', function(x_location){
+   
+       metric.plot.grid(
+    hms = homes_all,
+    mets_list = met_pairs,
+    loc = x_location,
+    # met_2 = 'temp', loc_2 = 'outdoor'
+        )
+   # insert page break between plots
+   cat("\n\n\\pagebreak\n")
+       
+   # ggsave(paste0('hourly_corr_',metric,'_', Sys.Date(),'.pdf'), grid,
+    #       height = 8, width = 10)
+}
+   )
 
 ```
 
