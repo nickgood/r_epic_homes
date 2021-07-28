@@ -484,6 +484,38 @@ small <- 15
 medium <- 20
 large <- 26
 
+
+# color blind pallette
+# check http://www.cookbook-r.com/Graphs/Colors_(ggplot2)/#a-colorblind-friendly-palette
+cbbPalette <- c('black' = "#000000",
+                'light_orange' = "#E69F00",
+                'light_blue' = "#56B4E9",
+                'green' = "#009E73",
+                'yellow' = "#F0E442",
+                'dark_blue' = "#0072B2",
+                'dark_orange' = "#D55E00",
+                'purple' = "#CC79A7"
+                )
+# define colors for room-comparisons
+inter_room_colors <- c(cbbPalette['light_blue'],
+                   cbbPalette['purple'],
+                   cbbPalette['light_orange'],
+                   cbbPalette['green'],
+                   cbbPalette['dark_orange']
+                   )%>% unname()
+
+inter_room_breaks <- c('kitchen-bedroom', 'kitchen-living',
+                       'living-bedroom','garage-living', 'outdoor-living')
+
+# define colors for metric-comparisons
+inter_metric_colors <- c(cbbPalette['dark_blue'],
+                   cbbPalette['light_orange'],
+                   cbbPalette['green'],
+                   cbbPalette['dark_orange']                   )%>% unname()
+
+inter_metric_breaks <- c('co2-voc', 'co2-lux', 'pm25-voc', 'pm25-co2')
+
+
 # dimensions for hourly correlation figure outputs
 corr_fig_height <- 8
 corr_fig_width <- 10.5
@@ -647,13 +679,20 @@ bind_rows()
    ggplot(a, aes(x = hour)) + 
      ggtitle(hm)+
      geom_point(aes(y = as.numeric(coeff),
-                    shape = ifelse(p_val < 0.05, 16, 4),
+                    shape = ifelse(p_val < 0.05, 'p < 0.05', 'p > 0.05'),
                     color = loc_pair))+
-
-     scale_shape_identity() +
+     scale_shape_manual(
+       breaks = c('p < 0.05', 'p > 0.05'),
+       values = c(16,4),
+       name = 'Significance'
+     ) +
      ylab(expression("Spearman's"~rho))+
+     xlab('Hour of Day')+
       theme_bw()+
-     scale_color_discrete(name = 'Location Correlation')+
+     scale_color_manual(
+       values = inter_room_colors,
+              breaks = inter_room_breaks,
+       name = 'Location Correlation')+
       {if(!is.null(met_2)) list(
               ##add points for CO2 levels in kitchen
      geom_point(aes(y = var_2/scale_ratio, size = paste(loc_2, met_2)),
@@ -669,14 +708,21 @@ bind_rows()
                         ymax= var_2_high/scale_ratio),
                     color = 'dimgray')
      )}+
-     coord_cartesian(ylim = c(0,1))
+     coord_cartesian(ylim = c(0,1))+
+     theme(legend.box = 'horizontal')+
+         scale_x_continuous(limits = c(0,24),
+                       breaks = c(0,6,12,18),
+                       labels = c('midnight', '6am','noon', '6pm'),
+                       expand = c(0,0))
  }
- 
+
  # # test function
  # room.hourly.plot(
  #    hm = '005',
- #    rms_list = list(c('living', 'garage'), c('living', 'kitchen')),
- #    met = 'pm25', met_2 = 'co2', loc_2 = 'living')
+ #    rms_list = rms_indoor,
+ #    met = 'pm25',
+ #    # met_2 = 'co2', loc_2 = 'living'
+ #    )
  
   ##functions that omit legends and lables to plot in a grid
 
@@ -874,13 +920,20 @@ bind_rows()
    ggplot(a, aes(x = hour)) + 
      ggtitle(hm)+
      geom_point(aes(y = as.numeric(coeff),
-                    shape = ifelse(p_val < 0.05, 16, 4),
+                    shape = ifelse(p_val < 0.05, 'p < 0.05', 'p > 0.05'),
                     color = met_pair))+
-
-     scale_shape_identity() +
+     scale_shape_manual(
+       breaks = c('p < 0.05', 'p > 0.05'),
+       values = c(16,4),
+       name = 'Significance'
+     )+
      ylab(expression("Spearman's"~rho))+
+     xlab('Hour of Day')+
       theme_bw()+
-     scale_color_discrete(name = 'Metric Correlation')+
+     scale_color_manual(
+       values = inter_metric_colors,
+              breaks = inter_metric_breaks,
+       name = 'Metric Correlation')+
       {if(!is.null(met_2)) list(
               ##add points for CO2 levels in kitchen
      geom_point(aes(y = var_2/scale_ratio, size = paste(loc_2, met_2)),
@@ -897,7 +950,12 @@ bind_rows()
                     color = 'dimgray')
      )}+
      coord_cartesian(ylim = c(-0.5,1))+
-      geom_hline(yintercept = 0, linetype = 'dashed')
+      geom_hline(yintercept = 0, linetype = 'dashed')+
+     theme(legend.box = 'horizontal')+
+         scale_x_continuous(limits = c(0,24),
+                       breaks = c(0,6,12,18),
+                       labels = c('midnight', '6am','noon', '6pm'),
+                       expand = c(0,0))
  }
  
  # # test function
@@ -905,7 +963,7 @@ bind_rows()
  #    hm = '005',
  #    mets_list = list(c('pm25', 'co2'), c('pm25', 'voc')),
  #    loc = 'living',
- # met_2 = 'co2', loc_2 = 'living'
+ # # met_2 = 'co2', loc_2 = 'living'
  # )
  
   ##functions that omit legends and lables to plot in a grid
@@ -989,7 +1047,7 @@ bind_rows()
 * separate plot for each house
 * only a selection of houses
 
-```{r between_room_hour_correlations_grid, warning=FALSE, fig.height=corr_fig_height, fig.width=corr_fig_width, eval = FALSE, results='asis'}
+```{r between_room_hour_correlations_grid, warning=FALSE, fig.height=corr_fig_height, fig.width=corr_fig_width, eval = TRUE, results='asis'}
  
 #  # test for one metric
 # grid <- room.plot.grid(
@@ -1056,7 +1114,7 @@ lapply(metrics_all, function(x_metric){
 # Hourly Between-Metrics Correlation Plots  
 
 
-```{r between_metric_hour_correlations_grid, warning=FALSE, fig.height=corr_fig_height, fig.width=corr_fig_width, eval = TRUE, results='asis'}
+```{r between_metric_hour_correlations_grid, warning=FALSE, fig.height=corr_fig_height, fig.width=corr_fig_width, eval = FALSE, results='asis'}
  
 #  # test for one metric
 # grid <- room.plot.grid(

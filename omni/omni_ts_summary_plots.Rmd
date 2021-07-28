@@ -165,7 +165,7 @@ time.table <- function(data, period,
   
   #use start and end date to define timespan during which to use data
   a <- data %>%
-    subset(datetime > ymd_hms(start_date) &
+    filter(datetime > ymd_hms(start_date) &
              datetime < ymd_hms(end_date))
   
   #if geo is FALSE (default), use arithmetic mean and standard deviation
@@ -528,7 +528,7 @@ large <- 26
 line_size <- 0.5
 max_point_size <- 1.5
 
-# define upper y-limits for metrics (for plots)
+# define y-limits for metrics (for time series plots)
 pm25_lim <- c(0,60)
 voc_lim <- c(0,1500)
 co2_lim <- c(0,2500)
@@ -536,6 +536,16 @@ temp_lim <- c(0,25)
 humid_lim <- c(0,60)
 lux_lim <- c(0,1000)
 spl_a_lim <- c(40,70)
+
+# define y-limits for metrics (for difference of means plots)
+pm25_diff_lim <- c(-10,10)
+voc_diff_lim <- c(-400,700)
+co2_diff_lim <- c(-600,1000)
+temp_diff_lim <- c(-5,3.5)
+humid_diff_lim <- c(-9,9)
+lux_diff_lim <- c(-500,750)
+pm25_diff_lim <- c(-10,10)
+spl_a_diff_lim <- c(-9,9)
 
 ## for zoom:
 #   pm25_lim <- c(0,40)
@@ -562,12 +572,29 @@ outdoor_data <- rtdata %>% filter(location == 'outdoor')
 garage_data <- rtdata %>% filter(location == 'garage')
 
 
+# color blind pallette
+# check http://www.cookbook-r.com/Graphs/Colors_(ggplot2)/#a-colorblind-friendly-palette
+cbbPalette <- c('black' = "#000000",
+                'light_orange' = "#E69F00",
+                'light_blue' = "#56B4E9",
+                'green' = "#009E73",
+                'yellow' = "#F0E442",
+                'dark_blue' = "#0072B2",
+                'dark_orange' = "#D55E00",
+                'purple' = "#CC79A7"
+                )
+# define colors for room-comparisons
+room_colors <- c(cbbPalette['green'],
+                   cbbPalette['purple'],
+                   cbbPalette['light_orange']
+                   )%>% unname()
 
+room_breaks <- locations_indoor
 
 ```
 
 
-```{r grid_pdfs}
+```{r grid_pdfs, eval = FALSE}
 
 hour.day.month.grid <- function(location, err_ribbon_plot1 = TRUE,
                                 note = NULL,
@@ -647,7 +674,7 @@ hour.day.month.grid(rm, err_ribbon_plot1 = FALSE, note = version,
 
 ## Overall
 
-```{r hourly_overall}
+```{r hourly_overall, eval = FALSE}
 
 
 
@@ -717,7 +744,7 @@ plotvoc
 
 ## By Home
 
-```{r hourly_homes}
+```{r hourly_homes, eval = FALSE}
 
    # plot with details
       plot.hourly <- function(metric, data, location = NULL) {
@@ -771,7 +798,7 @@ plot.hourly('pm25', data = a)
 
 # Daily
 
-```{r date_day}
+```{r date_day, eval = FALSE}
 
 
 
@@ -832,7 +859,7 @@ plotvoc
 
 # Monthly (for one room)
 
-```{r monthly}
+```{r monthly, eval = FALSE}
 
 
 
@@ -919,21 +946,16 @@ plotvoc
 
 # Comparing variation between rooms
 
-```{r room_comparison}
-
-pm25_diff_lim <- c(-10,10)
-voc_diff_lim <- c(-250,700)
-co2_diff_lim <- c(-750,750)
-temp_diff_lim <- c(-5,3.5)
-humid_diff_lim <- c(-9,9)
-lux_diff_lim <- c(-500,750)
-pm25_diff_lim <- c(-10,10)
-spl_a_diff_lim <- c(-9,9)
+```{r room_comparison, fig.height=8, fig.width = 10.5, results='asis'}
 
 
- # make data for plots
-a <- rtdata %>%
-  select(home, location, datetime, metrics_all) %>%
+# function to compare diurnal trends of indoor rooms
+# for specified metric
+room.compare <- function(metric, data = rtdata) {
+  
+  # make data for plots
+a <- data %>%
+  select(home, location, datetime, all_of(metric)) %>%
   filter(location %in% c('living', 'kitchen', 'bedroom'))
 
 # then find diurnal means and sd for each room
@@ -945,17 +967,14 @@ avg <- time.table(a,
                        'hour', groupers = c('home'))
 
 # join dataframes together
-compare_df <- full_join(locations,
-                 avg %>% select(home, hour, overall_mean = mean.val)) %>%
+compare_df <- full_join(
+  locations,
+  avg %>% select(home, hour, overall_mean = mean.val),
+  by = c('hour', 'home')) %>%
   # subtract the overall mean from each of the room mean and interval values
   mutate(mean = mean.val-overall_mean, high = high.val-overall_mean,
          low = low.val-overall_mean)
 
-
-# function to compare diurnal trends of indoor rooms
-# for specified metric
-room.compare <- function(metric, data = compare_df) {
-  
   # define plot y limits based on metric
   y_limits <- case_when(
         metric == 'pm25' ~ pm25_diff_lim,
@@ -967,14 +986,14 @@ room.compare <- function(metric, data = compare_df) {
         metric == 'spl_a' ~ spl_a_diff_lim)
   
 
- a <- ggplot(data, aes(x = hour, y = mean, color = location))+
+  ggplot(compare_df, aes(x = hour, y = mean, color = location))+
     geom_line( size = 1)+
     labs(y = 'Room Hourly Mean - Pooled Hourly Mean',
-         x = "Time",
+         x = "Hour of Day",
          title = metric)+
     scale_x_continuous(limits = c(0,24),
                        breaks = c(0,6,12,18),
-                       labels = c('12am', '6am','noon', '6pm'),
+                       labels = c('midnight', '6am','noon', '6pm'),
                        expand = c(0,0))+
     theme_bw()+
     coord_cartesian(ylim = y_limits)+ # defined in beginngin of function
@@ -987,20 +1006,36 @@ room.compare <- function(metric, data = compare_df) {
           ##for extra space between facets
     theme(panel.spacing = unit(1, "lines"),
           strip.background =element_blank())+
-   facet_wrap(vars(home))+
-   geom_hline(yintercept = 0, linetype = 'dashed')
-   
-
-    ggsave(paste0('room_compare_',metric, '_', Sys.Date(),'.pdf'), plot = a ,
-           width = 10.5, height = 8, units = 'in')
+   facet_wrap(vars(home), ncol = 4)+
+   geom_hline(yintercept = 0, linetype = 'dashed')+
+     scale_color_manual(
+       values = room_colors,
+              breaks = room_breaks,
+       name = 'Room')
+  # use below lines if using error ribbon
+   # geom_ribbon(aes(ymax = high, ymin = low, fill = location),
+   #                  alpha = 0.2, color = NA)+
+   #      scale_fill_manual(
+   #     values = room_colors,
+   #            breaks = room_breaks,
+   #     name = 'Room')
+    
+    
+    # ggsave(paste0('room_compare_',metric, '_', Sys.Date(),'.pdf'), plot = a ,
+    #        width = 10.5, height = 8, units = 'in')
   
 }
 
 # # test for one metric
 # room.compare('voc')
 
-# make and save all metric files
-lapply(metrics_all, room.compare)
+# make comparison plots for all metrics
+lapply(metrics_all, function(x_metric) {
+  a <- room.compare(metric = x_metric, data = rtdata)
+  print(a)
+  # insert page break between plots
+  cat("\n\n\\pagebreak\n")
+})
 
 
 # for one metric
