@@ -49,6 +49,46 @@ data <- read_rds("../drive_sync/epic_homes/r_epic_homes/output/sense/sense_all.r
 
 # Manual Clustering  
 
+```{r define_variables_manual_cluster, eval = TRUE}
+# define variables
+
+homes_ac <- c('001', '002', '006', '007', '008', '009', '012', '014')
+homes_no_ac <- c('004', '010', '011', '013', '015')
+
+# classify homes into "tiers" based on cluster pattern
+homes_tier3<-home.list(c(1,2,7,9,12)) # ac-shoulder-heat
+homes_tier2<-home.list(c(4,10,11,13,15)) # shoulder-heat (sometimes second shoulder)
+homes_tier1<-home.list(c(6,8,14))
+
+# just compare methods for daily fraction of time-on (pct)
+heat_percentile_thresh <- 0.25
+ac_usage_thresh <- 0
+
+# color blind pallette
+# check http://www.cookbook-r.com/Graphs/Colors_(ggplot2)/#a-colorblind-friendly-palette
+cbbPalette <- c('black' = "#000000",
+                'light_orange' = "#E69F00",
+                'light_blue' = "#56B4E9",
+                'green' = "#009E73",
+                'yellow' = "#F0E442",
+                'dark_blue' = "#0072B2",
+                'dark_orange' = "#D55E00",
+                'purple' = "#CC79A7"
+                )
+# define colors for energy clusters
+energy_colors <- c(cbbPalette['light_blue'],
+                   cbbPalette['green'],
+                   cbbPalette['dark_orange'])%>% unname()
+
+energy_breaks <- c('ac', 'shoulder', 'heat')
+energy_labels <- c('AC', 'Shoulder', 'Heat')
+
+```
+
+
+heating threshold set at `r heat_percentile_thresh` percentile for daily % time on
+
+ac threshold set at `r ac_usage_thresh`% for daily % time on
 
 ```{r function_cluster}
 
@@ -127,8 +167,9 @@ cluster.manual <- function(home_id, devices,
     cluster_time_plot <- ggplot(a_cl, aes(x = as.Date(dateday), y = 1)) +
       # color data point by cluster
       geom_tile(aes(fill = energy_cluster))+
-      scale_fill_manual(values = c('red', 'blue', 'darkgreen'),
-                        breaks = c('heat', 'ac', 'shoulder'))+ 
+      scale_fill_manual(values = energy_colors,
+                        breaks = energy_breaks,
+                        labels = energy_labels)+ 
       scale_x_date(date_breaks = "1 month", date_labels = '%B')+
       theme_bw()+
       theme(
@@ -212,8 +253,10 @@ cluster.manual.heat <- function(home_id, devices,
     cluster_time_plot <- ggplot(a_cl, aes(x = as.Date(dateday), y = 1)) +
       # color data point by cluster
       geom_tile(aes(fill = energy_cluster))+
-      scale_fill_manual(values = c('red', 'blue', 'darkgreen'),
-                        breaks = c('heat', 'ac', 'shoulder'))+
+      scale_fill_manual(values = energy_colors,
+                        breaks = energy_breaks,
+                        labels = energy_labels,
+                        name = 'Season')+
       scale_x_date(date_breaks = "1 month", date_labels = '%B')+
       theme_bw()+
       theme(
@@ -239,30 +282,8 @@ cluster.manual.heat <- function(home_id, devices,
 
 
 
-```{r define_variables_manual_cluster, eval = TRUE}
-# define variables
-
-homes_ac <- c('001', '002', '006', '007', '008', '009', '012', '014')
-homes_no_ac <- c('004', '010', '011', '013', '015')
-
-# classify homes into "tiers" based on cluster pattern
-homes_tier3<-home.list(c(1,2,7,9,12)) # ac-shoulder-heat
-homes_tier2<-home.list(c(4,10,11,13,15)) # shoulder-heat (sometimes second shoulder)
-homes_tier1<-home.list(c(6,8,14))
-
-# just compare methods for daily fraction of time-on (pct)
-heat_percentile_thresh <- 0.25
-ac_usage_thresh <- 0
-
-
-```
-
-heating threshold set at `r heat_percentile_thresh` percentile for daily % time on
-
-ac threshold set at `r ac_usage_thresh`% for daily % time on
-
 ## Tier 3 Homes
-```{r plot_manual_cluster_tier3, eval = FALSE, fig.width=8, fig.height=1}
+```{r plot_manual_cluster_tier3, eval = FALSE, fig.width=8, fig.height=1, eval = FALSE}
 
 
 
@@ -296,7 +317,7 @@ home_012 <- cluster.manual(hm, c('furnace','ac'))
 ```
 
 ## Tier 2 Homes
-```{r plot_manual_cluster_tier2, eval = FALSE, fig.width=8, fig.height=1}
+```{r plot_manual_cluster_tier2, eval = FALSE, fig.width=8, fig.height=1, eval = FALSE}
 
 hm <- '004'
 # no AC
@@ -330,7 +351,7 @@ cluster.manual.heat(hm, c('furnace'))
 ```
 
 ## Tier 1 Homes
-```{r plot_manual_cluster_tier1, eval = FALSE, fig.width=8, fig.height=1}
+```{r plot_manual_cluster_tier1, eval = FALSE, fig.width=8, fig.height=1, eval = FALSE}
 
 
 hm <- '006'
@@ -481,8 +502,9 @@ names(type_labs) <- c("tier1", "tier2", "tier3")
 ggplot(a, aes(x = as.Date(dateday), y = home)) +
   # color data point by cluster
   geom_tile(aes(fill = energy_cluster))+
-  scale_fill_manual(values = c('red', 'blue', 'darkgreen'),
-                    breaks = c('heat', 'ac', 'shoulder'),
+  scale_fill_manual(values = energy_colors,
+                        breaks = energy_breaks,
+                        labels = energy_labels,
                     name = 'Season')+
   scale_x_date(date_breaks = "1 month", date_labels = '%b')+
   theme_bw()+
