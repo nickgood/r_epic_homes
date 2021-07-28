@@ -138,9 +138,13 @@ cbbPalette <- c('black' = "#000000",
                 'purple' = "#CC79A7"
                 )
 # define colors for energy clusters
-energy_colors <- c(cbbPalette['green'],
-                   cbbPalette['purple'],
-                   cbbPalette['light_orange'])%>% unname()
+energy_colors <- c(cbbPalette['light_blue'],
+                   cbbPalette['green'],
+                   cbbPalette['dark_orange'])%>% unname()
+energy_shapes <- c(15, 16, 17)
+energy_breaks <- c('ac', 'shoulder', 'heat')
+energy_labels <- c('AC', 'Shoulder', 'Heat')
+
 
 ```
 
@@ -521,16 +525,32 @@ unwanted_scaled_na <- spec_df %>%
 ### `r unwanted_scaled_na %>% nrow()` unexpected missing values in scaled spec data
 
 ```{r plot_spec_rooms}
+
 ggplot(spec_df, aes(x = location, y = specificity))+
   geom_boxplot(outlier.shape = NA)+
-  geom_jitter( aes(color = energy_cluster), width = 0.1)+
+  geom_jitter( aes(color = energy_cluster, shape = energy_cluster), width = 0.1)+
   facet_wrap(vars(metric), labeller = labeller.metrics)+
-  scale_color_manual(breaks = c('ac', 'shoulder', 'heat'),
+  # specify shape and color for each season
+  list(
+    scale_color_manual(
+      breaks = energy_breaks,
                      values = energy_colors,
-                     name = 'Season')
+                     labels = energy_labels,
+                     name = 'Season'
+                     ),
+  scale_shape_manual(
+    breaks = energy_breaks,
+                     values = energy_shapes,
+                         labels = energy_labels,
+                     name = 'Season'
+    )
+  )+
+  theme_classic()+
+  xlab('Room')+
+  ylab('Specificity')
 ```
 
-```{r table_rank}
+```{r table_rank, fig.height = 3.5, fig.width = 8}
 
 a <- spec_df %>%
   group_by(home, energy_cluster, metric) %>%
@@ -546,14 +566,18 @@ ggplot(a, (aes(x = home, y = rank)))+
             )+
   facet_wrap(vars(metric), labeller = labeller.metrics)+
   theme_minimal()+
-  theme(panel.grid = element_blank())+
-  scale_y_discrete(breaks = c('1','2','3'), labels = c('least', '', 'greatest'))+
+  theme(panel.grid = element_blank(),
+        axis.text.y = element_text(hjust = 0))+
+  scale_y_discrete(breaks = c('1','2','3'),
+                   labels = c('Lowest', '', 'Highest'))+
   ylab('Specificity Rank')+
+  xlab('Home')+
   geom_vline(
     xintercept = seq(1.5,length(a %>% pull(home)%>%as.factor%>% levels)-0.5, 1),
     color = 'grey')+ # insert lines between homes
-  scale_color_manual(breaks = c('ac', 'shoulder', 'heat'),
+  scale_color_manual(breaks = energy_breaks,
                      values = energy_colors,
+                     labels = energy_labels,
                      name = 'Season')
 
 
