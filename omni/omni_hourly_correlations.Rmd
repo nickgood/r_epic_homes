@@ -484,6 +484,10 @@ small <- 15
 medium <- 20
 large <- 26
 
+# dimensions for hourly correlation figure outputs
+corr_fig_height <- 8
+corr_fig_width <- 10.5
+
 # # for looking at seasons
 # fall <- c('2020-09-21 00:00:00', '2020-12-20 23:59:59')
 # winter <- c('2020-12-21 00:00:00', '2020-3-20 23:59:59')
@@ -731,7 +735,7 @@ bind_rows()
     grid.arrange(arrangeGrob(grobs = plots),
                  legend, # add in legend
                  nrow=2, # one row for all plots, one row for legend
-                 heights=c(10, 1), # second height is for legend
+                 heights=c(corr_fig_height-1, 1), # second height is for legend
                  top = paste(met, ifelse(!is.null(met_2),
                                          paste('with', loc_2, met_2),
                                          ''))
@@ -748,20 +752,20 @@ bind_rows()
  
 # between metric correlation plots---------------
  
- ##in a home at a given hour 
+ ##in a home/room at a given hour 
  metric.coeff.hour <- function(hm, met_pair,
                           hr, loc,
                           method,
                           data) {
    hour_data <-
      data %>%
-     filter(home == hm) %>%
+     filter(home == hm, location == loc) %>%
      select(datehour, home, location, all_of(met_pair)) %>%
       ##make an hour column and filter data by hour of day
      mutate(hour = hour(datehour)) %>%
      filter(hour == hr)
    
-      ##calculate R coefficient of choice for room at the filtered hour
+      ##calculate R coefficient of choice for metrics at the filtered hour
    cor_results <- tryCatch(
      {
      a <- cor.test(hour_data %>% pull(met_pair[1]),
@@ -791,7 +795,7 @@ bind_rows()
  
 
 
- ##find correlation between room pair by hour
+ ##find correlation between metric pair by hour
  metric.cor.hourly <- function (hm, met_pair,
                            loc, method,
                            data) {
@@ -961,7 +965,7 @@ bind_rows()
     grid.arrange(arrangeGrob(grobs = plots),
                  legend, # add in legend
                  nrow=2, # one row for all plots, one row for legend
-                 heights=c(10, 1), # second height is for legend
+                 heights=c(corr_fig_height-1, 1), # second height is for legend
                  top = paste(loc, ifelse(!is.null(met_2),
                                          paste('with', loc_2, met_2),
                                          ''))
@@ -970,10 +974,11 @@ bind_rows()
  
  # # test funciton
  # metric.plot.grid(
- #    hms = home.list(c(1,7,8,9)),
+ #    hms = home.list(c(1:17)),
  #    mets_list = list(c('pm25', 'co2'), c('pm25', 'voc')),
  #    loc = 'living',
- #    met_2 = 'temp', loc_2 = 'outdoor')
+ #    # met_2 = 'temp', loc_2 = 'outdoor',
+ #    )
  
 ```
 
@@ -984,7 +989,7 @@ bind_rows()
 * separate plot for each house
 * only a selection of houses
 
-```{r between_room_hour_correlations_grid, warning=FALSE, fig.width=10.5, fig.height=8,eval = FALSE, results='asis'}
+```{r between_room_hour_correlations_grid, warning=FALSE, fig.height=corr_fig_height, fig.width=corr_fig_width, eval = FALSE, results='asis'}
  
 #  # test for one metric
 # grid <- room.plot.grid(
@@ -1051,7 +1056,7 @@ lapply(metrics_all, function(x_metric){
 # Hourly Between-Metrics Correlation Plots  
 
 
-```{r between_metric_hour_correlations_grid, warning=FALSE, fig.width=10.5, fig.height=8,eval = TRUE, results='asis'}
+```{r between_metric_hour_correlations_grid, warning=FALSE, fig.height=corr_fig_height, fig.width=corr_fig_width, eval = TRUE, results='asis'}
  
 #  # test for one metric
 # grid <- room.plot.grid(
