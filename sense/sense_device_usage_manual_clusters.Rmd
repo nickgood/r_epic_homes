@@ -49,9 +49,9 @@ data <- read_rds("../drive_sync/epic_homes/r_epic_homes/output/sense/sense_all.r
 
 # Manual Clustering  
 
-```{r define_variables_manual_cluster, eval = TRUE}
+```{r define_variables, eval = TRUE}
 # define variables
-
+homes_all <- home.list(1:17)
 homes_ac <- c('001', '002', '006', '007', '008', '009', '012', '014')
 homes_no_ac <- c('004', '010', '011', '013', '015')
 
@@ -464,8 +464,10 @@ daily_energy_data_clustered <-
          function(x) get(paste0('cluster_df_', x))) %>%
   bind_rows()
 
-# make csv file
-write_csv(daily_energy_data_clustered, './csv_created_sense/daily_energy_data_clustered.csv')
+# make csv file (mutating date to character to avoid time change)
+write_csv(daily_energy_data_clustered %>%
+            mutate(dateday = as.character(dateday)), './csv_created_sense/daily_energy_data_clustered.csv')
+
 ```
 
 ## Make color plot with all homes
@@ -480,14 +482,90 @@ daily_energy_data_clustered <- read_csv('./csv_created_sense/daily_energy_data_c
     TRUE ~ 'unclassified'))
 
 ```
+```{r cluster_end_points}
+# find where clusters start (first occurence of 6 consecutive days in cluster)
+
+# #test: define start based on first occurence
+# test <- daily_energy_data_clustered %>%
+#   group_by(home) %>%
+#   summarise(shoulder_start = dateday[which(energy_cluster == 'heat')[1]])
+
+
+# test with function
+season_end_points <- map(homes_all, function(x_home) {
+
+a <- daily_energy_data_clustered %>%
+  filter(home == x_home) %>%
+  arrange(dateday)  
+
+# look for shoulder dates in tier 3
+if(x_home %in% homes_tier3) {
+  # define sets of days based on their consecutive energy_cluster value
+  # (and the lengths of each set)
+y <- rle(a$energy_cluster) 
+#label a set TRUE if it contains 6 or more consecutive shoulder days
+    z <- y$values == 'shoulder' & y$lengths >= 8 
+    # find first set of clustered shoulder days that is 8 or more days long
+    i_shoulder <- which(z)[1] 
+    # return NA if there is never a 8-day stretch of shoulder days
+    shoulder_start <- if (is.na(i_shoulder)) NA else 
+    # return first day if that is when 8-day stretch starts
+    if (i_shoulder == 1) a$dateday[1] else
+    # return position of start of 8-day stretch
+    a$dateday[sum(y$lengths[1:(i_shoulder-1)])+1]
+}
+# look for heat dates in tier 2 and 3
+
+if(x_home %in% c(homes_tier3, homes_tier2)) {
+
+    #same for heat days
+    z <- y$values == 'heat' & y$lengths >= 8 
+    # find first set of clustered heat days that is 8 or more days long
+    i_heat <- which(z)[1]
+#     # NOT WORKING ensure that heat set of heat days is after shoulder days
+#     if(!is.na(i_heat) & !is.na(i_shoulder)) {
+#              iter <- 0
+# while(i_heat < i_shoulder){
+#       i_heat <- which(z)[1+iter]
+#       iter <- iter+1
+# }
+#     }
+    # return NA if there is never a 8-day stretch of heat days
+    heat_start <- if (is.na(i_heat)) NA else 
+    # return first day if that is when 8-day stretch starts
+    if (i_heat == 1) a$dateday[1] else
+    # return position of start of 8-day stretch
+    a$dateday[sum(y$lengths[1:(i_heat-1)])+1]
+    
+    return(tibble('home' = x_home, 'shoulder_start' = shoulder_start,
+                  'heat_start' = heat_start))
+}
+  }) %>% bind_rows()
+
+```
 
 ```{r plot_cluster_color_all_homes}
+# for reference:
+# https://stackoverflow.com/questions/59398026/adding-geom-segment-to-faceted-plot-that-have-free-x-axis
+a <- daily_energy_data_clustered %>%
+  left_join(season_end_points, by = 'home')%>%
+  group_by(home_type) %>%
+  # make a column that will allow for proper positioning of lines
+  mutate(plot_home = case_when(
+    home == '006' ~ '001',
+    home == '008' ~ '002',
+    home == '014' ~ '003',
+    home == '004' ~ '001',
+    home == '010' ~ '002',
+    home == '011' ~ '003',
+    home == '013' ~ '004',
+    home == '015' ~ '005',    
+    home == '007' ~ '003',
+    home == '009' ~ '004',
+    home == '012' ~ '005',
+    TRUE ~ home))
 
-
-
-a <- daily_energy_data_clustered 
-
-# line_data <- a %>%
+  # line_data <- a %>%
 #   group_by(home_type) %>%
 #   summarise(n_homes = length(unique(home))) %>%
 #   mutate(func = paste0('seq(1,', n_homes, ') - 0.5'))
@@ -498,10 +576,45 @@ a <- daily_energy_data_clustered
 type_labs <- c("Tier 1", "Tier 2", "Tier 3")
 names(type_labs) <- c("tier1", "tier2", "tier3")
 
+# #plot the cluster over date
+# ggplot(a) +
+#   # color data point by cluster
+#   geom_tile(aes(x = as.Date(dateday), y = home, fill = energy_cluster))+
+#   scale_fill_manual(values = energy_colors,
+#                         breaks = energy_breaks,
+#                         labels = energy_labels,
+#                     name = 'Season')+
+#   scale_x_date(date_breaks = "1 month", date_labels = '%b')+
+#   theme_bw()+
+#   theme(
+#     # axis.title.y = element_blank(),
+#     # axis.text.y = element_blank(),
+#     axis.ticks.y = element_blank()
+#   )+
+#   #below line not working...
+#   # geom_hline(data = line_data, aes(yintercept = seq(1,n_homes)-0.5)))+
+#   geom_hline(yintercept = seq(1,6)-0.5, color = 'grey')+
+#   # below allows for only homes within each tier to be plotted
+#   # and keeps bar height constant
+#   facet_grid(home_type~., scales = "free", space = "free_y",
+#              labeller = labeller(home_type = type_labs))+
+#   xlab('Date')+
+#   ylab('Home')+
+#   theme_classic()+
+#     # geom_vline(data = season_end_points,
+#     #         aes(xintercept = shoulder_start))+
+#     # geom_segment(data=season_end_points,
+#     #              aes(x = shoulder_start, xend = shoulder_start,
+#     #                  y = home, yend=home))
+#           geom_segment(
+#                  aes(x = shoulder_start, xend = shoulder_start,
+#                      y = as.numeric(home)-0.5, yend=as.numeric(home)+0.5))
+
+##############test function
 #plot the cluster over date
-ggplot(a, aes(x = as.Date(dateday), y = home)) +
+ggplot(a) +
   # color data point by cluster
-  geom_tile(aes(fill = energy_cluster))+
+  geom_tile(aes(x = as.Date(dateday), y = home, fill = energy_cluster))+
   scale_fill_manual(values = energy_colors,
                         breaks = energy_breaks,
                         labels = energy_labels,
@@ -516,18 +629,27 @@ ggplot(a, aes(x = as.Date(dateday), y = home)) +
   #below line not working...
   # geom_hline(data = line_data, aes(yintercept = seq(1,n_homes)-0.5)))+
   geom_hline(yintercept = seq(1,6)-0.5, color = 'grey')+
-
   # below allows for only homes within each tier to be plotted
   # and keeps bar height constant
   facet_grid(home_type~., scales = "free", space = "free_y",
              labeller = labeller(home_type = type_labs))+
   xlab('Date')+
   ylab('Home')+
-  theme_classic()
+  theme_classic()+
+          geom_segment( 
+                 aes(x = shoulder_start, xend = shoulder_start,
+                     y = as.numeric(plot_home)-0.5,
+                     yend=as.numeric(plot_home)+0.5))+
+  geom_segment( 
+                 aes(x = heat_start, xend = heat_start,
+                     y = as.numeric(plot_home)-0.5,
+                     yend=as.numeric(plot_home)+0.5))
+
 ```
 
 
 ## Make Cluster Dataframe
+
 
 ```{r make_cluster_csv, eval = FALSE}
 
