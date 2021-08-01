@@ -654,36 +654,76 @@ ggplot(a) +
 
 ```{r make_cluster_csv, eval = FALSE}
 
-energy_cluster_df<- tribble(~home, ~cluster_type,
-                            ~start_date, ~end_date,
-                     '001', 'ac', '2020-07-20', '2020-10-01',
-                     '001', 'shoulder', '2020-10-02', '2020-12-02',
-                     '001', 'heat', '2020-12-03', '2021-04-10',
-                     '002', 'ac', '2020-07-21', '2020-08-27',
-                     '002', 'shoulder', '2020-08-28', '2020-10-07',
-                     '002', 'heat', '2020-10-08', '2021-04-18',
-                     '004', 'shoulder', '2020-08-10', '2020-10-12',
-                     '004', 'heat', '2020-10-13', '2021-04-22',
-                     '007', 'ac', '2020-08-18', '2020-09-04',
-                     '007', 'shoulder', '2020-09-05', '2020-10-12',
-                     '007', 'heat', '2020-10-13', '2021-03-27',
-                     '009', 'ac', '2020-08-25', '2020-09-23',
-                     '009', 'shoulder', '2020-09-24', '2020-10-31',
-                     '009', 'heat', '2020-11-01', '2021-04-22',                     
-                     '010', 'heat', '2020-12-02', '2021-04-23',
-                     '011', 'shoulder', '2020-08-26', '2020-12-01',
-                     '011', 'heat', '2020-12-02', '2021-04-22',
-                     '012', 'ac', '2020-09-20', '2020-09-26',
-                     '012', 'shoulder', '2020-09-27', '2020-11-07',
-                     '012', 'heat', '2020-11-08', '2021-04-22',
-                     '013', 'shoulder', '2020-10-13', '2020-11-07',
-                     '013', 'heat', '2020-11-08', '2021-03-31',
-                     '013', 'shoulder_2', '2021-04-01', '2021-05-23',
-                     '015', 'shoulder', '2020-11-26', '2020-11-23',
-                     '015', 'heat', '2020-11-24', '2021-03-28',
-                     '015', 'shoulder_2', '2021-03-29', '2021-05-23',
-) %>%
-  mutate(across(start_date, ymd), across(end_date, ymd))
+energy_cluster_df <- map(homes_all, function(x_home) {
+    
+first_date <- daily_energy_data_clustered %>%
+  filter(home == x_home, dateday == min(dateday))%>%
+  pull(dateday) %>% as.character()
+
+first_date <- ifelse(is_empty(first_date), NA, first_date)
+
+shoulder_date <- season_end_points %>% 
+  filter(home == x_home) %>%
+  pull(shoulder_start) %>% as.character()
+
+shoulder_date <- ifelse(is_empty(shoulder_date), NA, shoulder_date)
+
+heat_date <- season_end_points %>% 
+  filter(home == x_home) %>%
+  pull(heat_start) %>% as.character()
+
+heat_date <- ifelse(is_empty(heat_date), NA, heat_date)
+
+
+last_date <- daily_energy_data_clustered %>%
+  filter(home == x_home, dateday == max(dateday))%>%
+  pull(dateday) %>% as.character()
+
+last_date <- ifelse(is_empty(last_date), NA, last_date)
+
+tibble(home = rep(x_home, 3),
+         cluster_type = c('ac', 'shoulder', 'heat'),
+         start_date = c(first_date,
+                        shoulder_date,
+                        heat_date),
+         end_date = c(shoulder_date,
+                        heat_date,
+                        last_date))
+
+}) %>%
+  bind_rows()
+
+
+# energy_cluster_df<- tribble(~home, ~cluster_type,
+#                             ~start_date, ~end_date,
+#                      '001', 'ac', '2020-07-20', '2020-10-01',
+#                      '001', 'shoulder', '2020-10-02', '2020-12-02',
+#                      '001', 'heat', '2020-12-03', '2021-04-10',
+#                      '002', 'ac', '2020-07-21', '2020-08-27',
+#                      '002', 'shoulder', '2020-08-28', '2020-10-07',
+#                      '002', 'heat', '2020-10-08', '2021-04-18',
+#                      '004', 'shoulder', '2020-08-10', '2020-10-12',
+#                      '004', 'heat', '2020-10-13', '2021-04-22',
+#                      '007', 'ac', '2020-08-18', '2020-09-04',
+#                      '007', 'shoulder', '2020-09-05', '2020-10-12',
+#                      '007', 'heat', '2020-10-13', '2021-03-27',
+#                      '009', 'ac', '2020-08-25', '2020-09-23',
+#                      '009', 'shoulder', '2020-09-24', '2020-10-31',
+#                      '009', 'heat', '2020-11-01', '2021-04-22',                     
+#                      '010', 'heat', '2020-12-02', '2021-04-23',
+#                      '011', 'shoulder', '2020-08-26', '2020-12-01',
+#                      '011', 'heat', '2020-12-02', '2021-04-22',
+#                      '012', 'ac', '2020-09-20', '2020-09-26',
+#                      '012', 'shoulder', '2020-09-27', '2020-11-07',
+#                      '012', 'heat', '2020-11-08', '2021-04-22',
+#                      '013', 'shoulder', '2020-10-13', '2020-11-07',
+#                      '013', 'heat', '2020-11-08', '2021-03-31',
+#                      '013', 'shoulder_2', '2021-04-01', '2021-05-23',
+#                      '015', 'shoulder', '2020-11-26', '2020-11-23',
+#                      '015', 'heat', '2020-11-24', '2021-03-28',
+#                      '015', 'shoulder_2', '2021-03-29', '2021-05-23',
+# ) %>%
+#   mutate(across(start_date, ymd), across(end_date, ymd))
 
 # create csv
 write_csv(energy_cluster_df, './csv_created_sense/energy_cluster_df.csv')
