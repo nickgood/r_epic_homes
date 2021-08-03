@@ -12,6 +12,8 @@ library(stringr)
 library(googlesheets4)
 library(hrbrthemes)
 library(kableExtra)
+library(pracma)
+library(padr)
 
 #_______________________________________________________________________________
 # clean names
@@ -134,3 +136,39 @@ pm25_mean <- function(start, end, df){
     mean(., na.rm = TRUE)
 }
 #_______________________________________________________________________________
+
+
+##______________________________________________________________________________
+## filter sense data by job id and device name
+filter_sense <- function(x, id, device_name){
+  x %>% 
+    filter(sense_device_name == device_name) %>%
+    filter(job_id == id)
+}
+##______________________________________________________________________________
+
+##______________________________________________________________________________
+## pad sense time series @ 1 minute
+pad_sense <- function(x){
+  x %>% 
+    select(datetime, avg_wattage, consumption_kwh) %>%
+    pad(interval = "min") %>%
+    mutate(avg_wattage = if_else(is.na(avg_wattage), 0, avg_wattage),
+           consumption_kwh = if_else(is.na(consumption_kwh), 0, consumption_kwh))
+}
+##______________________________________________________________________________
+
+##______________________________________________________________________________
+## find peaks
+findpeaks_sense <- function(x){
+  # find peaks in avg wattage
+  peaks_w <- findpeaks(x %>% pull(avg_wattage), 
+                       nups = 2, ndowns = 2,
+                       zero = "+",
+                       minpeakheight = -Inf, minpeakdistance = 1,
+                       threshold = 0, npeaks = 0, sortstr = FALSE) %>%
+    as_tibble() %>%
+    rename(peak_height = "V1", row = "V2") %>%
+    select(peak_height, row)
+}
+##______________________________________________________________________________
