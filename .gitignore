@@ -2,4 +2,5 @@
 .Rhistory
 .RData
 .Ruserdata
-.output/
+output/
+sense/csv_created_sense/
