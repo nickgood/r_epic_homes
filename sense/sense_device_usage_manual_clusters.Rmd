@@ -657,38 +657,50 @@ ggplot(a) +
 energy_cluster_df <- map(homes_all, function(x_home) {
     
 first_date <- daily_energy_data_clustered %>%
-  filter(home == x_home, dateday == min(dateday))%>%
-  pull(dateday) %>% as.character()
+  filter(home == x_home)%>%
+  pull(dateday) %>% min() %>% as.character()
 
 first_date <- ifelse(is_empty(first_date), NA, first_date)
 
-shoulder_date <- season_end_points %>% 
+should_start <- season_end_points %>% 
   filter(home == x_home) %>%
   pull(shoulder_start) %>% as.character()
 
-shoulder_date <- ifelse(is_empty(shoulder_date), NA, shoulder_date)
+should_start <- if(x_home %in% c('010', '015')) should_start else
+  if (x_home %in% homes_tier2) first_date else
+    ifelse(is_empty(should_start), NA, should_start)
 
-heat_date <- season_end_points %>% 
+ht_start <- season_end_points %>% 
   filter(home == x_home) %>%
   pull(heat_start) %>% as.character()
 
-heat_date <- ifelse(is_empty(heat_date), NA, heat_date)
+ht_start <- ifelse(is_empty(ht_start), NA, ht_start)
+
+ht_end <- season_end_points %>% 
+  filter(home == x_home) %>%
+  pull(heat_end) %>% as.character()
+
+ht_end <- ifelse(is_empty(ht_end), NA, ht_end)
 
 
 last_date <- daily_energy_data_clustered %>%
-  filter(home == x_home, dateday == max(dateday))%>%
-  pull(dateday) %>% as.character()
+  filter(home == x_home)%>%
+  pull(dateday) %>% max() %>% as.character()
 
 last_date <- ifelse(is_empty(last_date), NA, last_date)
 
 tibble(home = rep(x_home, 3),
          cluster_type = c('ac', 'shoulder', 'heat'),
-         start_date = c(first_date,
-                        shoulder_date,
-                        heat_date),
-         end_date = c(shoulder_date,
-                        heat_date,
-                        last_date))
+         start_date = if (x_home %in% homes_tier1) c(NA,NA,NA) else
+             c(ifelse(x_home %in% homes_tier3,
+                               first_date, NA),
+                        should_start,
+                        ht_start),
+         end_date = if (x_home %in% homes_tier1) c(NA,NA,NA) else
+           c(ifelse(x_home %in% homes_tier3,
+                               should_start, NA),
+                        ht_start,
+                        ifelse(!is.na(ht_end), ht_end, last_date)))
 
 }) %>%
   bind_rows()
@@ -741,8 +753,6 @@ home_type_df <- tibble('home' = home.list(1:17)) %>%
 
 #create csv
 write_csv(home_type_df, './csv_created_sense/home_type_df.csv')
-
-
 
 
 ```
