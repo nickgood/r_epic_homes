@@ -49,7 +49,7 @@ library(ggpubr) # for tesing log-normality
 ```
 
 ```{r import_omni_hourly_data}
-omni_hourly_data<- read_csv('./csv_created/omni_hourly_data.csv')
+omni_hourly_data<- read_rds('./csv_created/omni_hourly_calibrated.rds')
 
 # # remove all variables but omni_data
 # rm(list=setdiff(ls(), "omni_data"))
@@ -64,7 +64,7 @@ omni_hourly_data<- read_csv('./csv_created/omni_hourly_data.csv')
 
 ```{r import_energy_cluster_homes}
 # import energy cluster dataframe for all homes
-energy_cluster_df <- read_csv('./csv_created/from_sense/energy_cluster_df.csv')
+energy_cluster_df <- read_csv('./csv_created_sense/energy_cluster_df.csv')
 ```
 
 ```{r import_acf_lags}
