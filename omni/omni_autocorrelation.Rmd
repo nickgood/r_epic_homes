@@ -33,8 +33,7 @@ library(ggpubr) # for making time series plot grids (with common legends)
 ```{r data_import, eval = FALSE}
 
 ##Import CSV with Real Time Data
-omni_data<- read_csv(paste0('./csv_created/',
-                         'omni_all_locations.csv'))
+omni_data<- read_rds('./csv_created/omni_calibrated.rds')
 
 
 ```
@@ -193,7 +192,7 @@ omni_daily_data_complete <- omni_data %>%
 # classify homes into "types" based on cluster pattern
 # and add home types to data
 
-home_type_df <- read_csv('./csv_created/from_sense/home_type_df.csv')
+home_type_df <- read_csv('../sense/csv_created_sense/home_type_df.csv')
 
 homes_tier3<-home_type_df %>% filter(home_type == 'tier3') %>%
   pull(home) # ac-shoulder-heat
@@ -216,7 +215,7 @@ omni_daily_data_complete<- omni_daily_data_complete %>%
 
 # add date range clusters to data -------------------------
 
-energy_cluster_df <- read_csv('./csv_created/from_sense/energy_cluster_df.csv')
+energy_cluster_df <- read_csv('../sense/csv_created_sense/energy_cluster_df.csv')
 
 ############# using for loop
 
@@ -285,8 +284,10 @@ omni_daily_data_complete <- omni_daily_data_complete %>%
 
 ```{r daily_df_csv, eval = FALSE}
 # make a df with rows of NA for days within each home with no data
-write_csv(omni_daily_data_complete, paste0('./csv_created/omni_daily_data_complete_',
-                                  Sys.Date(), '.csv'))
+write_csv(omni_daily_data_complete, paste0('./csv_created/omni_daily_data_complete.csv'))
+
+# create dated backup
+write_csv(omni_daily_data_complete, paste0('./csv_created/omni_daily_data_complete_', Sys.Date(),'.csv'))
 
 ```
 
@@ -936,7 +937,13 @@ acf_lags_cluster <-
 # bind results into one dataframe
 acf_lags <- acf_lags_cluster %>% bind_rows(acf_lags_no_cluster)
 
+
+#write file
+write_csv(acf_lags, paste0('./csv_created/acf_lags.csv'))
+
+# create dated backup
 write_csv(acf_lags, paste0('./csv_created/acf_lags_',Sys.Date(), '.csv'))
+
 
 ```
 
@@ -945,7 +952,7 @@ acf_lags <- read_csv('./csv_created/acf_lags.csv')
 ```
 
 
-```{r lag_plot_omissions}
+```{r lag_df_omissions}
 
 # and omit samples that have less than ___ available days
 # and omit samples with a missing pct greater than ____
@@ -1171,8 +1178,8 @@ lag_summary_cluster <- acf_lags_finite %>%
             q3 = quantile(lag_signif, probs= 3/4),
                         mean = mean(lag_signif),
             sd = sd(lag_signif), 
-                 n = sum(days_avail)) %>%
-  ungroup()
+                 n = sum(days_avail),
+                        .groups = 'drop')
 
 lag_summary_total <- acf_lags_finite %>%
   filter(energy_cluster %in% c('heat', 'ac', 'shoulder'))%>%
@@ -1181,13 +1188,17 @@ lag_summary_total <- acf_lags_finite %>%
             q3 = quantile(lag_signif, probs= 3/4),
                                     mean = mean(lag_signif),
             sd = sd(lag_signif), 
-                 n = sum(days_avail)) %>%
-  ungroup() %>%
+                 n = sum(days_avail),
+            .groups = 'drop') %>%
   mutate(energy_cluster = 'total')
 
 lag_summary <- bind_rows(lag_summary_total, lag_summary_cluster)
 
+# write file
+write_csv(lag_summary, paste0('./csv_created/lag_summary.csv'))
+# create dated backup file
 write_csv(lag_summary, paste0('./csv_created/lag_summary_', Sys.Date(), '.csv'))
+
 ```
 
 
