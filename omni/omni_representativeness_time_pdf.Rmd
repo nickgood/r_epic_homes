@@ -55,7 +55,7 @@ omni_hourly_data<- read_rds('./csv_created/omni_hourly_calibrated.rds')
 
 ```{r import_energy_cluster_homes}
 # import energy cluster dataframe for all homes
-energy_cluster_df <- read_csv('./csv_created_sense/energy_cluster_df.csv')
+energy_cluster_df <- read_csv('../sense/csv_created_sense/energy_cluster_df.csv')
 ```
 
 ```{r import_acf_lags}
@@ -564,7 +564,7 @@ pdf_days <- c(3,7,10,14,21)
 
 # test function for multiple homes
       
-      # make csvs--------------------
+      # make dfs--------------------
 
 all_time_choice <- TRUE
 clust <- c('heat', 'shoulder', 'ac') # can do multiple
@@ -722,7 +722,11 @@ entropy_time_hourly_pdf_df <- bind_rows(
 #   voc_kitchen_ac_rep_data_time_hourly_pdf
 # )
 
+# write csv files------------------------
 
+# make csv of all data
+write_csv(entropy_time_hourly_pdf_df, file =
+            paste0('./csv_created/representativeness_data/rep_data_time_hourly_pdf.csv'))
 
 # make csv of all data
 write_csv(entropy_time_hourly_pdf_df, file =

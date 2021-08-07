@@ -51,7 +51,7 @@ library(ggpubr) # for tesing log-normality
 
 ```{r import_energy_cluster_homes}
 # import energy cluster dataframe for all homes
-energy_cluster_df <- read_csv('./csv_created/from_sense/energy_cluster_df.csv')
+energy_cluster_df <- read_csv('../sense/csv_created_sense/energy_cluster_df.csv')
 ```
 
 ```{r import_pdf_data}
@@ -482,7 +482,7 @@ threshold_df <- map(thresh_vector, frac.above.threshold) %>% bind_rows()
 # Time Structured--------------
 
 meth <- 'time'
-a <- threshold_df %>% filter(sample_length %in% c(1,3,7,11, 15, 19),
+a <- threshold_df %>% filter(sample_length %in% c(3,7,11,15),
                              method == meth)
  # bar chart showing fraction that acieved representativeness by smaple_length
 # facet by metric and method
@@ -490,11 +490,11 @@ ggplot(a, aes(x = as.factor(sample_length), y = frac_greater,
                          fill = as.factor(thresh)))+
   geom_col(position = 'dodge')+
   facet_wrap(vars( metric, energy_cluster))+
-  geom_text(aes( label = n_condition), y = 0.9, size = smaller)+
+  geom_text(aes( label = n_condition), y = 1.05, size = smaller)+
   ggtitle(label = paste(meth, 'Samples Greater than Representativeness Thresholds'))+
   ylab('Fraction Greater than Threshold')+
   xlab('Sample Length, days')+
-  coord_cartesian(ylim = c(0,1))+
+  coord_cartesian(ylim = c(0,1.05))+
   scale_fill_manual(values = c('gold', 'orange', 'darkred'),
                     name = 'Threshold')+
   theme(
@@ -509,7 +509,7 @@ ggplot(a, aes(x = as.factor(sample_length), y = frac_greater,
 # Magnitude-Based--------------
 
 meth <- 'shape'
-a <- threshold_df %>% filter(sample_length %in% c(1,3,7,11, 15, 19),
+a <- threshold_df %>% filter(sample_length %in% c(3,7,11, 15),
                              method == meth)
  # bar chart showing fraction that acieved representativeness by smaple_length
 # facet by metric and method
@@ -517,11 +517,11 @@ ggplot(a, aes(x = as.factor(sample_length), y = frac_greater,
                          fill = as.factor(thresh)))+
   geom_col(position = 'dodge')+
   facet_wrap(vars( metric, energy_cluster))+
-  geom_text(aes( label = n_condition), y = 0.9, size = smaller)+
+  geom_text(aes( label = n_condition), y = 1.05, size = smaller)+
   ggtitle(label = paste(meth, 'Samples Greater than Representativeness Thresholds'))+
   ylab('Fraction Greater than Threshold')+
   xlab('Sample Length, days')+
-    coord_cartesian(ylim = c(0,1))+
+    coord_cartesian(ylim = c(0,1.05))+
     scale_fill_manual(values = c('gold', 'orange', 'darkred'),
                     name = 'Threshold')+
   theme(

@@ -64,7 +64,7 @@ omni_hourly_data<- read_rds('./csv_created/omni_hourly_calibrated.rds')
 
 ```{r import_energy_cluster_homes}
 # import energy cluster dataframe for all homes
-energy_cluster_df <- read_csv('./csv_created_sense/energy_cluster_df.csv')
+energy_cluster_df <- read_csv('../sense/csv_created_sense/energy_cluster_df.csv')
 ```
 
 ```{r import_acf_lags}
@@ -196,8 +196,9 @@ entropy.table.shape <- function(
   sample_avail_limit = 0, # only use data from a sample period if it has at least this fraction of data available (0 means no periods are omitted if they have any data)
   data = omni_hourly_data) {
   
+    warn <<- 'none'# clear warning output in case it was triggered previously
+
   output <<- na.result(NA) # clear error output in case it was triggered previously
-  warn <<- 'none'# clear warning output in case it was triggered previously
   
   if(metric %in% c('pm25', 'voc')) {
     # define LOD of metric to be 1/2 minimum detected (non-zero) value
@@ -542,7 +543,7 @@ all_time_choice <- TRUE
                 
     test2 <- lapply(clust, function(cluster_type) {
       
-      rep_data <-  lapply('010', function(x_home) {
+      rep_data <-  lapply('009', function(x_home) {
         
         start_date <- pick.start(x_home, cluster_type)
         end_date <- pick.end(x_home, cluster_type)
@@ -600,7 +601,7 @@ all_time_choice <- TRUE
           date_ranges_entire = list(c(start_date,
                                       end_date)),
           tested_sample_sequence = 
-           c(1, seq(3,sample_max,4)),
+        c(1, seq(3,27,4)),
           location_type = loc,
           all_time = all_time_choice) %>%
           
@@ -638,7 +639,7 @@ all_time_choice <- TRUE
           date_ranges_entire = list(c(start_date,
                                       end_date)),
           tested_sample_sequence = 
-           c(1, seq(3,sample_max,4)),
+        c(1, seq(3,27,4)),
           location_type = loc,
           all_time = all_time_choice) %>%
           
@@ -675,7 +676,7 @@ all_time_choice <- TRUE
           date_ranges_entire = list(c(start_date,
                                       end_date)),
           tested_sample_sequence = 
-           c(1, seq(3,sample_max,4)),
+        c(1, seq(3,27,4)),
           location_type = loc,
           all_time = all_time_choice) %>%
           
@@ -744,8 +745,10 @@ entropy_shape_pdf_df <- bind_rows(
 #                    Sys.Date(), '.csv'))
 
 
-
 # make csv of all data
+write_csv(entropy_shape_pdf_df, file =
+            paste0('./csv_created/representativeness_data/rep_data_shape_hourly_pdf.csv'))
+# make dated backup
 write_csv(entropy_shape_pdf_df, file =
             paste0('./csv_created/representativeness_data/rep_data_shape_hourly_pdf_',
                    Sys.Date(), '.csv'))
