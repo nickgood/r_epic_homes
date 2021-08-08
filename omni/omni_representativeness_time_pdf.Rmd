@@ -179,6 +179,7 @@ entropy.table.hourly <- function(
   sample_avail_limit = 0, # only use data from a sample period if it has at least this fraction of data available (0 means no periods are omitted if they have any data)
   data = omni_hourly_data) {
   
+      warn <<- 'none'# clear warning output in case it was triggered previously
   output <<- na.result(NA) # clear error output in case it was triggered previously
   
   if(metric %in% c('pm25', 'voc')) {
@@ -350,6 +351,14 @@ entropy.table.hourly <- function(
       # for testing
       # y<- all_dates_season[(159*24*12):((159+28)*24*12)]
       
+      # warn if not enough days in season to calculate for given sampling period length
+      if(length(all_dates_season) <= days*24) {
+        warn <<- 'short_season'
+        a <- rep(NA, 2) %>% as.integer() %>% as.data.frame()
+        colnames(a) <- days # give name to column just to suppress "new name" message
+        
+      } else {
+        
       a <-
         runner(
           all_dates_season,
@@ -401,6 +410,7 @@ entropy.table.hourly <- function(
             a
           }
         )
+      }
       
       # bind all elements of list into a dataframe
       a <- bind_cols(a)
@@ -450,7 +460,9 @@ entropy.table.hourly <- function(
           'sample_length' = rep(days2, length(a[[1]])),
           'monitor_season' = rep(period_label, length(a[[1]])),
           'n_samp_avail' = a[['n_samp_avail']],
-          'error' = rep('none', length(a[[1]]))
+          'error' = rep('none', length(a[[1]])),
+          'warn' = rep(warn, length(a[[1]])) # return wrnaing if there was one triggered
+
         )
         a
       }
@@ -563,7 +575,56 @@ pdf_days <- c(3,7,10,14,21)
 ```{r data_maker_hourly, eval = FALSE}
 
 # test function for multiple homes
+      all_time_choice <- TRUE
+   test_homes <- c('007', '012')
+    test_cluster <- c('ac') # can do multiple
+
+    mets <- c('pm25', 'voc')
+    locs <- locations_indoor
+    
+    test<- lapply(locs, function(x_location) {
       
+      lapply(mets, function(x_metric) {
+        
+        lapply(test_cluster, function(cluster_type) {
+          
+          lapply(test_homes, function(x_home) {
+            
+            start_date <- pick.start(x_home, cluster_type)
+            end_date <- pick.end(x_home, cluster_type)
+            sample_min <- pick.sample.min(met)
+            sample_max <- if_else(
+              as.numeric(as.Date(end_date) - as.Date(start_date))>=28,
+              28,
+              as.numeric(as.Date(end_date) - as.Date(start_date))
+            )
+            
+            entropy.table.hourly(
+              x_home, metric = x_metric,
+              date_ranges_entire = list(c(start_date,
+                                          end_date)),
+              tested_sample_sequence = 
+                c(1, seq(3,27,4)),
+              location_type = x_location,
+              all_time = all_time_choice) %>%
+              
+              # add in column for energy_cluster
+              mutate(energy_cluster = cluster_type) 
+          }
+          ) %>%
+            bind_rows()
+        }
+        ) %>%
+          bind_rows()
+      }
+      ) %>%
+        bind_rows()
+    }
+    ) %>%
+      bind_rows()
+    
+
+
       # make dfs--------------------
 
 all_time_choice <- TRUE

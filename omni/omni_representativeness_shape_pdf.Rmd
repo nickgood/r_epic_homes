@@ -142,13 +142,13 @@ pdf_days <- c(3,7,10,14,21)
 
 # define variables for testing-----------------------
 
-# date_ranges_entire <- list(c('2020-12-02','2021-04-23'))
+# date_ranges_entire <- list(c('2020-08-18','2021-09-12'))
 # tested_sample_sequence <- seq(1,5,2)
-# home_num <- '009'
+# home_num <- '007'
 # location_type <- 'bedroom'
 # data <- omni_hourly_data
 # monitor_season <- date_ranges_entire[1]
-# metric <- 'voc'
+# metric <- 'pm25'
 # days <- 1
 # days2 <- 1
 # all_time <- TRUE
@@ -349,6 +349,13 @@ entropy.table.shape <- function(
       # for testing
       # y<- all_dates_season[(159*24):((159+days)*24)]
       
+      # warn if not enough days in season to calculate for given sampling period length
+      if(length(all_dates_season) <= days*24) {
+        warn <<- 'short_season'
+        a <- rep(NA, 2) %>% as.integer() %>% as.data.frame()
+        colnames(a) <- days # give name to column just to suppress "new name" message
+        
+      } else {
       a <-
         runner(all_dates_season,
                k = days*24, # number of hour periods in short sampling period
@@ -386,6 +393,7 @@ entropy.table.shape <- function(
                  a
                }
         )
+      }
       
       # bind all elements of list into a dataframe
       a <- bind_cols(a)
@@ -485,15 +493,14 @@ entropy.table.shape <- function(
 
 # test function--------------------------
 
+
 # start <- Sys.time()
 # 
-# test<- entropy.table.shape('004', 'pm25',
+# test<- entropy.table.shape('012', 'pm25',
 # 
 #                            date_ranges_entire = list(
-#                              c('2020-12-01', '2020-12-31'),
-#                                                      c('2020-11-01',
-#                                                        '2020-11-30')),
-#                            tested_sample_sequence = c(4,5),
+#                              c('2020-09-01', '2020-09-28')),
+#                            tested_sample_sequence = c(7,11,23,27),
 #                            location_type = 'living',
 #                            all_time = TRUE)
 # end <- Sys.time()
@@ -536,45 +543,58 @@ entropy.table.shape <- function(
 # test function for one home/sensor-----------------
 
 all_time_choice <- TRUE
-    clust <- c('heat') # can do multiple
-                met <- 'voc'
-                loc <- 'bedroom'
-                sample_seq <- c(1,3,7,11,15,19,23,27)
-                
-    test2 <- lapply(clust, function(cluster_type) {
+   test_homes <- c('007', '012')
+    test_cluster <- c('ac') # can do multiple
+
+    mets <- c('pm25', 'voc')
+    locs <- locations_indoor
+    
+    test<- lapply(locs, function(x_location) {
       
-      rep_data <-  lapply('009', function(x_home) {
+      lapply(mets, function(x_metric) {
         
-        start_date <- pick.start(x_home, cluster_type)
-        end_date <- pick.end(x_home, cluster_type)
-        sample_min <- pick.sample.min(met)
-        sample_max <- if_else(
-          as.numeric(as.Date(end_date) - as.Date(start_date))>=28,
-          28,
-          as.numeric(as.Date(end_date) - as.Date(start_date))
-          )
-        
-        entropy.table.shape(
-          x_home, metric = met,
-          date_ranges_entire = list(c(start_date,
-                                      end_date)),
-          tested_sample_sequence = 
-            sample_seq,
-          location_type = loc,
-          all_time = all_time_choice) %>%
+        lapply(test_cluster, function(cluster_type) {
           
-          # add in column for energy_cluster
-          mutate(energy_cluster = cluster_type) 
+          lapply(test_homes, function(x_home) {
+            
+            start_date <- pick.start(x_home, cluster_type)
+            end_date <- pick.end(x_home, cluster_type)
+            sample_min <- pick.sample.min(met)
+            sample_max <- if_else(
+              as.numeric(as.Date(end_date) - as.Date(start_date))>=28,
+              28,
+              as.numeric(as.Date(end_date) - as.Date(start_date))
+            )
+            
+            entropy.table.shape(
+              x_home, metric = x_metric,
+              date_ranges_entire = list(c(start_date,
+                                          end_date)),
+              tested_sample_sequence = 
+                c(1, seq(3,27,4)),
+              location_type = x_location,
+              all_time = all_time_choice) %>%
+              
+              # add in column for energy_cluster
+              mutate(energy_cluster = cluster_type) 
+          }
+          ) %>%
+            bind_rows()
+        }
+        ) %>%
+          bind_rows()
       }
       ) %>%
         bind_rows()
-      
     }
-    ) %>% bind_rows()
+    ) %>%
+      bind_rows()
+    
+
     
 
 
-      # make csvs for all homes--------------------
+      # make dfs for all homes--------------------
 
 all_time_choice <- TRUE
     clust <- c('heat', 'shoulder', 'ac') # can do multiple
@@ -734,6 +754,8 @@ entropy_shape_pdf_df <- bind_rows(
 #   voc_bedroom_ac_rep_data_shape_pdf,
 #   voc_living_ac_rep_data_shape_pdf,
 #   voc_kitchen_ac_rep_data_shape_pdf)
+
+# write csvs----------------------
 
 # # to bind new to old data
 # a_old <- read_csv('./csv_created/representativeness_data/rep_data_shape_pdf.csv')
