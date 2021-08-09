@@ -56,7 +56,7 @@ omni_hourly_data<- read_rds('./csv_created/omni_hourly_calibrated.rds')
 
 ```{r import_energy_cluster_homes}
 # import energy cluster dataframe for all homes
-energy_cluster_df <- read_csv('./csv_created/from_sense/energy_cluster_df.csv')
+energy_cluster_df <- read_csv('../sense/csv_created_sense/energy_cluster_df.csv')
 ```
 
 ```{r import_acf_lags}
@@ -483,6 +483,9 @@ mutual_info_df <-
 
 # make csv of all data
 write_csv(mutual_info_df, file =
+            paste0('./csv_created/representativeness_data/mutual_info.csv'))
+# make dated backup
+write_csv(mutual_info_df, file =
             paste0('./csv_created/representativeness_data/mutual_info_',
                    Sys.Date(), '.csv'))
 
@@ -524,7 +527,7 @@ unwanted_scaled_na <- spec_df %>%
 
 ### `r unwanted_scaled_na %>% nrow()` unexpected missing values in scaled spec data
 
-```{r plot_spec_rooms}
+```{r plot_spec_rooms, fig.width = 7, fig.height = 3}
 
 ggplot(spec_df, aes(x = location, y = specificity))+
   geom_boxplot(outlier.shape = NA)+

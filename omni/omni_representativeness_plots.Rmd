@@ -100,6 +100,15 @@ threedig <- function(x) {
 
 home.list <- function(x) sapply(x, threedig)
 
+# make function to label metric names with subscripts
+labeller.metrics <- as_labeller(c('pm25'='PM[2.5]', 'voc'="TVOC"),
+                           default = label_parsed)
+
+# make function to label metric names with subscripts and seasons
+labeller.metrics.seasons <- as_labeller(c(
+  'pm25'='PM[2.5]', 'voc'="TVOC",
+  'ac' = 'AC', 'shoulder' = 'Shoulder', 'heat' = 'Heat'
+  ), default = label_parsed)
 
 ```
 
@@ -116,6 +125,10 @@ max_method <- 'conditional'
 
 # list of all home numbers
 homes_all <- home.list(1:17)
+homes_tier3 <- home.list(c(1,2,7,9,12))
+homes_tier2 <- home.list(c(4,10,11,13,15))
+
+
 
 clusters_all <- c('heat','shoulder', 'ac')
 locations_indoor <- c('living', 'kitchen', 'bedroom')
@@ -523,8 +536,8 @@ meth <- 'shape'
 
 ```
 
-## Test how many samples exceed represetnativeness threshold
-## at different threshod values
+### Test how many samples exceed represetnativeness threshold
+### at different threshod values
 
 ```{r threshold_table}
  
@@ -555,8 +568,12 @@ a <- threshold_df %>% filter(sample_length %in% c(3,7,11,15),
 ggplot(a, aes(x = as.factor(sample_length), y = frac_greater,
                          fill = as.factor(thresh)))+
   geom_col(position = 'dodge')+
-  facet_grid(vars(energy_cluster), vars(metric))+
-  geom_text(aes( label = n_condition), y = 1.05, size = smaller)+
+  facet_grid(vars(factor(energy_cluster,
+                         levels = energy_breaks)),
+             vars(metric),
+             labeller = labeller.metrics.seasons)+
+  # # add n of sample length for each condition
+  # geom_text(aes( label = n_condition), y = 1.05, size = smaller)+
   ggtitle(label = paste(meth, 'Samples Greater than Representativeness Thresholds'))+
   ylab('Fraction Greater than Threshold')+
   xlab('Sample Length, days')+
@@ -571,8 +588,9 @@ ggplot(a, aes(x = as.factor(sample_length), y = frac_greater,
     strip.text = element_text(size = medium),
     legend.text = element_text(size = medium),
     legend.title = element_text(size = medium),
-    panel.grid.major.x = element_blank()
-    )
+    panel.grid.major.x = element_blank())+
+  scale_y_continuous(breaks = c(0, 0.5, 1),
+                     minor_breaks = c(0.25, 0.75))
 
 # Magnitude-Based--------------
 
@@ -584,8 +602,12 @@ a <- threshold_df %>% filter(sample_length %in% c(3,7,11, 15),
 ggplot(a, aes(x = as.factor(sample_length), y = frac_greater,
                          fill = as.factor(thresh)))+
   geom_col(position = 'dodge')+
-  facet_grid(vars(energy_cluster), vars(metric))+
-  geom_text(aes( label = n_condition), y = 1.05, size = smaller)+
+  facet_grid(vars(factor(energy_cluster,
+                         levels = energy_breaks)),
+             vars(metric),
+             labeller = labeller.metrics.seasons)+
+  # # add n of sample length for each condition
+  # geom_text(aes( label = n_condition), y = 1.05, size = smaller)+
   ggtitle(label = paste(meth, 'Samples Greater than Representativeness Thresholds'))+
   ylab('Fraction Greater than Threshold')+
   xlab('Sample Length, days')+
@@ -600,8 +622,9 @@ ggplot(a, aes(x = as.factor(sample_length), y = frac_greater,
     strip.text = element_text(size = medium),
     legend.text = element_text(size = medium),
     legend.title = element_text(size = medium),
-    panel.grid.major.x = element_blank()
-    )
+    panel.grid.major.x = element_blank())+
+  scale_y_continuous(breaks = c(0, 0.5, 1),
+                     minor_breaks = c(0.25, 0.75))
 
 
   
@@ -623,52 +646,41 @@ pooled_scaled_entropy_df <- scaled_entropy_df %>%
 
 ```{r function_avg_entropy_plotter}
 
-#make function to define color based on cluster
-color.find <- function(x)  {
-  case_when(x == 'heat'~ energy_colors[1],
-            x == 'ac' ~ energy_colors[2],
-            x == 'shoulder' ~ energy_colors[3],
-            TRUE ~ 'black')}
-
 entropy.plot <- function (
   hm,
   # omit a sampling period of given length
   # if this proportion of possible samples
   # were not availabel in data
+  simple = FALSE,
   metrics = c('pm25', 'voc'),
   data = pooled_scaled_entropy_df
 ) {
   
-  # for one home:
-  a <- data %>%
-    filter(home == hm & metric %in% metrics)%>%
-  mutate(clust_color = color.find(energy_cluster)) %>% # add column for color based on cluster
-  #convert cluster col to factor
-  mutate(energy_cluster = as.factor(energy_cluster))
-  
-  
-  col <- as.character(a$clust_color)
-names(col) <- as.character(a$energy_cluster)
-
-# add ach50 for home to plot
+  # add ach50 for home to plot
 ach50 <- assessment_data %>% filter( home == hm) %>%
   pull(ach50)
 ach50 <- if(is_empty(ach50)) NA else if (is.na(ach50)) {
   NA} else ach50
+
+  # for one home:
+  a <- data %>%
+    filter(home == hm & metric %in% metrics)
 
   if(nrow(a) == 0) {
     plot <- NULL # return NULL if no data for home/metric/cluster combo
   }else {
     
     # plot results
-    plot <- ggplot(aes(x = sample_length, y = avg_scaled_kld,
+    plot <-
+      ggplot(aes(x = sample_length, y = avg_scaled_kld,
                        color = energy_cluster), data = a)+
       geom_line()+
       geom_point(size = 1)+
       xlab('Sample Length, days')+
-      ylab('Scaled Relative Entropy')+
-      geom_hline(yintercept=thresh_vector, linetype="dashed",
-                 color = "black", size=0.5)+
+      ylab('Temporal Representativeness')+
+      # # add threshold lines
+      # geom_hline(yintercept=thresh_vector, linetype="dashed",
+      #            color = "black", size=0.5)+
       # # to color threshold lines based on value
       # lapply(c(1:3), function(i){
       #         geom_hline(yintercept=thresh_vector[i],
@@ -682,19 +694,37 @@ ach50 <- if(is_empty(ach50)) NA else if (is.na(ach50)) {
     # geom_ribbon(aes(ymin = low_val, ymax = high_val,
     #                 fill = energy_cluster),
     #             alpha = 0.15, color = NA)+
-  scale_fill_manual(values = col)+
-        scale_color_manual(values = col)+
+  scale_fill_manual(values = energy_colors,
+                    breaks = energy_breaks,
+                    labels = energy_labels,
+                    name = 'Season')+
+        scale_color_manual(values = energy_colors,
+                    breaks = energy_breaks,
+                    labels = energy_labels,
+                    name = 'Season')+
       theme_bw()+
-      theme(legend.position = 'none',
-            axis.title = element_blank(),
-            axis.text = element_text(size = small),
-            title = element_text(size = small))+
-            facet_wrap(vars(metric))+
-          annotate('text', x = 14, y = 0.25, hjust = 0.5, size = xsmall+1,
+      #prep for grid if simple is TRUE
+      {if(simple ==TRUE) 
+        theme(
+        legend.position = 'none',
+        axis.title = element_blank(),
+                    axis.text = element_text(size = small),
+            plot.title = element_text(size = small+4, hjust = 0.5),
+            legend.title = element_text(size = small+4))
+        else
+              theme(
+                axis.title = element_text(size = medium),
+                axis.text = element_text(size = medium-2),
+                strip.text = element_text(size = medium)
+              )}+
+            facet_wrap(vars(metric), labeller = labeller.metrics)+
+          {if(!is.na(ach50)) annotate('text', x = 28, y = 0.18,
+                   hjust = 1, size = ifelse(simple == TRUE, xsmall+0.5,small-1),
              # label = bquote(ACH[50] ==  ~ .(ach50))
              label = paste( 'ACH50 =', ach50)
-             ) # annotate with ach50
-
+             )}+ # annotate with ach50 if available
+  scale_y_continuous(breaks = c(0, 0.5, 1),
+                     minor_breaks = c(0.25, 0.75))
 
    }
   plot
@@ -714,18 +744,22 @@ grid.plots <- function(plots, title,
 
 ```
 
-```{r plot_single_sensor_avg_entropy, eval = FALSE}
+## Representativeness as function of sample length
+
+### Test for one home
+```{r plot_single_sensor_avg_entropy, fig.width = 7, fig.height = 4}
 
 # plot results for one home
 
 a <- pooled_scaled_entropy_df %>%
-  filter(home == '009', method == 'time')
+  filter(method == 'time')
 
-entropy.plot('009', data = a)
+entropy.plot('001', data = a)
 
 ```
 
-```{r grid_plot_avg_entropy, fig.height=8, fig.width = 10.5}
+### Plot for all homes
+```{r grid_plot_avg_entropy, fig.height=8, fig.width = 10.5, eval = FALSE}
 # time ----------------
 meth <- 'time'
 
@@ -733,11 +767,12 @@ meth <- 'time'
 a <- pooled_scaled_entropy_df %>% filter(method == meth)
 # make plots for all homes
 map(homes_all, function (x_home) {
-    entropy.plot(hm = x_home, data = a)
+    entropy.plot(hm = x_home, simple = TRUE, data = a)
 }) %>%
   grid.plots(title = 'Time-Structured Scaled Relative Entropy')%>%
-  annotate_figure(fig.lab = paste0('Scale Method: ',
-                                   unique(scaled_entropy_df$max_method)))
+  annotate_figure(
+    fig.lab = paste0('Scale Method: ',
+                     unique(scaled_entropy_df$max_method)))
 
 }
 
@@ -748,11 +783,12 @@ meth <- 'shape'
 a <- pooled_scaled_entropy_df %>% filter(method == meth)
 # make plots for all homes
 map(homes_all, function (x_home) {
-    entropy.plot(hm = x_home, data = a)
+    entropy.plot(hm = x_home, simple = TRUE, data = a)
 }) %>%
   grid.plots(title = 'Magnitiude-Based Scaled Relative Entropy') %>%
-  annotate_figure(fig.lab = paste0('Scale Method: ',
-                                   unique(scaled_entropy_df$max_method)))
+  annotate_figure(
+    fig.lab = paste0('Scale Method: ',
+                     unique(scaled_entropy_df$max_method)))
 
 }
 
@@ -760,6 +796,56 @@ map(homes_all, function (x_home) {
 
 ```
 
+### arranged by tier
+```{r grid_plot_avg_entropy_tiers, fig.height=4, fig.width = 10.5}
+# time-------------------
+meth <- 'time'
+
+a <- pooled_scaled_entropy_df %>% filter(method == meth)
+
+# make plots for all homes
+plots_t3 <- map(homes_tier3, function (x_home) {
+    entropy.plot(hm = x_home, simple = TRUE, data = a)
+})
+
+plots_t2 <- map(homes_tier2, function (x_home) {
+    entropy.plot(hm = x_home, simple = TRUE, data = a)
+})
+
+grid.arrange(grobs = c(plots_t2, plots_t3),
+                          top = 'Time-Structured',
+                          left = 'Temporal Representativeness',
+                          bottom = 'Sample Length, days',
+                          nrow = 2)
+
+# shape---------------
+meth <- 'shape'
+
+a <- pooled_scaled_entropy_df %>% filter(method == meth)
+
+# make plots for all homes
+plots_t3 <- map(homes_tier3, function (x_home) {
+    entropy.plot(hm = x_home, simple = TRUE, data = a)
+})
+
+plots_t2 <- map(homes_tier2, function (x_home) {
+    entropy.plot(hm = x_home, simple = TRUE, data = a)
+})
+
+grid.arrange(grobs = c(plots_t2, plots_t3),
+                          top = 'Magnitude-Based',
+                          left = 'Temporal Representativeness',
+                          bottom = 'Sample Length, days',
+                          nrow = 2)
+
+# # may need to use arrange grob in future
+# # https://cran.r-project.org/web/packages/gridExtra/vignettes/arrangeGrob.html
+# t3_row <- arrangeGrob(plots_t3, nrow = 1)
+# t2_row <- arrangeGrob(plots_t2, nrow = 1)
+# but will have to figure out how to convert ggplot rows to grob
+# https://wilkelab.org/cowplot/reference/as_grob.html
+
+```
 
 
 
