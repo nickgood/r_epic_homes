@@ -541,7 +541,7 @@ info_gain_df_clean <- info_gain_df%>%
 ```{r create_rep_df}
 
 represent_df <- info_gain_df_clean %>%
-  group_by(home) %>%
+  group_by(home, metric) %>%
   mutate(info_gain_max = max(info_gain)) %>%
   ungroup() %>%
   mutate(represent = info_gain/info_gain_max)
