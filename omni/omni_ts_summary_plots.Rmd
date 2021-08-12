@@ -787,7 +787,9 @@ plotvoc
                        breaks = c(0,6,12,18),
                        labels = c('12am', '6am','noon', '6pm'),
                        expand = c(0,0))+
-       scale_color_discrete(name = 'Home')+
+       scale_color_discrete(name = 'Home',
+                            guide = 'none'
+                            )+
     theme_bw()+
     theme(plot.title = element_blank(),
           title = element_text(size = medium),
@@ -798,11 +800,11 @@ plotvoc
           legend.title = element_text(size = medium-3),
           panel.spacing.x = unit(1, 'lines') # add horiz space between facets
           )+
-    geom_point(size = 2)+
                coord_cartesian(ylim = y_range)+
         # make point size proportional to # of obs, with 0 obs = size 0
-        geom_point(aes(size = n))+
+        # geom_point(aes(size = n))+
         scale_size_area(max_size = max_point_size, guide = 'none')+
+       # guides(col = guide_legend(ncol = 2))+ #split up legend
           ##for extra space between facets
     theme(
           strip.background =element_blank())
@@ -940,10 +942,9 @@ plotvoc
           legend.title = element_text(size = medium-3),
           panel.spacing.x = unit(1, 'lines') # add horiz space between facets
           )+
-    geom_point(size = 2)+
                coord_cartesian(ylim = y_range)+
         # make point size proportional to # of obs, with 0 obs = size 0
-        geom_point(aes(size = n))+
+        # geom_point(aes(size = n))+
         scale_size_area(max_size = max_point_size, guide = 'none')+
           ##for extra space between facets
     theme(
@@ -1106,10 +1107,9 @@ plotvoc
           legend.title = element_text(size = medium-3),
           panel.spacing.x = unit(1, 'lines') # add horiz space between facets
           )+
-    geom_point(size = 2)+
                coord_cartesian(ylim = y_range)+
         # make point size proportional to # of obs, with 0 obs = size 0
-        geom_point(aes(size = n))+
+        # geom_point(aes(size = n))+
         scale_size_area(max_size = max_point_size, guide = 'none')+
           ##for extra space between facets
     theme(
