@@ -603,7 +603,7 @@ a <- daily_energy_data_clustered %>%
  # parse(text = paste0('seq(1,', 5, ') - 0.5')) %>%eval()
 
 # define labels for facets
-type_labs <- c("Tier 1", "Tier 2", "Tier 3")
+type_labs <- c("Group 1", "Group 2", "Group 3")
 names(type_labs) <- c("tier1", "tier2", "tier3")
 
 #plot the cluster over date
