@@ -465,9 +465,23 @@ stop('duplicates outside of daylight savings time exist')}
   omni_data_clean <- omni_data_clean %>%
   mutate(temp = ifelse(temp > 100, NA, temp))
 
-# write data------------------- 
+ 
+ # copy outdoor data for outdoor duplex units ----------------
+ omni_data_clean <- omni_data_clean %>%
+   bind_rows(
+     omni_data_clean %>%
+               filter(home == '014' & location == 'outdoor') %>%
+               mutate(home = '013'),
+     omni_data_clean %>%
+               filter(home == '015' & location == 'outdoor') %>%
+               mutate(home = '016')
+     )
+
+  # write data and backup------------------- 
+
 write_rds(omni_data_clean, paste0('./csv_created/pre-calibration/omni_all_locations_pre-cal_', Sys.Date(), '.rds'))
 
+write_rds(omni_data_clean, paste0('./csv_created/pre-calibration/omni_all_locations_pre-cal.rds'))
  
 ```
 
@@ -483,8 +497,12 @@ omni_hourly_data <- omni_data_clean %>%
   summarise_if(is.numeric, list(mean), na.rm = TRUE) %>%
   ungroup()
 
+# make csv and backup------------------------
+
 write_rds(omni_hourly_data, paste0('./csv_created/pre-calibration/omni_hourly_data_pre-cal_',
 Sys.Date(),'.rds'))
+
+write_rds(omni_hourly_data, paste0('./csv_created/pre-calibration/omni_hourly_data_pre-cal.rds'))
 
 ```
 
@@ -496,8 +514,11 @@ Sys.Date(),'.rds'))
   summarise_if(is.numeric, list(mean), na.rm = TRUE) %>%
   ungroup()
 
+# make csv and backup------------------------
 write_rds(omni_daily_data, paste0('./csv_created/pre-calibration/omni_daily_data_pre-cal_',
 Sys.Date(),'.rds'))
+
+write_rds(omni_daily_data, paste0('./csv_created/pre-calibration/omni_daily_data_pre-cal.rds'))
 
 ```
 
@@ -567,9 +588,11 @@ omni_data_cal <- omni_data_precal %>%
   mutate(pm25 = pm25/grav_cf)
 
 
-# make rds file
+# make rds file and backup-----------
 write_rds(omni_data_cal, paste0('./csv_created/omni_calibrated_',
 Sys.Date(),'.rds'))
+
+write_rds(omni_data_cal, paste0('./csv_created/omni_calibrated.rds'))
 ```
 
 
@@ -581,9 +604,11 @@ omni_hourly_data <- omni_data_cal %>%
   summarise_if(is.numeric, list(mean), na.rm = TRUE) %>%
   ungroup()
 
-# make rds file
+# make rds file and backup-----------------
 write_rds(omni_hourly_data, paste0('./csv_created/omni_hourly_calibrated_',
 Sys.Date(),'.rds'))
+
+write_rds(omni_hourly_data, paste0('./csv_created/omni_hourly_calibrated.rds'))
 
 ```
 
@@ -595,8 +620,11 @@ Sys.Date(),'.rds'))
   summarise_if(is.numeric, list(mean), na.rm = TRUE) %>%
   ungroup()
 
+# make rds file and backup-----------------
 write_rds(omni_daily_data, paste0('./csv_created/omni_daily_calibrated_',
 Sys.Date(),'.rds'))
+
+write_rds(omni_daily_data, paste0('./csv_created/omni_daily_calibrated.rds'))
 
 ```
 
