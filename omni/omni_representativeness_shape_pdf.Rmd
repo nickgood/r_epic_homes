@@ -59,7 +59,7 @@ omni_hourly_data<- read_rds('./csv_created/omni_hourly_calibrated.rds')
 #   summarize(pm25_zeros = sum(pm25 == 0), pm25_n = n()) %>%
 #   mutate(pm25_zero_pct = pm25_zeros/pm25_n*100) %>%
 #   ungroup()
-
+str(omni_hourly_data)
 ```
 
 ```{r import_energy_cluster_homes}
@@ -600,7 +600,7 @@ all_time_choice <- TRUE
     clust <- c('heat', 'shoulder', 'ac') # can do multiple
    
   
-                met <- 'voc'
+                met <- 'pm25'
 
      loc <- 'living'
     {lapply(clust, function(cluster_type) {
