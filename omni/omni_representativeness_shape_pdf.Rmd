@@ -310,7 +310,7 @@ entropy.table.shape <- function(
     
     if(all_time == TRUE) {
       
-      # stop if missing 25% of data in year
+      # stop if missing certain % of data in year
       if(year_data_avail <= longterm_avail_limit) {
         output <<- na.result(
           paste0('year_missing_',
@@ -325,7 +325,7 @@ entropy.table.shape <- function(
       
     } else { 
       
-          # stop if missing 25% of data in season
+          # stop if missing certain % of data in season
     if(season_data_avail <= longterm_avail_limit) {
       output <<- na.result(
         paste0('season_missing_',
@@ -370,14 +370,14 @@ entropy.table.shape <- function(
                    filter( location == location_type & datehour %in% y)
                  
                  # omit sampling period if missing more than
-                 # 25 % of sampling period
+                 # certain % of sampling period
                  if(nrow(sample) <= sample_avail_limit * days*24) {
                    
                    a <- rep(NA, 2) %>% as.integer()
                    
                    
                    
-                   # if not missing 25% of sampling period...
+                   # if not missing certain % of sampling period...
                  } else {
                    
         # calculate mean and variance of logged values
