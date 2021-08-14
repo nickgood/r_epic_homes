@@ -631,14 +631,34 @@ ggplot(a, aes(x = as.factor(sample_length), y = frac_greater,
 ```
 
 
-```{r create_pooled_avg_scaled_kld_df}
-pooled_scaled_entropy_df <- scaled_entropy_df %>%
+```{r create_avg_scaled_kld_df}
+
+pooled_avg_scaled_entropy_df <- scaled_entropy_df %>%
   group_by(metric, home, energy_cluster, sample_length, method) %>%
   summarise(avg_scaled_kld = mean(scaled_kld),
             high_val = avg_scaled_kld+ sd(scaled_kld),
                       low_val = avg_scaled_kld- sd(scaled_kld),
-            .groups = 'drop')
+            n_samples = n(),
+            .groups = 'drop')%>%
+    group_by(metric, home, energy_cluster, method) %>%
+  mutate(n_samples_max = max(n_samples),
+         n_samples_frac = n_samples/n_samples_max) %>%
+  ungroup()
 
+
+
+
+avg_scaled_entropy_df <- scaled_entropy_df %>%
+  group_by(metric, home, energy_cluster, sample_length, method, location) %>%
+  summarise(avg_scaled_kld = mean(scaled_kld),
+            high_val = avg_scaled_kld+ sd(scaled_kld),
+                      low_val = avg_scaled_kld- sd(scaled_kld),
+                        n_samples = n(),
+            .groups = 'drop')%>%
+    group_by(metric, home, energy_cluster, method) %>%
+  mutate(n_samples_max = max(n_samples),
+         n_samples_frac = n_samples/n_samples_max) %>%
+  ungroup()
 
 ```
 
@@ -647,14 +667,17 @@ pooled_scaled_entropy_df <- scaled_entropy_df %>%
 ```{r function_avg_entropy_plotter}
 
 entropy.plot <- function (
-  hm,
+  hm, meth,
   # omit a sampling period of given length
   # if this proportion of possible samples
   # were not availabel in data
   simple = FALSE,
   metrics = c('pm25', 'voc'),
-  data = pooled_scaled_entropy_df
+  room = 'pooled' # or choose a room
 ) {
+  
+  data <- if(room == 'pooled') pooled_avg_scaled_entropy_df else{
+                 avg_scaled_entropy_df %>% filter(location == room)}
   
   # add ach50 for home to plot
 ach50 <- assessment_data %>% filter( home == hm) %>%
@@ -664,7 +687,7 @@ ach50 <- if(is_empty(ach50)) NA else if (is.na(ach50)) {
 
   # for one home:
   a <- data %>%
-    filter(home == hm & metric %in% metrics)
+    filter(home == hm & metric %in% metrics & method == meth)
 
   if(nrow(a) == 0) {
     plot <- NULL # return NULL if no data for home/metric/cluster combo
@@ -675,7 +698,8 @@ ach50 <- if(is_empty(ach50)) NA else if (is.na(ach50)) {
       ggplot(aes(x = sample_length, y = avg_scaled_kld,
                        color = energy_cluster), data = a)+
       geom_line()+
-      geom_point(size = 1)+
+      geom_point(aes(size = n_samples_frac))+ # make size of pooints proportional to n
+      scale_size_area(max_size = 2)+
       xlab('Sample Length, days')+
       ylab('Temporal Representativeness')+
       # # add threshold lines
@@ -688,7 +712,9 @@ ach50 <- if(is_empty(ach50)) NA else if (is.na(ach50)) {
       #            color = threshold_colors[i], size=0.5)
       # })+
       coord_cartesian(ylim = c(0,1))+
-      ggtitle(paste('Home',hm)) +
+      ggtitle(paste('Home',hm, ifelse(room == 'pooled',
+                                      'Pooled Rooms',
+                                      room))) +
       scale_x_continuous(breaks=seq(0,28,7))+
     #   # add error bars
     # geom_ribbon(aes(ymin = low_val, ymax = high_val,
@@ -746,28 +772,26 @@ grid.plots <- function(plots, title,
 
 ## Representativeness as function of sample length
 
-### Test for one home
-```{r plot_single_sensor_avg_entropy, fig.width = 7, fig.height = 4}
+### Pooled Rooms
+
+* Test for one home
+```{r plot_single_home_avg_entropy, fig.width = 7, fig.height = 4}
 
 # plot results for one home
-
-a <- pooled_scaled_entropy_df %>%
-  filter(method == 'time')
-
-entropy.plot('001', data = a)
+entropy.plot('012', meth = 'time', room = 'pooled')
 
 ```
 
-### Plot for all homes
+* Plot for all homes
 ```{r grid_plot_avg_entropy, fig.height=8, fig.width = 10.5, eval = FALSE}
 # time ----------------
 meth <- 'time'
 
 {
-a <- pooled_scaled_entropy_df %>% filter(method == meth)
-# make plots for all homes
+
+  # make plots for all homes
 map(homes_all, function (x_home) {
-    entropy.plot(hm = x_home, simple = TRUE, data = a)
+    entropy.plot(hm = x_home, simple = TRUE, meth = meth, room = 'pooled')
 }) %>%
   grid.plots(title = 'Time-Structured Scaled Relative Entropy')%>%
   annotate_figure(
@@ -780,10 +804,9 @@ map(homes_all, function (x_home) {
 meth <- 'shape'
 
 {
-a <- pooled_scaled_entropy_df %>% filter(method == meth)
 # make plots for all homes
 map(homes_all, function (x_home) {
-    entropy.plot(hm = x_home, simple = TRUE, data = a)
+    entropy.plot(hm = x_home, simple = TRUE, meth = meth, room = 'pooled')
 }) %>%
   grid.plots(title = 'Magnitiude-Based Scaled Relative Entropy') %>%
   annotate_figure(
@@ -796,20 +819,19 @@ map(homes_all, function (x_home) {
 
 ```
 
-### arranged by tier
+* arranged by tier
 ```{r grid_plot_avg_entropy_tiers, fig.height=4, fig.width = 10.5}
 # time-------------------
 meth <- 'time'
 
-a <- pooled_scaled_entropy_df %>% filter(method == meth)
 
 # make plots for all homes
 plots_t3 <- map(homes_tier3, function (x_home) {
-    entropy.plot(hm = x_home, simple = TRUE, data = a)
+    entropy.plot(hm = x_home, simple = TRUE, meth = meth, room = 'pooled')
 })
 
 plots_t2 <- map(homes_tier2, function (x_home) {
-    entropy.plot(hm = x_home, simple = TRUE, data = a)
+    entropy.plot(hm = x_home, simple = TRUE, meth = meth, room = 'pooled')
 })
 
 grid.arrange(grobs = c(plots_t2, plots_t3),
@@ -821,15 +843,13 @@ grid.arrange(grobs = c(plots_t2, plots_t3),
 # shape---------------
 meth <- 'shape'
 
-a <- pooled_scaled_entropy_df %>% filter(method == meth)
-
 # make plots for all homes
 plots_t3 <- map(homes_tier3, function (x_home) {
-    entropy.plot(hm = x_home, simple = TRUE, data = a)
+    entropy.plot(hm = x_home, simple = TRUE, meth = meth, room = 'pooled')
 })
 
 plots_t2 <- map(homes_tier2, function (x_home) {
-    entropy.plot(hm = x_home, simple = TRUE, data = a)
+    entropy.plot(hm = x_home, simple = TRUE, meth = meth, room = 'pooled')
 })
 
 grid.arrange(grobs = c(plots_t2, plots_t3),
@@ -847,5 +867,110 @@ grid.arrange(grobs = c(plots_t2, plots_t3),
 
 ```
 
+### for each room
 
+* Plot for all homes
+```{r grid_plot_avg_entropy_rooms, fig.height=8, fig.width = 10.5, eval = FALSE}
+# time ----------------
+meth <- 'time'
+
+{
+
+  # make plots for all rooms, with all homes gridded
+  map(locations_indoor, function (x_location) {
+    
+map(homes_all, function (x_home) {
+    entropy.plot(hm = x_home, simple = TRUE, meth = meth, room = x_location)
+}) %>%
+  grid.plots(title = 'Time-Structured Scaled Relative Entropy')%>%
+  annotate_figure(
+    fig.lab = paste0('Scale Method: ',
+                     unique(scaled_entropy_df$max_method)))
+
+  })
+  
+}
+
+
+# shape ----------------
+meth <- 'shape'
+
+{
+  # make plots for all rooms, with all homes gridded
+  map(locations_indoor, function (x_location) {
+    map(homes_all, function (x_home) {
+    entropy.plot(hm = x_home, simple = TRUE, meth = meth, room = x_location)
+}) %>%
+  grid.plots(title = 'Magnitiude-Based Scaled Relative Entropy') %>%
+  annotate_figure(
+    fig.lab = paste0('Scale Method: ',
+                     unique(scaled_entropy_df$max_method)))
+  })
+
+}
+
+
+
+```
+
+* arranged by tier
+```{r grid_plot_avg_entropy_tiers_rooms, fig.height=4, fig.width = 10.5}
+# time-------------------
+meth <- 'time'
+
+  # make plots for all rooms, with all homes gridded
+  map(locations_indoor, function (x_location) {
+    
+    # don't try a plot for kitchen if doing home 002
+    if(x_location == 'kitchen'){
+      homes_tier3 <- homes_tier3[-which(homes_tier3=='002')]
+    }
+plots_t3 <- map(homes_tier3, function (x_home) {
+    entropy.plot(hm = x_home, simple = TRUE, meth = meth, room = x_location)
+})
+
+plots_t2 <- map(homes_tier2, function (x_home) {
+    entropy.plot(hm = x_home, simple = TRUE, meth = meth, room = x_location)
+})
+
+grid.arrange(grobs = c(plots_t2, plots_t3),
+                          top = 'Time-Structured',
+                          left = 'Temporal Representativeness',
+                          bottom = 'Sample Length, days',
+                          nrow = 2)
+})
+
+# shape---------------
+meth <- 'shape'
+
+  # make plots for all rooms, with all homes gridded
+  map(locations_indoor, function (x_location) {
+    
+        # don't try a plot for kitchen if doing home 002
+    if(x_location == 'kitchen'){
+      homes_tier3 <- homes_tier3[-which(homes_tier3=='002')]
+    }
+    plots_t3 <- map(homes_tier3, function (x_home) {
+    entropy.plot(hm = x_home, simple = TRUE, meth = meth, room = x_location)
+})
+
+plots_t2 <- map(homes_tier2, function (x_home) {
+    entropy.plot(hm = x_home, simple = TRUE, meth = meth, room = x_location)
+})
+
+grid.arrange(grobs = c(plots_t2, plots_t3),
+                          top = 'Magnitude-Based',
+                          left = 'Temporal Representativeness',
+                          bottom = 'Sample Length, days',
+                          nrow = 2)
+})
+
+# # may need to use arrange grob in future
+# # https://cran.r-project.org/web/packages/gridExtra/vignettes/arrangeGrob.html
+# t3_row <- arrangeGrob(plots_t3, nrow = 1)
+# t2_row <- arrangeGrob(plots_t2, nrow = 1)
+# but will have to figure out how to convert ggplot rows to grob
+# https://wilkelab.org/cowplot/reference/as_grob.html
+
+```
 
