@@ -362,9 +362,8 @@ entropy.table.hourly <- function(
       a <-
         runner(
           all_dates_season,
-          k = days*24, # number of 5-min periods in short sampling period
-          # only evaluate windows that start at 12AM
-          # and windows that are full (ignore partial windows at start)
+          k = days*24, # number of hour periods in short sampling period
+          # only evaluate windows that are full (ignore partial windows at start)
           at = seq(days*24, length(all_dates_season), 24),
           f = function(y) { # y = window, vector (length = k) of specified days per iteration
             
@@ -381,7 +380,7 @@ entropy.table.hourly <- function(
               
               
               
-              # if not missing 25% of sampling period...
+              # if not missing certain % of sampling period...
             } else {
               
               a <- sample %>%
