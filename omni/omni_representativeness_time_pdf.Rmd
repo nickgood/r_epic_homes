@@ -134,6 +134,9 @@ na.result <- function(error, season = NA, sample_days = NA, samp_avail = NA) {
 # days <- 16
 # days2 <- 16
 # all_time <- TRUE
+#     longterm_avail_limit <- 0
+#     sample_avail_limit <- 0
+#     
 # 
 # 
 # # remove variables after done testing
@@ -291,7 +294,6 @@ entropy.table.hourly <- function(
       length(data_season %>% pull(datehour) %>% unique())/
       length(all_dates_season)
     
-    
     if(all_time == TRUE) {
       
       # stop if missing 25% of data in year
@@ -341,7 +343,17 @@ entropy.table.hourly <- function(
       output <<- na.result('missing_hour', period_label)
       stop()
     }
-    
+
+    # find max and where it occurs
+    max_entire <- max(entire)
+            max_hour_entire <- which(entire==max(entire))
+        
+            # stop if max occurs at multiple hours
+    if(length(max_hour_entire) >1) {
+      output <<- na.result(paste0(length(max_hour_entire),'_max_hours'), period_label)
+      stop()
+    }
+        
     
     # function to take a running window of all short sampling periods possible
     # within the longer montirong period,
@@ -398,8 +410,8 @@ entropy.table.hourly <- function(
               # for all 5-min period bins in the period
               if(length(a)<24) {
                 a <- rep(NA, 24) %>% as.integer()
-                
               }
+              
             }  
             
             # return values for one running window
@@ -427,18 +439,49 @@ entropy.table.hourly <- function(
       
       
       a <- lapply(colnames(a), function(x) {
-        a %>%
-          pull(x) %>%
+        samp <- a %>%
+          pull(x)
+        
+        kld <- samp %>%
           kld(entire)
+                      
+        # find max and where it occurs
+        max_sample <- max(samp)
+        max_hour_sample <- which(samp ==max(samp))
+
+        # stop if max occurs at multiple hours
+        if(length(max_hour_sample) >1) {
+          output <<- na.result(paste0(length(max_hour_sample),
+                                      '_max_hours'), period_label, days)
+          stop()
+        }
+        
+        # return a list of values
+        list('kld' = kld, 'max_sample' = max_sample,
+             'max_hour_sample' = max_hour_sample)
       })
       
       # return all calculated kld values
-            list('kld' = unlist(a),
-           'n_samp_avail' = rep(n_samp_avail, length(unlist(a))))
+            map(a, function(x){
+              list(
+                'n_samp_avail' = rep(n_samp_avail, length(x[[1]])),
+                'kld' = x[['kld']],
+                'max_sample' = x[['max_sample']],
+                'max_hour_sample' = x[['max_hour_sample']],
+           'max_entire' = rep(max_entire, length(x[[1]])),
+           'max_hour_entire' = rep(max_hour_entire, length(x[[1]]))
+              )
+            })
+      
+      # list('kld' = unlist(a),
+      #      'n_samp_avail' = rep(n_samp_avail, length(unlist(a))),
+      #      'max_entire' = rep(max_entire, length(unlist(a))),
+      #      'max_hour_entire' = rep(max_hour_entire, length(unlist(a)))
+      #       )
       
     }
-    # # test kld.period function
-    # test <- kld.period(16)
+    # test kld.period function
+    test <- kld.period(16)
     
     
     # apply function to find scaled_entropy dataframe for
@@ -453,25 +496,29 @@ entropy.table.hourly <- function(
         # calculate  KLD for all
         # short sampling period of length "days2"
         a <- kld.period(days2)
-        
-        a <- list(
-          'kld' = a[['kld']], # entropy value
-          'sample_length' = rep(days2, length(a[[1]])),
-          'monitor_season' = rep(period_label, length(a[[1]])),
-          'n_samp_avail' = a[['n_samp_avail']],
-          'error' = rep('none', length(a[[1]])),
-          'warn' = rep(warn, length(a[[1]])) # return wrnaing if there was one triggered
 
+        map(a, function(x){
+
+          list(
+            'sample_length' = rep(days2, length(x[[1]])),
+            'monitor_season' = rep(period_label, length(x[[1]])),
+            'n_samp_avail' = x[['n_samp_avail']],
+            'kld' = x[['kld']], # entropy value
+            'max_sample' = x[['max_sample']],
+            'max_hour_sample' = x[['max_hour_sample']],
+            'max_entire' = x[['max_entire']],
+            'max_hour_entire' = x[['max_hour_entire']],
+            'error' = rep('none', length(x[[1]])),
+            'warn' = rep(warn, length(x[[1]])) # return wrnaing if there was one triggered
         )
-        a
+        })
+        
       }
     )
     
     
-    # bind all into a dataframe
-    a <- bind_rows(entropy_data_list)
-    
-    a # scaled_entropy for one date range
+    # bind all into a dataframe scaled_entropy for one date range
+    bind_rows(entropy_data_list)
     
   }  %>%
     # if season results in an error, return the error message in a df
@@ -505,9 +552,7 @@ entropy.table.hourly <- function(
 # test<- entropy.table.hourly('004', 'pm25',
 # 
 #                            date_ranges_entire = list(
-#                              c('2020-12-01', '2020-12-31'),
-#                                                      c('2020-11-01',
-#                                                        '2020-11-30')),
+#                              c('2020-12-01', '2020-12-31')),
 #                            tested_sample_sequence = c(4,5),
 #                            location_type = 'living',
 #                            all_time = TRUE)

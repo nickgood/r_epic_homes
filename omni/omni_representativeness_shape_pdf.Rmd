@@ -14,6 +14,15 @@ knitr::opts_chunk$set(fig.path = 'figures/',
   echo = FALSE,
   fig.width = 10, fig.height = 3,
   cache = FALSE)
+
+# test <- c(1,4,5,2,5,5,7,8)
+# log_test <- log(test)
+# 
+# mean <- mean(test)
+# log_mean <- (mean(log_test))
+# 
+# exp(log_mean) == mean
+
 ```
 
 ```{r libraries, include=FALSE}
@@ -339,10 +348,14 @@ entropy.table.shape <- function(
       entire <- data_season
     }
     
-        # calculate mean and variance of logged values
-    mean_entire <- entire %>% pull(metric) %>% log() %>% mean(na.rm = TRUE)
-    variance_entire <- entire %>% pull(metric) %>% log() %>% var(na.rm = TRUE)
-
+        # calculate mean and variance of logged values and non-logged
+    log_mean_entire <- entire %>% pull(metric) %>% log() %>% mean(na.rm = TRUE)
+    log_variance_entire <- entire %>% pull(metric) %>% log() %>% var(na.rm = TRUE)
+    mean_entire <- entire %>% pull(metric) %>%  mean(na.rm = TRUE)
+    variance_entire <- entire %>% pull(metric) %>% var(na.rm = TRUE)
+    median_entire <- entire %>% pull(metric) %>%  median(na.rm = TRUE)
+    iqr_entire <- entire %>% pull(metric) %>% IQR(na.rm = TRUE)
+    
         # function to take a running window of all short sampling periods possible
     # within the longer montirong period
     kld.period <- function(days) { # days = number of days in short samping period
@@ -380,9 +393,14 @@ entropy.table.shape <- function(
                    # if not missing certain % of sampling period...
                  } else {
                    
-        # calculate mean and variance of logged values
-                   a <- c(sample %>% pull(metric) %>% log() %>% mean(na.rm = TRUE),
-                          sample %>% pull(metric) %>% log() %>% var(na.rm = TRUE))
+        # calculate mean and variance of logged values and unlogged
+                   a <- c(
+                     sample %>% pull(metric) %>% log() %>% mean(na.rm = TRUE),
+                          sample %>% pull(metric) %>% log() %>% var(na.rm = TRUE),
+                          sample %>% pull(metric)  %>% mean(na.rm = TRUE),
+                          sample %>% pull(metric)  %>% var(na.rm = TRUE),
+                          sample %>% pull(metric)  %>% median(na.rm = TRUE),
+                          sample %>% pull(metric)  %>% IQR(na.rm = TRUE)                     )
                    
                  }
                  
@@ -416,22 +434,25 @@ entropy.table.shape <- function(
         
         a <- a %>% pull(x)
         
-        mean_sample <- a[1]
-      variance_sample <- a[2]
-      # calculate the difference between the sample and entire period
-      # means and variances
-      diff_mean <- mean_sample - mean_entire
-      diff_variance <- variance_sample - variance_entire
+        log_mean_sample <- a[1]
+      log_variance_sample <- a[2]
+              mean_sample <- a[3]
+      variance_sample <- a[4]
+              median_sample <- a[5]
+      iqr_sample <- a[6]
       
       # find kld value
       # from formula from Osses paper
-      sample_kld <- 0.5*(variance_sample/variance_entire-1-log(variance_sample/variance_entire)+
-             ((mean_sample-mean_entire)^2)/variance_entire)
+      sample_kld <- 0.5*(log_variance_sample/log_variance_entire-1-log(log_variance_sample/log_variance_entire)+
+             ((log_mean_sample-mean_entire)^2)/log_variance_entire)
       
       # return all values calculated for al samples of given sample length
 list('kld' = sample_kld,
-     'diff_mean' = diff_mean,
-     'diff_variance' = diff_variance)
+     'mean_sample' = mean_sample,
+     'variance_sample' = variance_sample,
+     'median_sample' = median_sample,
+     'iqr_sample' = iqr_sample
+     )
         
       })
 
@@ -439,9 +460,15 @@ list('kld' = sample_kld,
 map(a, function(x) {
             list(
               'kld' = x[['kld']],
-              'diff_mean' = x[['diff_mean']],
-              'diff_variance' = x[['diff_variance']],
-           'n_samp_avail' = rep(n_samp_avail, length(x[[1]]))
+              'mean_sample' = x[['mean_sample']],
+              'variance_sample' = x[['variance_sample']],
+                         'median_sample' = x[['median_sample']],
+              'iqr_sample' = x[['iqr_sample']],
+              'n_samp_avail' = rep(n_samp_avail, length(x[[1]])),
+           'mean_entire' = rep(mean_entire, length(x[[1]])),
+           'variance_entire' = rep(variance_entire, length(x[[1]])),
+                      'median_entire' = rep(median_entire, length(x[[1]])),
+           'iqr_entire' = rep(iqr_entire, length(x[[1]]))
            )
 })
     }
@@ -466,12 +493,18 @@ map(a, function(x) {
         # return all values
         map(a, function(x) {
 list(
-          'kld' = x[['kld']], # entropy value
-              'diff_mean' = x[['diff_mean']],
-              'diff_variance' = x[['diff_variance']],
           'sample_length' = rep(days2, length(x[[1]])),
           'monitor_season' = rep(period_label, length(x[[1]])),
           'n_samp_avail' = x[['n_samp_avail']],
+                     'kld' = x[['kld']], # entropy value
+              'mean_sample' = x[['mean_sample']],
+              'variance_sample' = x[['variance_sample']],
+              'median_sample' = x[['median_sample']],
+              'iqr_sample' = x[['iqr_sample']],
+          'mean_entire' = x[['mean_entire']],
+           'variance_entire' = x[['variance_entire']],
+              'median_entire' = x[['median_entire']],
+              'iqr_entire' = x[['iqr_entire']],
           'error' = rep('none', length(x[[1]])),
           # return wrnaing if there was one triggered          
             'warn' = rep(warn, length(x[[1]])) 
@@ -495,16 +528,16 @@ list(
   a <- lapply(date_ranges_entire, scaled.entropy.season)
   
   
-  # bind all into a dataframe
-  entropy_data_season <- bind_rows(a) %>%
+  # bind all into a dataframe and return scaled_entropy for all specified date ranges
+  bind_rows(a) %>%
     mutate(method = 'shape',
            home = home_num,
            metric = metric,
            location = location_type,
-           period_compare = ifelse(all_time == TRUE, 'year', 'season'))
+           period_compare = ifelse(all_time == TRUE, 'year', 'season')
+
+)
   
-  
-  entropy_data_season  # scaled_entropy for all specified date ranges
   
 }
 
@@ -513,18 +546,25 @@ list(
 
 # test function--------------------------
 
+# test2 <- omni_hourly_data %>% filter(
+#   home == '010' & location == 'living' &
+#     datehour %>% between(as.POSIXct(ymd('2020-10-25')),
+#                          as.POSIXct(ymd('2020-11-03')))
+# )
+# 
+# test3 <- mean(test2 %>% pull(pm25))
 
-start <- Sys.time()
-
-test<- entropy.table.shape('013', 'pm25',
-
-                           date_ranges_entire = list(
-                             c('2020-10-18', '2020-11-08')),
-                           tested_sample_sequence = c(7,11,23,27),
-                           location_type = 'living',
-                           all_time = TRUE)
-end <- Sys.time()
-run2 <- end- start
+# start <- Sys.time()
+# 
+# test<- entropy.table.shape('013', 'pm25',
+# 
+#                            date_ranges_entire = list(
+#                              c('2020-10-18', '2020-11-08')),
+#                            tested_sample_sequence = c(7,11,23,27),
+#                            location_type = 'living',
+#                            all_time = TRUE)
+# end <- Sys.time()
+# run2 <- end- start
 
 ```
 
@@ -620,7 +660,7 @@ all_time_choice <- TRUE
     clust <- c('heat', 'shoulder', 'ac') # can do multiple
    
   
-                met <- 'pm25'
+                met <- 'voc'
 
      loc <- 'living'
     {lapply(clust, function(cluster_type) {
