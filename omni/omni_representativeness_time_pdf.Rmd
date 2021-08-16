@@ -124,15 +124,15 @@ na.result <- function(error, season = NA, sample_days = NA, samp_avail = NA) {
 
 # define variables for testing-----------------------
 
-# date_ranges_entire <- list(c('2020-12-02','2021-04-23'))
-# tested_sample_sequence <- seq(3,28,4)
-# home_num <- '010'
-# location_type <- 'living'
+# date_ranges_entire <- list(c('2020-09-26','2020-10-22'))
+# tested_sample_sequence <- seq(1,27)
+# home_num <- '012'
+# location_type <- 'kitchen'
 # data <- omni_hourly_data
 # monitor_season <- date_ranges_entire[1]
 # metric <- 'pm25'
-# days <- 16
-# days2 <- 16
+# days <- 27
+# days2 <- 27
 # all_time <- TRUE
 #     longterm_avail_limit <- 0
 #     sample_avail_limit <- 0
@@ -447,7 +447,8 @@ entropy.table.hourly <- function(
                       
         # find max and where it occurs
         max_sample <- max(samp)
-        max_hour_sample <- which(samp ==max(samp))
+        max_hour_sample <- ifelse(!is.na(max_sample),
+                                  which(samp ==max(samp)), NA)
 
         # stop if max occurs at multiple hours
         if(length(max_hour_sample) >1) {
@@ -480,8 +481,8 @@ entropy.table.hourly <- function(
       #       )
       
     }
-    # test kld.period function
-    test <- kld.period(16)
+    # # test kld.period function
+    # test <- kld.period(27)
     
     
     # apply function to find scaled_entropy dataframe for
@@ -518,7 +519,7 @@ entropy.table.hourly <- function(
     
     
     # bind all into a dataframe scaled_entropy for one date range
-    bind_rows(entropy_data_list)
+   bind_rows(entropy_data_list)
     
   }  %>%
     # if season results in an error, return the error message in a df
@@ -543,17 +544,19 @@ entropy.table.hourly <- function(
 }
 
  
+    
+    # test <- bind_rows(entropy_data_list[c(1:27)])
 
 
 # test function--------------------------
 
 # start <- Sys.time()
 # 
-# test<- entropy.table.hourly('004', 'pm25',
+# test<- entropy.table.hourly('012', 'pm25',
 # 
 #                            date_ranges_entire = list(
-#                              c('2020-12-01', '2020-12-31')),
-#                            tested_sample_sequence = c(4,5),
+#                              c('2020-09-26', '2020-10-22')),
+#                            tested_sample_sequence = c(1,3,7,11,15,19,23,27),
 #                            location_type = 'living',
 #                            all_time = TRUE)
 # 
@@ -674,6 +677,116 @@ pdf_days <- c(3,7,10,14,21)
 all_time_choice <- TRUE
 clust <- c('heat', 'shoulder', 'ac') # can do multiple
 
+
+met <- 'pm25'
+
+loc <- 'living'
+lapply(clust, function(cluster_type) {
+  
+  rep_data <-  lapply(homes_all, function(x_home) {
+    
+    start_date <- pick.start(x_home, cluster_type)
+    end_date <- pick.end(x_home, cluster_type)
+    sample_min <- pick.sample.min(met)
+    sample_max <- if_else(
+      as.numeric(as.Date(end_date) - as.Date(start_date))>=28,
+      28,
+      as.numeric(as.Date(end_date) - as.Date(start_date))
+    )
+    
+    entropy.table.hourly(
+      x_home, metric = met,
+      date_ranges_entire = list(c(start_date,
+                                  end_date)),
+      tested_sample_sequence =
+        c(1, seq(3,27,4)),
+      location_type = loc,
+      all_time = all_time_choice) %>%
+      
+      # add in column for energy_cluster
+      mutate(energy_cluster = cluster_type) 
+  }
+  ) %>%
+    bind_rows()
+  
+  # give a variable name to the created data
+  assign(paste(met, loc, cluster_type, 'rep_data_time_hourly_pdf', sep = '_'),
+         rep_data,
+         envir = .GlobalEnv)
+}
+)
+
+loc <- 'kitchen'
+lapply(clust, function(cluster_type) {
+  
+  rep_data <-  lapply(homes_all, function(x_home) {
+    
+    start_date <- pick.start(x_home, cluster_type)
+    end_date <- pick.end(x_home, cluster_type)
+    sample_min <- pick.sample.min(met)
+    sample_max <- if_else(
+      as.numeric(as.Date(end_date) - as.Date(start_date))>=28,
+      28,
+      as.numeric(as.Date(end_date) - as.Date(start_date))
+    )
+    
+    entropy.table.hourly(
+      x_home, metric = met,
+      date_ranges_entire = list(c(start_date,
+                                  end_date)),
+      tested_sample_sequence =
+        c(1, seq(3,27,4)),
+      location_type = loc,
+      all_time = all_time_choice) %>%
+      
+      # add in column for energy_cluster
+      mutate(energy_cluster = cluster_type) 
+  }
+  ) %>%
+    bind_rows()
+  
+  # give a variable name to the created data
+  assign(paste(met, loc, cluster_type, 'rep_data_time_hourly_pdf', sep = '_'),
+         rep_data,
+         envir = .GlobalEnv)
+}
+)
+
+loc <- 'bedroom'
+lapply(clust, function(cluster_type) {
+  
+  rep_data <-  lapply(homes_all, function(x_home) {
+    
+    start_date <- pick.start(x_home, cluster_type)
+    end_date <- pick.end(x_home, cluster_type)
+    sample_min <- pick.sample.min(met)
+    sample_max <- if_else(
+      as.numeric(as.Date(end_date) - as.Date(start_date))>=28,
+      28,
+      as.numeric(as.Date(end_date) - as.Date(start_date))
+    )
+    
+    entropy.table.hourly(
+      x_home, metric = met,
+      date_ranges_entire = list(c(start_date,
+                                  end_date)),
+      tested_sample_sequence =
+        c(1, seq(3,27,4)),
+      location_type = loc,
+      all_time = all_time_choice) %>%
+      
+      # add in column for energy_cluster
+      mutate(energy_cluster = cluster_type) 
+  }
+  ) %>%
+    bind_rows()
+  
+  # give a variable name to the created data
+  assign(paste(met, loc, cluster_type, 'rep_data_time_hourly_pdf', sep = '_'),
+         rep_data,
+         envir = .GlobalEnv)
+}
+)
 
 met <- 'voc'
 
