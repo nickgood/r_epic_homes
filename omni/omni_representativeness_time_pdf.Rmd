@@ -366,7 +366,7 @@ entropy.table.hourly <- function(
       # warn if not enough days in season to calculate for given sampling period length
       if(length(all_dates_season) <= days*24) {
         warn <<- 'short_season'
-        a <- rep(NA, 2) %>% as.integer() %>% as.data.frame()
+        a <- rep(NA, 24) %>% as.integer() %>% as.data.frame()
         colnames(a) <- days # give name to column just to suppress "new name" message
         
       } else {
