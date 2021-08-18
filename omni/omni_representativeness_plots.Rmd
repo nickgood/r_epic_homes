@@ -265,8 +265,6 @@ ggplot(kld_max_df_clean, aes(y = kld,
   geom_boxplot()+
   facet_wrap(vars(method, metric, energy_cluster))
 
-
-
 # one max per kld method-----------------
 
 kld_max_shape <-  kld_max_df_clean %>%
@@ -274,7 +272,7 @@ kld_max_shape <-  kld_max_df_clean %>%
   group_by(home, location, energy_cluster, metric) %>%
     summarise(cutoff = mean(kld), .groups = 'drop') %>%
   # summarise(cutoff = median(kld)+1.5*IQR(kld), .groups = 'drop') %>%
-  pull(cutoff) %>%mean()
+  pull(cutoff) %>%max()
 
 
 kld_max_time <-  kld_max_df_clean %>%
@@ -282,14 +280,14 @@ kld_max_time <-  kld_max_df_clean %>%
   group_by(home, location, energy_cluster, metric) %>%
     summarise(cutoff = mean(kld), .groups = 'drop') %>%
   # summarise(cutoff = median(kld)+1.5*IQR(kld), .groups = 'drop') %>%
-  pull(cutoff) %>%mean()
+  pull(cutoff) %>%max()
 
 # one max per metric per kld method---------------
 kld_max_metric <- kld_max_df_clean %>%
   group_by(sample_length, home, location, energy_cluster, metric, method) %>%
       summarise(cutoff = mean(kld), .groups = 'drop') %>%
   group_by(sample_length, metric, method) %>%
-        summarise(max_kld_cutoff = mean(cutoff), .groups = 'drop') %>%
+        summarise(max_kld_cutoff = max(cutoff), .groups = 'drop') %>%
     # summarise(max_kld_cutoff = median(kld), .groups = 'drop') %>%
   rename(sample_min = sample_length)
 
@@ -298,7 +296,7 @@ kld_max_home <- kld_max_df_clean %>%
   group_by(sample_length, home, location, energy_cluster, metric, method) %>%
       summarise(cutoff = mean(kld), .groups = 'drop') %>%
   group_by(sample_length, metric, method, home) %>%
-        summarise(max_kld_cutoff = mean(cutoff), .groups = 'drop') %>%
+        summarise(max_kld_cutoff = max(cutoff), .groups = 'drop') %>%
     # summarise(max_kld_cutoff = median(kld), .groups = 'drop') %>%
   rename(sample_min = sample_length)
 
@@ -306,13 +304,11 @@ kld_max_home <- kld_max_df_clean %>%
 
 kld_max_conditional <- kld_max_df_clean %>%
   group_by(sample_length, home, location, energy_cluster, metric, method) %>%
-      summarise(max_kld_cutoff = mean(kld), .groups = 'drop') %>%
+      summarise(max_kld_cutoff = max(kld), .groups = 'drop') %>%
   # summarise(max_kld_cutoff = median(kld), .groups = 'drop') %>%
   rename(sample_min = sample_length)
 
-test <- kld_max_conditional %>%
-  group_by(home, location, metric, method) %>%
-  summarise(n = n())
+
 ```
 
  * If "universal" maximum relative entropy is used to scale, the *average* of the *average relative entropy values (calculated separately for each condition)* for sample length of 1 day was determined **between all sensors, energy clusters, and metrics** and chosen as the "zero" point in the scale, for each method separately. So there was only one max value for each method (time and shape).
@@ -768,27 +764,27 @@ avg_pooled_kld_max_universal <-  kld_max_df_clean %>%
   group_by(home, energy_cluster, metric, method) %>%
     summarise(kld_cutoff = mean(kld), .groups = 'drop')%>%
     group_by(method) %>%
-    summarise(max_kld = mean(kld_cutoff), .groups = 'drop')
+    summarise(max_kld = max(kld_cutoff), .groups = 'drop')
 
 ## one max per metric per kld method---------------
 avg_pooled_kld_max_metric <-  kld_max_df_clean %>%
   group_by(home, energy_cluster, metric, method) %>%
     summarise(kld_cutoff = mean(kld), .groups = 'drop')%>%
     group_by(method, metric) %>%
-    summarise(max_kld = mean(kld_cutoff), .groups = 'drop')
+    summarise(max_kld = max(kld_cutoff), .groups = 'drop')
 
 ## one max per metric per home per kld method---------------
 avg_pooled_kld_max_home <-  kld_max_df_clean %>%
   group_by(home, energy_cluster, metric, method) %>%
     summarise(kld_cutoff = mean(kld), .groups = 'drop')%>%
     group_by(method, metric, home) %>%
-    summarise(max_kld = mean(kld_cutoff), .groups = 'drop')
+    summarise(max_kld = max(kld_cutoff), .groups = 'drop')
 
 ## one max per metric per sensor per time period per kld method -----------------
 
 avg_pooled_kld_max_conditional <-  kld_max_df_clean %>%
   group_by(home, energy_cluster, metric, method) %>%
-    summarise(max_kld = mean(kld), .groups = 'drop')
+    summarise(max_kld = max(kld), .groups = 'drop')
 
 
 
@@ -799,28 +795,28 @@ avg_pooled_kld_max_conditional <-  kld_max_df_clean %>%
 avg_kld_max_universal <-  kld_max_df_clean %>%
   group_by(home, energy_cluster, metric, method, location) %>%
     summarise(kld_cutoff = mean(kld), .groups = 'drop')%>%
-    group_by(method, location) %>%
-    summarise(max_kld = mean(kld_cutoff), .groups = 'drop')
+    group_by(method) %>%
+    summarise(max_kld = max(kld_cutoff), .groups = 'drop')
 
 ## one max per metric per kld method---------------
 avg_kld_max_metric <-  kld_max_df_clean %>%
   group_by(home, energy_cluster, metric, method, location) %>%
     summarise(kld_cutoff = mean(kld), .groups = 'drop')%>%
-    group_by(method, metric, location) %>%
-    summarise(max_kld = mean(kld_cutoff), .groups = 'drop')
+    group_by(method, metric) %>%
+    summarise(max_kld = max(kld_cutoff), .groups = 'drop')
 
 ## one max per metric per home per kld method---------------
 avg_kld_max_home <-  kld_max_df_clean %>%
   group_by(home, energy_cluster, metric, method, location) %>%
     summarise(kld_cutoff = mean(kld), .groups = 'drop')%>%
-    group_by(method, metric, home, location) %>%
-    summarise(max_kld = mean(kld_cutoff), .groups = 'drop')
+    group_by(method, metric, home) %>%
+    summarise(max_kld = max(kld_cutoff), .groups = 'drop')
 
 ## one max per metric per sensor per time period per kld method -----------------
 
 avg_kld_max_conditional <-  kld_max_df_clean %>%
   group_by(home, energy_cluster, metric, method, location) %>%
-    summarise(max_kld = mean(kld), .groups = 'drop')
+    summarise(max_kld = max(kld), .groups = 'drop')
 
 
 ```
@@ -887,21 +883,21 @@ avg_scaled_entropy_df <- list(
   #scaled only per method (time/shape)
 avg_kld_df%>%
     left_join(avg_kld_max_universal,
-              by = c('method', 'location')) %>%
+              by = c('method')) %>%
   mutate(avg_kld_scaled_universal = 1-avg_kld/max_kld)%>%
   select(-max_kld),
 
   # scaled per metric as well
 avg_kld_df %>%
     left_join(avg_kld_max_metric,
-              by = c('method', 'metric', 'location')) %>%
+              by = c('method', 'metric')) %>%
   mutate(avg_kld_scaled_metric = 1-avg_kld/max_kld)%>%
   select(-max_kld),
 
   # scaled per metric as well
 avg_kld_df %>%
     left_join(avg_kld_max_home,
-              by = c('method', 'metric', 'home', 'location')) %>%
+              by = c('method', 'metric', 'home')) %>%
   mutate(avg_kld_scaled_home = 1-avg_kld/max_kld)%>%
   select(-max_kld),
 
@@ -1567,7 +1563,7 @@ a <- scaled_entropy_df %>% filter(metric == met,
                                   !is.na(get(dependent))
                                   )
   
-  ggplot(a, aes(x = get(independent), y = get(dependent)))+
+  ggplot(a, aes(x = get(independent), y = get(dependent), color = location))+
     # geom_bin2d(bins = c(150,300))+
             geom_point(size = 0.5)+
     ggtitle(label = met)+
