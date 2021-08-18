@@ -129,7 +129,7 @@ frac_samp_required <- 0
 
 # method of scaling relative entropy to scaled entropy
 # 'universal' or 'conditional'
-max_method <- 'conditional'
+max_method <- 'home'
 
 
 # list of all home numbers
@@ -227,17 +227,6 @@ n_sensors_ac_ignore <- 3 # Home 011 ac usage ignored because only detected 5 day
 
 # clean dataframes ------------------------
 
-# take values from shortest sample length for max kld
-kld_max_df <- entropy_df %>%
-  filter(sample_length == 1)
-
-# max kld
-# remove na kld values from runs
-kld_max_df_clean <- kld_max_df%>% 
-  filter(period_compare == 'year', # only comparing sample to whole mon. period
-         !is.na(kld), # with insufficient data in cluster/year/no cluster
-  n_samp_avail >= frac_samp_required)# with less than certain percentage of available samples
-  
 
 # test <- kld_max_df_clean %>%
 #   group_by(home, location, energy_cluster) %>%
@@ -262,6 +251,8 @@ entropy_df_clean <- entropy_df%>%
       
            )
 
+kld_max_df_clean <- entropy_df_clean %>%
+  filter(sample_length == 1)
 
 ```
 
@@ -302,6 +293,15 @@ kld_max_metric <- kld_max_df_clean %>%
     # summarise(max_kld_cutoff = median(kld), .groups = 'drop') %>%
   rename(sample_min = sample_length)
 
+# one max per metric per home per kld method---------------
+kld_max_home <- kld_max_df_clean %>%
+  group_by(sample_length, home, location, energy_cluster, metric, method) %>%
+      summarise(cutoff = mean(kld), .groups = 'drop') %>%
+  group_by(sample_length, metric, method, home) %>%
+        summarise(max_kld_cutoff = mean(cutoff), .groups = 'drop') %>%
+    # summarise(max_kld_cutoff = median(kld), .groups = 'drop') %>%
+  rename(sample_min = sample_length)
+
 # one max per metric per sensor per time period per kld method -----------------
 
 kld_max_conditional <- kld_max_df_clean %>%
@@ -316,7 +316,8 @@ test <- kld_max_conditional %>%
 ```
 
  * If "universal" maximum relative entropy is used to scale, the *average* of the *average relative entropy values (calculated separately for each condition)* for sample length of 1 day was determined **between all sensors, energy clusters, and metrics** and chosen as the "zero" point in the scale, for each method separately. So there was only one max value for each method (time and shape).
- * If "metric" maximum relative entropy is used to scale, the *average* of the *average relative entropy values (calculated separately for each condition)* for sample length of 1 day was determined **between all sensors and energy clusters for each metric separately** was chosen as the "zero" point in the scale, for each method separately. 
+ * If "metric" maximum relative entropy is used to scale, the *average* of the *average relative entropy values (calculated separately for each condition)* for sample length of 1 day was determined **between all sensors and energy clusters for each metric separately** was chosen as the "zero" point in the scale, for each method separately.
+ * add on home to metric if home was used
  * If conditional maximum relative entropy is used to scale, the *average* relative entropy values for sample length of 1 day **for each metric recorded by each sensor during each energy cluster separately** was chosen as the "zero" point in the scale, for each method separately. So in this case there were about 50+ different maximum values. 
  
 ```{r create_scaled_entropy_df}
@@ -403,7 +404,18 @@ scaled_entropy_df <- list(
   mutate(scaled_kld_metric = 1-kld/max_kld_cutoff) %>%
       select(index, scaled_kld_metric),
   
-  # scaled per condition as well
+  # scaled per home
+entropy_df_clean %>%
+  mutate(index = row_number()) %>%
+# join a and b, keep all rows in a
+  left_join(
+        kld_max_home,
+            by = c('home',
+                   'metric', 'method')) %>%
+  mutate(scaled_kld_home = 1-kld/max_kld_cutoff) %>%
+      select(index, scaled_kld_home),
+
+  # scaled per complete condition
 entropy_df_clean %>%
   mutate(index = row_number()) %>%
 # join a and b, keep all rows in a
@@ -765,6 +777,13 @@ avg_pooled_kld_max_metric <-  kld_max_df_clean %>%
     group_by(method, metric) %>%
     summarise(max_kld = mean(kld_cutoff), .groups = 'drop')
 
+## one max per metric per home per kld method---------------
+avg_pooled_kld_max_home <-  kld_max_df_clean %>%
+  group_by(home, energy_cluster, metric, method) %>%
+    summarise(kld_cutoff = mean(kld), .groups = 'drop')%>%
+    group_by(method, metric, home) %>%
+    summarise(max_kld = mean(kld_cutoff), .groups = 'drop')
+
 ## one max per metric per sensor per time period per kld method -----------------
 
 avg_pooled_kld_max_conditional <-  kld_max_df_clean %>%
@@ -788,6 +807,13 @@ avg_kld_max_metric <-  kld_max_df_clean %>%
   group_by(home, energy_cluster, metric, method, location) %>%
     summarise(kld_cutoff = mean(kld), .groups = 'drop')%>%
     group_by(method, metric, location) %>%
+    summarise(max_kld = mean(kld_cutoff), .groups = 'drop')
+
+## one max per metric per home per kld method---------------
+avg_kld_max_home <-  kld_max_df_clean %>%
+  group_by(home, energy_cluster, metric, method, location) %>%
+    summarise(kld_cutoff = mean(kld), .groups = 'drop')%>%
+    group_by(method, metric, home, location) %>%
     summarise(max_kld = mean(kld_cutoff), .groups = 'drop')
 
 ## one max per metric per sensor per time period per kld method -----------------
@@ -825,6 +851,13 @@ avg_pooled_kld_df %>%
     left_join(avg_pooled_kld_max_metric,
               by = c('method', 'metric')) %>%
   mutate(avg_kld_scaled_metric = 1-avg_kld/max_kld)%>%
+  select(-max_kld),
+
+  # scaled per home as well
+avg_pooled_kld_df %>%
+    left_join(avg_pooled_kld_max_home,
+              by = c('method', 'metric', 'home')) %>%
+  mutate(avg_kld_scaled_home = 1-avg_kld/max_kld)%>%
   select(-max_kld),
 
   # scaled per condition as well
@@ -865,6 +898,13 @@ avg_kld_df %>%
   mutate(avg_kld_scaled_metric = 1-avg_kld/max_kld)%>%
   select(-max_kld),
 
+  # scaled per metric as well
+avg_kld_df %>%
+    left_join(avg_kld_max_home,
+              by = c('method', 'metric', 'home', 'location')) %>%
+  mutate(avg_kld_scaled_home = 1-avg_kld/max_kld)%>%
+  select(-max_kld),
+
   # scaled per condition as well
 avg_kld_df %>%
     left_join(avg_kld_max_conditional,
@@ -886,7 +926,7 @@ avg_kld_df %>%
 
 entropy.plot <- function (
   hm, meth,
-  scale_method, # 'universal', 'metric', or 'condtitional'
+  scale_method, # 'universal', 'metric', 'home', or 'condtitional'
   # omit a sampling period of given length
   # if this proportion of possible samples
   # were not availabel in data
@@ -916,7 +956,9 @@ ach50 <- if(is_empty(ach50)) NA else if (is.na(ach50)) {
       rep_measure <- 'avg_kld_scaled_universal'
     } else if(scale_method == 'metric'){
             rep_measure <- 'avg_kld_scaled_metric'
-    } else if(scale_method == 'conditional'){
+    } else if(scale_method == 'home'){
+            rep_measure <- 'avg_kld_scaled_home'
+            } else if(scale_method == 'conditional'){
             rep_measure <- 'avg_kld_scaled_conditional'
 }
     # plot results
@@ -1495,7 +1537,7 @@ a <- scaled_entropy_df %>% filter(metric == met,
                                   !is.na(get(dependent))
                                   )
   
-  ggplot(a, aes(x = get(independent), y = get(dependent)))+
+  ggplot(a, aes(x = get(independent), y = get(dependent), color = location))+
     # geom_bin2d(bins = c(1500,3000))+
         geom_point(size = 0.1)+
     ggtitle(label = met)+
@@ -1533,7 +1575,7 @@ a <- scaled_entropy_df %>% filter(metric == met,
     ylab(dependent)+
       coord_cartesian(
       xlim = c(0,1),
-      ylim = c(0,100) #median value to...
+      ylim = c(0,150) #median value to...
     )+ 
     # labs(fill = 'Length of Sample, days')+
     # scale_fill_manual( values = length_colors,
@@ -1570,7 +1612,7 @@ a <- scaled_entropy_df %>% filter(
     geom_violin()+
     geom_boxplot(width=0.35, outlier.shape = NA,
                  color = cbbPalette['dark_orange'],
-                 lwd = 1)+
+                 lwd = 0.5)+
     # stat_summary(fun=median, geom="point", color="red")+
         coord_cartesian(ylim = c(0,5))+
     facet_wrap(vars(home, metric))+
@@ -1594,7 +1636,7 @@ a <- scaled_entropy_df %>% filter(
     geom_violin()+
     geom_boxplot(width=0.35, outlier.shape = NA,
                  color = cbbPalette['dark_orange'],
-                 lwd = 1)+
+                 lwd = 0.5)+
     # stat_summary(fun=median, geom="point", color="red")+
         coord_cartesian(ylim = c(0,700))+
     facet_wrap(vars(home, metric))+
