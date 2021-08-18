@@ -433,7 +433,7 @@ unwanted_scaled_na <- scaled_entropy_df %>%
 
 ### Effect on when individual sample Scaled Entropy crosses below threshold
 
-```{r pdf_plots}
+```{r pdf_plots, eval = FALSE}
 
 # time -------------------
 
@@ -655,7 +655,7 @@ meth <- 'shape'
 ### Test how many samples exceed represetnativeness threshold
 ### at different threshod values
 
-```{r threshold_table}
+```{r threshold_table, eval = FALSE}
  
 frac.above.threshold <- function(threshold) {
 
@@ -672,7 +672,7 @@ threshold_df <- map(thresh_vector, frac.above.threshold) %>% bind_rows()
 
 ```
 
-```{r barchart_threshold, fig.height=7, fig.width = 10.5}
+```{r barchart_threshold, eval = FALSE, fig.height=7, fig.width = 10.5}
 
 # Time Structured--------------
 
@@ -1480,21 +1480,24 @@ a <- scaled_entropy_df %>% filter(metric == met,
 ```
 
 ### compare to scaled value (Representativeness)
-```{r heatmap_deviations_vs_rep, eval = TRUE}
+```{r heatmap_deviations_vs_rep, fig.height=7, fig.width = 10.5, eval = TRUE}
 
 
 dependent <- 'median_diff'
-independent <- 'scaled_kld_universal'
+independent <- 'scaled_kld_conditional'
+
+# pm25-----------------------
 met <- 'pm25'
-hm <- '009'
+
+
 a <- scaled_entropy_df %>% filter(metric == met,
                                   !is.na(get(independent)),
-                                  !is.na(get(dependent)),
-                                         home == hm
+                                  !is.na(get(dependent))
                                   )
   
   ggplot(a, aes(x = get(independent), y = get(dependent)))+
-    geom_bin2d(bins = c(250,250))+
+    # geom_bin2d(bins = c(1500,3000))+
+        geom_point(size = 0.1)+
     ggtitle(label = met)+
     xlab(independent)+
     ylab(dependent)+
@@ -1505,27 +1508,59 @@ a <- scaled_entropy_df %>% filter(metric == met,
     # labs(fill = 'Length of Sample, days')+
     # scale_fill_manual( values = length_colors,
     #                    labels=labels) +
-    theme_classic()+
+    theme_bw()+
     theme(
       # axis.text.y = element_blank(),
       # axis.ticks.y = element_blank()
     )+
         facet_wrap(vars(home, metric))
 
+  
+  # voc-----------------------
+met <- 'voc'
+
+
+a <- scaled_entropy_df %>% filter(metric == met,
+                                  !is.na(get(independent)),
+                                  !is.na(get(dependent))
+                                  )
+  
+  ggplot(a, aes(x = get(independent), y = get(dependent)))+
+    # geom_bin2d(bins = c(150,300))+
+            geom_point(size = 0.5)+
+    ggtitle(label = met)+
+    xlab(independent)+
+    ylab(dependent)+
+      coord_cartesian(
+      xlim = c(0,1),
+      ylim = c(0,100) #median value to...
+    )+ 
+    # labs(fill = 'Length of Sample, days')+
+    # scale_fill_manual( values = length_colors,
+    #                    labels=labels) +
+    theme_bw()+
+    theme(
+      # axis.text.y = element_blank(),
+      # axis.ticks.y = element_blank()
+    )+
+        facet_wrap(vars(home, metric))
+
+
 ```
 
 
-```{r plot_deviation_vs_sample_length}
+```{r plot_deviation_vs_sample_length, fig.height=7, fig.width = 10.5}
 
 dependent <- 'median_diff'
 independent <- 'scaled_kld_conditional'
+
+# pm25--------------------
 met <- 'pm25'
-hm <- '009'
 
 a <- scaled_entropy_df %>% filter(
                                   !is.na(get(independent)),
-                                  !is.na(get(dependent))) %>%
-  filter(home == hm, metric == met)
+                                  !is.na(get(dependent)))%>%
+  filter(metric == met)
 
 # to modify scales individually:
 # https://fishandwhistle.net/post/2018/modifying-facet-scales-in-ggplot2/
@@ -1538,6 +1573,30 @@ a <- scaled_entropy_df %>% filter(
                  lwd = 1)+
     # stat_summary(fun=median, geom="point", color="red")+
         coord_cartesian(ylim = c(0,5))+
+    facet_wrap(vars(home, metric))+
+    ylab(dependent)+
+        theme_bw()
+  
+  
+# voc-------------------------
+  met <- 'voc'
+
+  a <- scaled_entropy_df %>% filter(
+                                  !is.na(get(independent)),
+                                  !is.na(get(dependent)))%>%
+  filter(metric == met)
+
+# to modify scales individually:
+# https://fishandwhistle.net/post/2018/modifying-facet-scales-in-ggplot2/
+
+  ggplot(data = a, aes(group = sample_length, x = sample_length,
+                       y = get(dependent)))+
+    geom_violin()+
+    geom_boxplot(width=0.35, outlier.shape = NA,
+                 color = cbbPalette['dark_orange'],
+                 lwd = 1)+
+    # stat_summary(fun=median, geom="point", color="red")+
+        coord_cartesian(ylim = c(0,700))+
     facet_wrap(vars(home, metric))+
     ylab(dependent)+
         theme_bw()
