@@ -25,9 +25,7 @@ source("../functions_epic.R")
 # Read Metadata
 
 ```{r}
-
 meta <- read_rds("../output/upas/upas_summary.rds")
-
 upas_log <- read_sheet("1PnPjgbYWljb5oXoSCBqpJb2pi7gU0Kzre5lx4H-3i70",
                        sheet = "upas", col_types = "c")
 ```
