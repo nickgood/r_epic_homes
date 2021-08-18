@@ -118,7 +118,7 @@ data_f <- function(file){
 }
 ```
 
-```{r}
+```{r, results='hide'}
 data <- map(files, data_f) %>%
   bind_rows() %>%
   mutate(visit = gsub("^(.*)_(.*)_(.*)_(.*)(.txt$)", "\\2", info),
@@ -128,19 +128,19 @@ data <- map(files, data_f) %>%
 
 ---
 
-```{r, fig.width=12, fig.height=5}
+```{r, fig.width=12, fig.height=9}
 ggplot(data, aes(x = datetime, y = battery, color = location)) +
   geom_line() +
   theme_bw() +
-  facet_wrap(~id, scales = "free") +
+  facet_wrap(~id+visit, scales = "free", ncol = 4) +
   ggtitle("Battery")
 ```
 
-```{r, fig.width=12, fig.height=5}
+```{r, fig.width=12, fig.height=9}
 ggplot(data, aes(x = datetime, y = fdpt, color = location)) +
   geom_line() +
   theme_bw() +
-  facet_wrap(~id, scales = "free") +
+  facet_wrap(~id+visit, scales = "free", ncol = 4) +
   ggtitle("Device Temperature") +
   ylab("Degrees C")
 ```
@@ -151,6 +151,9 @@ ggplot(data, aes(x = datetime, y = fdpt, color = location)) +
 
 ```{r}
 write_rds(summary_info, "../output/upas/upas_summary.rds")
+write_csv(summary_info, "../output/upas/upas_summary.csv")
+
 write_rds(data, "../output/upas/upas_data.rds")
+write_csv(data, "../output/upas/upas_data.csv")
 ```
 

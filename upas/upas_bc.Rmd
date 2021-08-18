@@ -1,0 +1,177 @@
+---
+title: "UPAS Analysis"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: paper
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.path = 'figures/',
+  warning = FALSE,
+  message = FALSE,
+  echo = FALSE,
+  fig.width = 10, fig.height = 3,
+  cache = FALSE)
+```
+
+```{r}
+source("../functions_epic.R")
+```
+
+---
+
+# Read Metadata
+
+```{r}
+meta <- read_rds("../output/upas/upas_summary.rds")
+upas_log <- read_sheet("1PnPjgbYWljb5oXoSCBqpJb2pi7gU0Kzre5lx4H-3i70",
+                       sheet = "upas", col_types = "c")
+```
+
+---
+
+# Black Carbon
+
+* read data
+
+```{r}
+files <- list.files("../../data/filters/soot_scan_csv", full.names = TRUE, pattern = ".csv$")
+
+data_bc <- map(files, read_csv, col_types = cols(.default = "c")) %>%
+  bind_rows() %>%
+  rename_all(clean_names) %>%
+  mutate(when = sub("epic_", "", description),
+         date_analyzed = as.Date(datetime, format = "%m/%d/%y")) %>%
+  select(filter_id, sampleir, when, date_analyzed) %>%
+  rename(id_filter = "filter_id", ir = "sampleir") %>%
+  mutate(id_filter = str_pad(id_filter, 4, side = "left", pad = "0")) %>%
+  mutate(ir = as.numeric(ir))
+```
+
+* organize data
+
+```{r}
+bc_dates <- data_bc %>%
+  left_join(upas_log %>% select(id_home, visit, location, id_filter),
+            by = "id_filter") %>%
+  left_join(meta %>% select(id_home, visit, location,
+                            volume, duration,
+                            start, end),
+            by = c("id_home", "visit", "location")) %>%
+  select(id_filter, when, date_analyzed) %>%
+  group_by(id_filter, when, date_analyzed) %>%
+  summarise_all(first, .groups = "drop") %>%
+  pivot_wider(names_from = "when", values_from = "date_analyzed") %>%
+  rename(date_pre = "pre", date_post = "post")
+```
+
+* blank dates
+
+```{r}
+blank_dates <- data_bc %>%
+  left_join(upas_log %>% select(id_home, visit, location, id_filter),
+            by = "id_filter") %>%
+  left_join(meta %>% select(id_home, visit, location,
+                            volume, duration,
+                            start, end),
+            by = c("id_home", "visit", "location")) %>%
+  filter(location == "blank") %>%
+  select(id_filter, when, date_analyzed) %>%
+  group_by(id_filter, when, date_analyzed) %>%
+  summarise_all(first, .groups = "drop") %>%
+  pivot_wider(names_from = "when", values_from = "date_analyzed") %>%
+  rename(date_pre = "pre", date_post = "post")
+```
+
+* blank values
+
+```{r}
+blank_values <- data_bc %>%
+  left_join(upas_log %>% select(id_home, visit, location, id_filter),
+            by = "id_filter") %>%
+  left_join(meta %>% select(id_home, visit, location,
+                            volume, duration,
+                            start, end),
+            by = c("id_home", "visit", "location")) %>%
+  filter(location == "blank") %>%
+  select(id_filter, when, ir) %>%
+  group_by(id_filter, when) %>%
+  summarise(ir = mean(ir, na.rm = TRUE), .groups = "drop") %>%
+  pivot_wider(names_from = "when", values_from = "ir")
+```
+
+* blank day of analysis correction
+
+```{r}
+blanks_bc <- blank_values %>%
+  left_join(blank_dates, by = c("id_filter")) %>%
+  mutate(delta = post - pre)
+```
+
+* change in blank ATN
+
+Note: samples 0001 to 0100 all have the same pre-scan day
+
+```{r}
+ggplot(blanks_bc, aes(x = date_post, y = delta)) +
+  geom_point() +
+  theme_bw() +
+  ylab("Post:Pre dAtn") +
+  xlab("Date Post")
+```
+
+```{r}
+blanks_bc_mean <- blanks_bc %>%
+  group_by(date_pre, date_post) %>%
+  summarise(blank_atn_cor = mean(delta, na.rm = TRUE), .groups = "drop")
+
+blanks_bc_mean
+```
+
+* Calculate BC
+
+```{r}
+data_bc <- data_bc %>%
+  group_by(id_filter, when) %>%
+  summarise(ir = mean(ir, na.rm = TRUE), .groups = "drop") %>%
+  pivot_wider(names_from = "when", values_from = "ir") %>%
+  na.omit() %>%
+  left_join(upas_log %>% select(id_home, visit, location, id_filter),
+            by = "id_filter") %>%
+  left_join(meta %>% select(id_home, visit, location,
+                            volume, duration,
+                            start, end),
+            by = c("id_home", "visit", "location")) %>%
+  mutate_at(vars("volume", "duration"), as.numeric)
+```
+
+```{r}
+bc <- data_bc %>%
+  left_join(bc_dates, by = c("id_filter")) %>%
+  left_join(blanks_bc_mean, by = c("date_pre", "date_post")) %>%
+  mutate(duration = if_else(location == "blank", 168, duration)) %>% # assume blanks run for 7 days
+  filter(duration > 24) %>% # only samples that ran for > 24 hours
+  mutate(bc = bc_calc(pre + blank_atn_cor, post, 2, 0.00045, duration * 60 * 60))
+```
+
+* Plot BC
+
+```{r}
+ggplot(bc %>% filter(!(location == "bedroom")), aes(x = location, y = bc)) +
+  geom_boxplot() +
+  theme_bw() +
+  ylab("micrograms per cubic meter") +
+  xlab("") +
+  ggtitle("BC Mass Equivalent")
+```
+
+---
+
+# Write Data
+
+```{r}
+write_rds(bc, "../output/bc/bc.rds")
+```
+
