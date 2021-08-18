@@ -1520,9 +1520,9 @@ a <- scaled_entropy_df %>% filter(metric == met,
 ### compare to scaled value (Representativeness)
 ```{r heatmap_deviations_vs_rep, fig.height=7, fig.width = 10.5, eval = TRUE}
 
+independent <- 'scaled_kld_home'
 
 dependent <- 'median_diff'
-independent <- 'scaled_kld_conditional'
 
 # pm25-----------------------
 met <- 'pm25'
@@ -1541,7 +1541,7 @@ a <- scaled_entropy_df %>% filter(metric == met,
     ylab(dependent)+
       coord_cartesian(
       xlim = c(0,1),
-      ylim = c(0,2) #median value to...
+      ylim = c(0,5) #median value to...
     )+ 
     # labs(fill = 'Length of Sample, days')+
     # scale_fill_manual( values = length_colors,
@@ -1571,7 +1571,71 @@ a <- scaled_entropy_df %>% filter(metric == met,
     ylab(dependent)+
       coord_cartesian(
       xlim = c(0,1),
-      ylim = c(0,150) #median value to...
+      ylim = c(0,300) #median value to...
+    )+ 
+    # labs(fill = 'Length of Sample, days')+
+    # scale_fill_manual( values = length_colors,
+    #                    labels=labels) +
+    theme_bw()+
+    theme(
+      # axis.text.y = element_blank(),
+      # axis.ticks.y = element_blank()
+    )+
+        facet_wrap(vars(home, metric))
+
+
+#####################  
+  
+  
+  dependent <- 'max_hour_diff'
+# pm25-----------------------
+met <- 'pm25'
+
+
+a <- scaled_entropy_df %>% filter(metric == met,
+                                  !is.na(get(independent)),
+                                  !is.na(get(dependent))
+                                  )
+  
+  ggplot(a, aes(x = get(independent), y = get(dependent)))+
+    geom_bin2d(bins = c(200,24))+
+        # geom_point(size = 0.1)+
+    ggtitle(label = met)+
+    xlab(independent)+
+    ylab(dependent)+
+      coord_cartesian(
+      xlim = c(0,1),
+      ylim = c(0,10) #diff value to...
+    )+ 
+    # labs(fill = 'Length of Sample, days')+
+    # scale_fill_manual( values = length_colors,
+    #                    labels=labels) +
+    theme_bw()+
+    theme(
+      # axis.text.y = element_blank(),
+      # axis.ticks.y = element_blank()
+    )+
+        facet_wrap(vars(home, metric))
+
+  
+  # voc-----------------------
+met <- 'voc'
+
+
+a <- scaled_entropy_df %>% filter(metric == met,
+                                  !is.na(get(independent)),
+                                  !is.na(get(dependent))
+                                  )
+  
+  ggplot(a, aes(x = get(independent), y = get(dependent)))+
+    geom_bin2d(bins = c(200,24))+
+        # geom_point(size = 0.5)+
+    ggtitle(label = met)+
+    xlab(independent)+
+    ylab(dependent)+
+      coord_cartesian(
+      xlim = c(0,1),
+      ylim = c(0,10) #median value to...
     )+ 
     # labs(fill = 'Length of Sample, days')+
     # scale_fill_manual( values = length_colors,
@@ -1590,7 +1654,7 @@ a <- scaled_entropy_df %>% filter(metric == met,
 ```{r plot_deviation_vs_sample_length, fig.height=7, fig.width = 10.5}
 
 dependent <- 'median_diff'
-independent <- 'scaled_kld_conditional'
+independent <- 'scaled_kld_home'
 
 # pm25--------------------
 met <- 'pm25'
