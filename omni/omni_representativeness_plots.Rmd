@@ -748,35 +748,135 @@ ggplot(a, aes(x = as.factor(sample_length), y = frac_greater,
 
 
 ## Average Representativeness as function of sample length
+```{r determine_max_for_avg_data}
+# pooled rooms------------------------
+## one max per kld method-----------------
+
+avg_pooled_kld_max_universal <-  kld_max_df_clean %>%
+  group_by(home, energy_cluster, metric, method) %>%
+    summarise(kld_cutoff = mean(kld), .groups = 'drop')%>%
+    group_by(method) %>%
+    summarise(max_kld = mean(kld_cutoff), .groups = 'drop')
+
+## one max per metric per kld method---------------
+avg_pooled_kld_max_metric <-  kld_max_df_clean %>%
+  group_by(home, energy_cluster, metric, method) %>%
+    summarise(kld_cutoff = mean(kld), .groups = 'drop')%>%
+    group_by(method, metric) %>%
+    summarise(max_kld = mean(kld_cutoff), .groups = 'drop')
+
+## one max per metric per sensor per time period per kld method -----------------
+
+avg_pooled_kld_max_conditional <-  kld_max_df_clean %>%
+  group_by(home, energy_cluster, metric, method) %>%
+    summarise(max_kld = mean(kld), .groups = 'drop')
+
+
+
+
+# rooms not pooled------------------------
+## one max per kld method-----------------
+
+avg_kld_max_universal <-  kld_max_df_clean %>%
+  group_by(home, energy_cluster, metric, method, location) %>%
+    summarise(kld_cutoff = mean(kld), .groups = 'drop')%>%
+    group_by(method, location) %>%
+    summarise(max_kld = mean(kld_cutoff), .groups = 'drop')
+
+## one max per metric per kld method---------------
+avg_kld_max_metric <-  kld_max_df_clean %>%
+  group_by(home, energy_cluster, metric, method, location) %>%
+    summarise(kld_cutoff = mean(kld), .groups = 'drop')%>%
+    group_by(method, metric, location) %>%
+    summarise(max_kld = mean(kld_cutoff), .groups = 'drop')
+
+## one max per metric per sensor per time period per kld method -----------------
+
+avg_kld_max_conditional <-  kld_max_df_clean %>%
+  group_by(home, energy_cluster, metric, method, location) %>%
+    summarise(max_kld = mean(kld), .groups = 'drop')
+
+
+```
 
 ```{r create_avg_scaled_kld_df}
 
-pooled_avg_scaled_entropy_df <- scaled_entropy_df %>%
+# rooms pooled------------------------
+
+avg_pooled_kld_df <- entropy_df_clean %>%
   group_by(metric, home, energy_cluster, sample_length, method) %>%
-  summarise(avg_scaled_kld = mean(scaled_kld),
-            high_val = avg_scaled_kld+ sd(scaled_kld),
-                      low_val = avg_scaled_kld- sd(scaled_kld),
-            n_samples = n(),
-            .groups = 'drop')%>%
+  summarize(
+    avg_kld = mean(kld), n_samples = n(), .groups = 'drop')%>%
     group_by(metric, home, energy_cluster, method) %>%
   mutate(n_samples_max = max(n_samples),
          n_samples_frac = n_samples/n_samples_max) %>%
   ungroup()
 
+avg_pooled_scaled_entropy_df <- list(
+  #scaled only per method (time/shape)
+avg_pooled_kld_df%>%
+    left_join(avg_pooled_kld_max_universal,
+              by = c('method')) %>%
+  mutate(avg_kld_scaled_universal = 1-avg_kld/max_kld)%>%
+  select(-max_kld),
 
+  # scaled per metric as well
+avg_pooled_kld_df %>%
+    left_join(avg_pooled_kld_max_metric,
+              by = c('method', 'metric')) %>%
+  mutate(avg_kld_scaled_metric = 1-avg_kld/max_kld)%>%
+  select(-max_kld),
 
+  # scaled per condition as well
+avg_pooled_kld_df %>%
+    left_join(avg_pooled_kld_max_conditional,
+              by = c('metric', 'home', 'energy_cluster',
+                     'method')) %>%
+  mutate(avg_kld_scaled_conditional = 1-avg_kld/max_kld)%>%
+  select(-max_kld)
 
-avg_scaled_entropy_df <- scaled_entropy_df %>%
+) %>% reduce(full_join, by = c('metric', 'home', 'energy_cluster',
+                               'sample_length', 'method', 'avg_kld',
+                               'n_samples', 'n_samples_max', 'n_samples_frac'))
+  
+  
+ # rooms not pooled ----------------- 
+  avg_kld_df <- entropy_df_clean %>%
   group_by(metric, home, energy_cluster, sample_length, method, location) %>%
-  summarise(avg_scaled_kld = mean(scaled_kld),
-            high_val = avg_scaled_kld+ sd(scaled_kld),
-                      low_val = avg_scaled_kld- sd(scaled_kld),
-                        n_samples = n(),
-            .groups = 'drop')%>%
-    group_by(metric, home, energy_cluster, method) %>%
+  summarize(
+    avg_kld = mean(kld), n_samples = n(), .groups = 'drop')%>%
+    group_by(metric, home, energy_cluster, method, location) %>%
   mutate(n_samples_max = max(n_samples),
          n_samples_frac = n_samples/n_samples_max) %>%
   ungroup()
+
+avg_scaled_entropy_df <- list(
+  #scaled only per method (time/shape)
+avg_kld_df%>%
+    left_join(avg_kld_max_universal,
+              by = c('method', 'location')) %>%
+  mutate(avg_kld_scaled_universal = 1-avg_kld/max_kld)%>%
+  select(-max_kld),
+
+  # scaled per metric as well
+avg_kld_df %>%
+    left_join(avg_kld_max_metric,
+              by = c('method', 'metric', 'location')) %>%
+  mutate(avg_kld_scaled_metric = 1-avg_kld/max_kld)%>%
+  select(-max_kld),
+
+  # scaled per condition as well
+avg_kld_df %>%
+    left_join(avg_kld_max_conditional,
+              by = c('metric', 'home', 'energy_cluster',
+                     'method', 'location')) %>%
+  mutate(avg_kld_scaled_conditional = 1-avg_kld/max_kld)%>%
+  select(-max_kld)
+
+) %>% reduce(full_join, by = c('metric', 'home', 'energy_cluster',
+                               'sample_length', 'method', 'avg_kld',
+                               'n_samples', 'n_samples_max', 'n_samples_frac',
+                               'location'))
 
 ```
 
@@ -786,6 +886,7 @@ avg_scaled_entropy_df <- scaled_entropy_df %>%
 
 entropy.plot <- function (
   hm, meth,
+  scale_method, # 'universal', 'metric', or 'condtitional'
   # omit a sampling period of given length
   # if this proportion of possible samples
   # were not availabel in data
@@ -794,7 +895,7 @@ entropy.plot <- function (
   room = 'pooled' # or choose a room
 ) {
   
-  data <- if(room == 'pooled') pooled_avg_scaled_entropy_df else{
+  data <- if(room == 'pooled') avg_pooled_scaled_entropy_df else{
                  avg_scaled_entropy_df %>% filter(location == room)}
   
   # add ach50 for home to plot
@@ -811,15 +912,23 @@ ach50 <- if(is_empty(ach50)) NA else if (is.na(ach50)) {
     plot <- NULL # return NULL if no data for home/metric/cluster combo
   }else {
     
+    if(scale_method == 'universal'){
+      rep_measure <- 'avg_kld_scaled_universal'
+    } else if(scale_method == 'metric'){
+            rep_measure <- 'avg_kld_scaled_metric'
+    } else if(scale_method == 'conditional'){
+            rep_measure <- 'avg_kld_scaled_conditional'
+}
     # plot results
     plot <-
-      ggplot(aes(x = sample_length, y = avg_scaled_kld,
+      ggplot(aes(x = sample_length,
+                 y = get(rep_measure),
                        color = energy_cluster), data = a)+
       geom_line()+
       geom_point(aes(size = n_samples_frac))+ # make size of pooints proportional to n
       scale_size_area(max_size = 2)+
       xlab('Sample Length, days')+
-      ylab('Temporal Representativeness')+
+      ylab(rep_measure)+
       # # add threshold lines
       # geom_hline(yintercept=thresh_vector, linetype="dashed",
       #            color = "black", size=0.5)+
@@ -832,7 +941,8 @@ ach50 <- if(is_empty(ach50)) NA else if (is.na(ach50)) {
       coord_cartesian(ylim = c(0,1))+
       ggtitle(paste('Home',hm, ifelse(room == 'pooled',
                                       'Pooled Rooms',
-                                      room))) +
+                                      room),
+                    scale_method)) +
       scale_x_continuous(breaks=seq(0,28,7))+
     #   # add error bars
     # geom_ribbon(aes(ymin = low_val, ymax = high_val,
@@ -876,7 +986,7 @@ ach50 <- if(is_empty(ach50)) NA else if (is.na(ach50)) {
 
 #function to put plots in a grid
 grid.plots <- function(plots, title,
-                     y_val = 'Scaled Relative Entropy',
+                     y_val = 'Temporal Representativeness',
                      x_val = 'Sample Length, days', ncol = 4, nrow = 4) {
   ##omit NULL values (from homes or rooms without valid data)
   plots <- plots[!sapply(plots, is.null)]
@@ -895,12 +1005,14 @@ grid.plots <- function(plots, title,
 ```{r plot_single_home_avg_entropy, fig.width = 7, fig.height = 4}
 
 # plot results for one home
-entropy.plot('012', meth = 'time', room = 'pooled')
+entropy.plot('012', meth = 'time', scale_method = 'conditional'
+             ,room = 'pooled')
 
 ```
 
 * Plot for all homes
 ```{r grid_plot_avg_entropy, fig.height=8, fig.width = 10.5, eval = FALSE}
+
 # time ----------------
 meth <- 'time'
 
@@ -908,7 +1020,8 @@ meth <- 'time'
 
   # make plots for all homes
 map(homes_all, function (x_home) {
-    entropy.plot(hm = x_home, simple = TRUE, meth = meth, room = 'pooled')
+    entropy.plot(hm = x_home, simple = TRUE, meth = meth,
+                 scale_method = max_method ,room = 'pooled')
 }) %>%
   grid.plots(title = 'Time-Structured Scaled Relative Entropy')%>%
   annotate_figure(
@@ -923,8 +1036,8 @@ meth <- 'shape'
 {
 # make plots for all homes
 map(homes_all, function (x_home) {
-    entropy.plot(hm = x_home, simple = TRUE, meth = meth, room = 'pooled')
-}) %>%
+    entropy.plot(hm = x_home, simple = TRUE, meth = meth,
+                 scale_method = max_method ,room = 'pooled')}) %>%
   grid.plots(title = 'Magnitiude-Based Scaled Relative Entropy') %>%
   annotate_figure(
     fig.lab = paste0('Scale Method: ',
@@ -944,12 +1057,12 @@ meth <- 'time'
 
 # make plots for all homes
 plots_t3 <- map(homes_tier3, function (x_home) {
-    entropy.plot(hm = x_home, simple = TRUE, meth = meth, room = 'pooled')
-})
+    entropy.plot(hm = x_home, simple = TRUE, meth = meth,
+                 scale_method = max_method ,room = 'pooled')})
 
 plots_t2 <- map(homes_tier2, function (x_home) {
-    entropy.plot(hm = x_home, simple = TRUE, meth = meth, room = 'pooled')
-})
+    entropy.plot(hm = x_home, simple = TRUE, meth = meth,
+                 scale_method = max_method ,room = 'pooled')})
 
 grid.arrange(grobs = c(plots_t2, plots_t3),
                           top = 'Time-Structured',
@@ -962,12 +1075,12 @@ meth <- 'shape'
 
 # make plots for all homes
 plots_t3 <- map(homes_tier3, function (x_home) {
-    entropy.plot(hm = x_home, simple = TRUE, meth = meth, room = 'pooled')
-})
+    entropy.plot(hm = x_home, simple = TRUE, meth = meth,
+                 scale_method = max_method ,room = 'pooled')})
 
 plots_t2 <- map(homes_tier2, function (x_home) {
-    entropy.plot(hm = x_home, simple = TRUE, meth = meth, room = 'pooled')
-})
+    entropy.plot(hm = x_home, simple = TRUE, meth = meth,
+                 scale_method = max_method ,room = 'pooled')})
 
 grid.arrange(grobs = c(plots_t2, plots_t3),
                           top = 'Magnitude-Based',
@@ -997,8 +1110,9 @@ meth <- 'time'
   map(locations_indoor, function (x_location) {
     
 map(homes_all, function (x_home) {
-    entropy.plot(hm = x_home, simple = TRUE, meth = meth, room = x_location)
-}) %>%
+    entropy.plot(hm = x_home, simple = TRUE, meth = meth,
+                 scale_method = max_method ,room = x_location)
+  }) %>%
   grid.plots(title = 'Time-Structured Scaled Relative Entropy')%>%
   annotate_figure(
     fig.lab = paste0('Scale Method: ',
@@ -1016,8 +1130,9 @@ meth <- 'shape'
   # make plots for all rooms, with all homes gridded
   map(locations_indoor, function (x_location) {
     map(homes_all, function (x_home) {
-    entropy.plot(hm = x_home, simple = TRUE, meth = meth, room = x_location)
-}) %>%
+entropy.plot(hm = x_home, simple = TRUE, meth = meth,
+                 scale_method = max_method ,room = x_location)
+      }) %>%
   grid.plots(title = 'Magnitiude-Based Scaled Relative Entropy') %>%
   annotate_figure(
     fig.lab = paste0('Scale Method: ',
@@ -1043,12 +1158,14 @@ meth <- 'time'
       homes_tier3 <- homes_tier3[-which(homes_tier3=='002')]
     }
 plots_t3 <- map(homes_tier3, function (x_home) {
-    entropy.plot(hm = x_home, simple = TRUE, meth = meth, room = x_location)
-})
+entropy.plot(hm = x_home, simple = TRUE, meth = meth,
+                 scale_method = max_method ,room = x_location)
+  })
 
 plots_t2 <- map(homes_tier2, function (x_home) {
-    entropy.plot(hm = x_home, simple = TRUE, meth = meth, room = x_location)
-})
+entropy.plot(hm = x_home, simple = TRUE, meth = meth,
+                 scale_method = max_method ,room = x_location)
+  })
 
 grid.arrange(grobs = c(plots_t2, plots_t3),
                           top = 'Time-Structured',
@@ -1068,12 +1185,14 @@ meth <- 'shape'
       homes_tier3 <- homes_tier3[-which(homes_tier3=='002')]
     }
     plots_t3 <- map(homes_tier3, function (x_home) {
-    entropy.plot(hm = x_home, simple = TRUE, meth = meth, room = x_location)
-})
+entropy.plot(hm = x_home, simple = TRUE, meth = meth,
+                 scale_method = max_method ,room = x_location)
+      })
 
 plots_t2 <- map(homes_tier2, function (x_home) {
-    entropy.plot(hm = x_home, simple = TRUE, meth = meth, room = x_location)
-})
+entropy.plot(hm = x_home, simple = TRUE, meth = meth,
+                 scale_method = max_method ,room = x_location)
+  })
 
 grid.arrange(grobs = c(plots_t2, plots_t3),
                           top = 'Magnitude-Based',
@@ -1097,7 +1216,7 @@ grid.arrange(grobs = c(plots_t2, plots_t3),
 ## Compare KLD/Representativeness to other values
 
 ### correlation
-```{r correlation}
+```{r correlation, eval = FALSE}
 # for one condition
 a <- entropy_df_clean %>% filter(method == 'shape', home == '001',
                                  location == 'living', metric == 'pm25',
@@ -1329,7 +1448,7 @@ cor.plot('scaled_kld_metric', 'median_diff')
 ```
 
 ### Compare to KLD
-```{r plot_deviations_vs_kld}
+```{r plot_deviations_vs_kld, eval = FALSE}
 dependent <- 'median_diff'
 independent <- 'kld'
 met <- 'pm25'
@@ -1361,24 +1480,27 @@ a <- scaled_entropy_df %>% filter(metric == met,
 ```
 
 ### compare to scaled value (Representativeness)
-```{r heatmap_deviations_vs_rep}
+```{r heatmap_deviations_vs_rep, eval = TRUE}
 
 
 dependent <- 'median_diff'
-independent <- 'scaled_kld_metric'
+independent <- 'scaled_kld_universal'
 met <- 'pm25'
+hm <- '009'
 a <- scaled_entropy_df %>% filter(metric == met,
                                   !is.na(get(independent)),
-                                  !is.na(get(dependent))
-  )
+                                  !is.na(get(dependent)),
+                                         home == hm
+                                  )
   
   ggplot(a, aes(x = get(independent), y = get(dependent)))+
-    geom_bin2d(bins = c(5000,5000))+
+    geom_bin2d(bins = c(250,250))+
     ggtitle(label = met)+
-    xlab(dependent)+
+    xlab(independent)+
+    ylab(dependent)+
       coord_cartesian(
       xlim = c(0,1),
-      ylim = c(0,1) #median value to...
+      ylim = c(0,2) #median value to...
     )+ 
     # labs(fill = 'Length of Sample, days')+
     # scale_fill_manual( values = length_colors,
@@ -1387,20 +1509,23 @@ a <- scaled_entropy_df %>% filter(metric == met,
     theme(
       # axis.text.y = element_blank(),
       # axis.ticks.y = element_blank()
-    )
+    )+
+        facet_wrap(vars(home, metric))
 
 ```
 
 
 ```{r plot_deviation_vs_sample_length}
 
-dependent <- 'variance_diff'
-independent <- 'scaled_kld_metric'
+dependent <- 'median_diff'
+independent <- 'scaled_kld_conditional'
+met <- 'pm25'
+hm <- '009'
 
 a <- scaled_entropy_df %>% filter(
                                   !is.na(get(independent)),
                                   !is.na(get(dependent))) %>%
-  filter(home == '009')
+  filter(home == hm, metric == met)
 
 # to modify scales individually:
 # https://fishandwhistle.net/post/2018/modifying-facet-scales-in-ggplot2/
@@ -1408,9 +1533,13 @@ a <- scaled_entropy_df %>% filter(
   ggplot(data = a, aes(group = sample_length, x = sample_length,
                        y = get(dependent)))+
     geom_violin()+
-    stat_summary(fun=median, geom="point", color="red")+
-        coord_cartesian(ylim = c(0,1000))+
+    geom_boxplot(width=0.35, outlier.shape = NA,
+                 color = cbbPalette['dark_orange'],
+                 lwd = 1)+
+    # stat_summary(fun=median, geom="point", color="red")+
+        coord_cartesian(ylim = c(0,5))+
     facet_wrap(vars(home, metric))+
-    ylab(dependent)
+    ylab(dependent)+
+        theme_bw()
 ```
 
