@@ -129,7 +129,7 @@ frac_samp_required <- 0
 
 # method of scaling relative entropy to scaled entropy
 # 'universal' or 'conditional'
-max_method <- 'home'
+max_method <- 'metric'
 
 
 # list of all home numbers
@@ -1251,9 +1251,8 @@ grid.arrange(grobs = c(plots_t2, plots_t3),
 
 
 
-## Compare KLD/Representativeness to other values
+## Compare Deviations between differences of summary stats of sample and monitoring period to Representativess Values
 
-### correlation
 ```{r correlation, eval = FALSE}
 # for one condition
 a <- entropy_df_clean %>% filter(method == 'shape', home == '001',
@@ -1480,47 +1479,34 @@ ggplot(data = a)+
   geom_histogram(aes(x = coeff))+
   ggtitle(label = paste('Correlation'))
 }
+cor.plot('kld', 'median_diff')
+cor.plot('kld', 'variance_diff')
+cor.plot('kld', 'max_diff')
+cor.plot('kld', 'max_hour_diff')
 
-cor.plot('scaled_kld_metric', 'median_diff')
-
-```
-
-### Compare to KLD
-```{r plot_deviations_vs_kld, eval = FALSE}
-dependent <- 'median_diff'
-independent <- 'kld'
-met <- 'pm25'
-a <- scaled_entropy_df %>% filter(metric == met,
-                                  !is.na(get(independent)),
-                                  !is.na(get(dependent))
-  )
-  
-  ggplot(a, aes(x = get(independent), y = get(dependent)))+
-    geom_bin2d(bins = c(10000,10000))+
-    xlab("Relative Entropy")+
-    ggtitle(label = paste('Relative Entropy of', met))+
-    coord_cartesian(
-      xlim = c(0,0.1),
-      ylim = c(0,1) #median value to...
-    )+ 
-    # labs(fill = 'Length of Sample, days')+
-    # scale_fill_manual( values = length_colors,
-    #                    labels=labels) +
-    theme_classic()+
-    theme(
-      # axis.text.y = element_blank(),
-      # axis.ticks.y = element_blank()
-    )
-
-  
-  
+# cor.plot('scaled_kld_metric', 'median_diff')
+cor.plot('scaled_kld_conditional', 'median_diff')
+# cor.plot('scaled_kld_metric', 'variance_diff')
+cor.plot('scaled_kld_conditional', 'variance_diff')
+# cor.plot('scaled_kld_metric', 'max_diff')
+cor.plot('scaled_kld_conditional', 'max_diff')
+# cor.plot('scaled_kld_metric', 'max_hour_diff')
+cor.plot('scaled_kld_conditional', 'max_hour_diff')
 
 ```
 
-### compare to scaled value (Representativeness)
+### Individual homes
 ```{r heatmap_deviations_vs_rep, fig.height=7, fig.width = 10.5, eval = TRUE}
 
-independent <- 'scaled_kld_home'
+if(max_method == 'universal'){
+      independent <- 'scaled_kld_universal'
+    } else if(max_method == 'metric'){
+            independent <- 'scaled_kld_metric'
+    } else if(max_method == 'home'){
+            independent <- 'scaled_kld_home'
+            } else if(max_method == 'conditional'){
+            independent <- 'scaled_kld_conditional'
+            }
 
 dependent <- 'median_diff'
 
@@ -1648,13 +1634,139 @@ a <- scaled_entropy_df %>% filter(metric == met,
         facet_wrap(vars(home, metric))
 
 
+  
+####################
+  
+dependent <- 'max_diff'
+
+# pm25-----------------------
+met <- 'pm25'
+
+
+a <- scaled_entropy_df %>% filter(metric == met,
+                                  !is.na(get(independent)),
+                                  !is.na(get(dependent))
+                                  )
+  
+  ggplot(a, aes(x = get(independent), y = get(dependent), color = location))+
+    # geom_bin2d(bins = c(1500,3000))+
+        geom_point(size = 0.1)+
+    ggtitle(label = met)+
+    xlab(independent)+
+    ylab(dependent)+
+      coord_cartesian(
+      xlim = c(0,1),
+      ylim = c(0,40) #median value to...
+    )+ 
+    # labs(fill = 'Length of Sample, days')+
+    # scale_fill_manual( values = length_colors,
+    #                    labels=labels) +
+    theme_bw()+
+    theme(
+      # axis.text.y = element_blank(),
+      # axis.ticks.y = element_blank()
+    )+
+        facet_wrap(vars(home, metric))
+
+  
+  # voc-----------------------
+met <- 'voc'
+
+
+a <- scaled_entropy_df %>% filter(metric == met,
+                                  !is.na(get(independent)),
+                                  !is.na(get(dependent))
+                                  )
+  
+  ggplot(a, aes(x = get(independent), y = get(dependent), color = location))+
+    # geom_bin2d(bins = c(150,300))+
+            geom_point(size = 0.5)+
+    ggtitle(label = met)+
+    xlab(independent)+
+    ylab(dependent)+
+      coord_cartesian(
+      xlim = c(0,1),
+      ylim = c(0,1000) #median value to...
+    )+ 
+    # labs(fill = 'Length of Sample, days')+
+    # scale_fill_manual( values = length_colors,
+    #                    labels=labels) +
+    theme_bw()+
+    theme(
+      # axis.text.y = element_blank(),
+      # axis.ticks.y = element_blank()
+    )+
+        facet_wrap(vars(home, metric))
+
+
+#####################  
 ```
 
+### Pooled Homes
+```{r heatmap_deviations_vs_rep_pooled_homes, fig.height=7, fig.width = 10.5, eval = TRUE}
+
+if(max_method == 'universal'){
+      independent <- 'scaled_kld_universal'
+    } else if(max_method == 'metric'){
+            independent <- 'scaled_kld_metric'
+    } else if(max_method == 'home'){
+            independent <- 'scaled_kld_home'
+            } else if(max_method == 'conditional'){
+            independent <- 'scaled_kld_conditional'
+            }
+
+dependent <- 'median_diff'
+
+# all homes heatmap---------------------------------------
+
+met <- 'pm25'
+
+a <- scaled_entropy_df %>% filter(metric == met,
+                                  !is.na(get(independent)),
+                                  !is.na(get(dependent))
+                                  )
+  
+  ggplot(a, aes(x = get(independent), y = get(dependent)))+
+    geom_bin2d(bins = c(3000,6000))+
+        # geom_point(size = 0.1)+
+    ggtitle(label = met)+
+    xlab(independent)+
+    ylab(dependent)+
+      coord_cartesian(
+      xlim = c(0.5,1),
+      ylim = c(0,5) #median value to...
+    )+ 
+    # labs(fill = 'Length of Sample, days')+
+    # scale_fill_manual( values = length_colors,
+    #                    labels=labels) +
+    theme_bw()+
+    theme(
+      # axis.text.y = element_blank(),
+      # axis.ticks.y = element_blank()
+    )
+
+
+
+
+
+```
+
+## Compare Deviations between differences of summary stats of sample and monitoring period to Sample Length
 
 ```{r plot_deviation_vs_sample_length, fig.height=7, fig.width = 10.5}
 
+if(max_method == 'universal'){
+      independent <- 'scaled_kld_universal'
+    } else if(max_method == 'metric'){
+            independent <- 'scaled_kld_metric'
+    } else if(max_method == 'home'){
+            independent <- 'scaled_kld_home'
+            } else if(max_method == 'conditional'){
+            independent <- 'scaled_kld_conditional'
+            }
+
+
 dependent <- 'median_diff'
-independent <- 'scaled_kld_home'
 
 # pm25--------------------
 met <- 'pm25'
@@ -1669,7 +1781,7 @@ a <- scaled_entropy_df %>% filter(
 
   ggplot(data = a, aes(group = sample_length, x = sample_length,
                        y = get(dependent)))+
-    geom_violin()+
+    geom_violin(color = 'grey')+
     geom_boxplot(width=0.35, outlier.shape = NA,
                  color = cbbPalette['dark_orange'],
                  lwd = 0.5)+
@@ -1693,8 +1805,9 @@ a <- scaled_entropy_df %>% filter(
 
   ggplot(data = a, aes(group = sample_length, x = sample_length,
                        y = get(dependent)))+
-    geom_violin()+
-    geom_boxplot(width=0.35, outlier.shape = NA,
+    geom_violin(color = 'grey')+
+    geom_boxplot(width=0.35,
+                 outlier.shape = NA,
                  color = cbbPalette['dark_orange'],
                  lwd = 0.5)+
     # stat_summary(fun=median, geom="point", color="red")+
@@ -1702,5 +1815,361 @@ a <- scaled_entropy_df %>% filter(
     facet_wrap(vars(home, metric))+
     ylab(dependent)+
         theme_bw()
+```
+
+### Compare to KLD
+```{r plot_deviations_vs_kld, eval = FALSE}
+dependent <- 'median_diff'
+independent <- 'kld'
+met <- 'pm25'
+a <- scaled_entropy_df %>% filter(metric == met,
+                                  !is.na(get(independent)),
+                                  !is.na(get(dependent))
+  )
+  
+  ggplot(a, aes(x = get(independent), y = get(dependent)))+
+    geom_bin2d(bins = c(10000,10000))+
+    xlab("Relative Entropy")+
+    ggtitle(label = paste('Relative Entropy of', met))+
+    coord_cartesian(
+      xlim = c(0,0.1),
+      ylim = c(0,1) #median value to...
+    )+ 
+    # labs(fill = 'Length of Sample, days')+
+    # scale_fill_manual( values = length_colors,
+    #                    labels=labels) +
+    theme_classic()+
+    theme(
+      # axis.text.y = element_blank(),
+      # axis.ticks.y = element_blank()
+    )
+
+  
+  
+
+```
+
+```{r heatmap_deviations_vs_kld_pooled_homes, fig.height=7, fig.width = 10.5, eval = FALSE}
+# HOW DO DEVIATIONS CHANGE WITH KLD?
+# independent <- 'kld'
+# 
+# dependent <- 'median_diff'
+# 
+# # all homes heatmap---------------------------------------
+# 
+# met <- 'pm25'
+# 
+# a <- entropy_df_clean %>% filter(metric == met,
+#                                   !is.na(get(independent)),
+#                                   !is.na(get(dependent))
+#                                   )
+#   
+#   ggplot(a, aes(x = get(independent), y = get(dependent)))+
+#     geom_bin2d(bins = c(3000,6000))+
+#         # geom_point(size = 0.1)+
+#     ggtitle(label = met)+
+#     xlab(independent)+
+#     ylab(dependent)+
+#       coord_cartesian(
+#       xlim = c(0,0.5),
+#       ylim = c(0,2) #median value to...
+#     )+ 
+#     # labs(fill = 'Length of Sample, days')+
+#     # scale_fill_manual( values = length_colors,
+#     #                    labels=labels) +
+#     theme_bw()+
+#     theme(
+#       # axis.text.y = element_blank(),
+#       # axis.ticks.y = element_blank()
+#     )
+# 
+# 
+# 
+# 
+
+```
+
+## Combine Average Representativeness with Deviation Measures
+
+```{r fig.height=7, fig.width = 10.5,}
+
+if(max_method == 'universal'){
+      independent <- 'scaled_kld_universal'
+      rep_measure <- 'avg_kld_scaled_universal'
+    } else if(max_method == 'metric'){
+            independent <- 'scaled_kld_metric'
+      rep_measure <- 'avg_kld_scaled_metric'
+    } else if(max_method == 'home'){
+            independent <- 'scaled_kld_home'
+      rep_measure <- 'avg_kld_scaled_home'
+            } else if(max_method == 'conditional'){
+            independent <- 'scaled_kld_conditional'
+      rep_measure <- 'avg_kld_scaled_conditional'
+            }
+# shape--------------------------- 
+meth <- 'shape'
+dependent <- 'median_diff'
+
+## pm25--------------------
+met <- 'pm25'
+coeff <- 5
+
+  a <- avg_pooled_scaled_entropy_df %>%
+    filter( metric == met & method == meth)
+
+b <- scaled_entropy_df %>% filter(
+                                  !is.na(get(independent)),
+                                  !is.na(get(dependent)))%>%
+  filter(metric == met)
+    
+      ggplot()+
+    geom_violin(data = b, aes(group = sample_length, x = sample_length,
+                       y = get(dependent)/coeff), color = 'grey')+
+    geom_boxplot(data = b, aes(group = sample_length, x = sample_length,
+                       y = get(dependent)/coeff), width=0.35, outlier.shape = NA,
+                 color = 'black',
+                 lwd = 0.5)+
+        scale_y_continuous(
+          breaks = c(0, 0.5, 1),
+                     minor_breaks = c(0.25, 0.75),
+          limits = c(0,1),
+          sec.axis = sec_axis(trans = ~.*coeff, name = dependent)
+        )+
+    # stat_summary(fun=median, geom="point", color="red")+
+    facet_wrap(vars(home))+
+              theme_bw()+
+    ylab(rep_measure)+
+        ggtitle(label = paste0('Representativeness and ', dependent,
+                              ' of ', met, ', Varying Sample Length, Scaled by ', max_method))+
+        geom_line(data = a, aes(x = sample_length,
+                 y = get(rep_measure),
+                       color = energy_cluster))+
+      geom_point(data = a, aes(x = sample_length,
+                 y = get(rep_measure),
+                       color = energy_cluster,
+                 size = n_samples_frac))+# make size of pooints proportional to n
+              scale_size_area(max_size = 2)+
+      # # add threshold lines
+      # geom_hline(yintercept=thresh_vector, linetype="dashed",
+      #            color = "black", size=0.5)+
+      # # to color threshold lines based on value
+      # lapply(c(1:3), function(i){
+      #         geom_hline(yintercept=thresh_vector[i],
+      #                    linetype="dashed", 
+      #            color = threshold_colors[i], size=0.5)
+      # })+
+      scale_x_continuous(breaks=seq(0,28,7))+
+    #   # add error bars
+    # geom_ribbon(aes(ymin = low_val, ymax = high_val,
+    #                 fill = energy_cluster),
+    #             alpha = 0.15, color = NA)+
+  scale_fill_manual(values = energy_colors,
+                    breaks = energy_breaks,
+                    labels = energy_labels,
+                    name = 'Season')+
+        scale_color_manual(values = energy_colors,
+                    breaks = energy_breaks,
+                    labels = energy_labels,
+                    name = 'Season')+
+        xlab('Sample Length, days')+
+        theme(legend.position = 'left')
+      
+## voc--------------------
+met <- 'voc'
+coeff <- 150
+
+
+  a <- avg_pooled_scaled_entropy_df %>%
+    filter( metric == met & method == meth)
+
+b <- scaled_entropy_df %>% filter(
+                                  !is.na(get(independent)),
+                                  !is.na(get(dependent)))%>%
+  filter(metric == met)
+    
+      ggplot()+
+    geom_violin(data = b, aes(group = sample_length, x = sample_length,
+                       y = get(dependent)/coeff), color = 'grey')+
+    geom_boxplot(data = b, aes(group = sample_length, x = sample_length,
+                       y = get(dependent)/coeff), width=0.35, outlier.shape = NA,
+                 color = 'black',
+                 lwd = 0.5)+
+        scale_y_continuous(
+          breaks = c(0, 0.5, 1),
+                     minor_breaks = c(0.25, 0.75),
+          limits = c(0,1),
+          sec.axis = sec_axis(trans = ~.*coeff, name = dependent)
+        )+
+    # stat_summary(fun=median, geom="point", color="red")+
+    facet_wrap(vars(home))+
+              theme_bw()+
+    ylab(rep_measure)+
+        ggtitle(label = paste0('Representativeness and ', dependent,
+                              ' of ', met, ', Varying Sample Length, Scaled by ', max_method))+
+        geom_line(data = a, aes(x = sample_length,
+                 y = get(rep_measure),
+                       color = energy_cluster))+
+      geom_point(data = a, aes(x = sample_length,
+                 y = get(rep_measure),
+                       color = energy_cluster,
+                 size = n_samples_frac))+# make size of pooints proportional to n
+              scale_size_area(max_size = 2)+
+      # # add threshold lines
+      # geom_hline(yintercept=thresh_vector, linetype="dashed",
+      #            color = "black", size=0.5)+
+      # # to color threshold lines based on value
+      # lapply(c(1:3), function(i){
+      #         geom_hline(yintercept=thresh_vector[i],
+      #                    linetype="dashed", 
+      #            color = threshold_colors[i], size=0.5)
+      # })+
+      scale_x_continuous(breaks=seq(0,28,7))+
+    #   # add error bars
+    # geom_ribbon(aes(ymin = low_val, ymax = high_val,
+    #                 fill = energy_cluster),
+    #             alpha = 0.15, color = NA)+
+  scale_fill_manual(values = energy_colors,
+                    breaks = energy_breaks,
+                    labels = energy_labels,
+                    name = 'Season')+
+        scale_color_manual(values = energy_colors,
+                    breaks = energy_breaks,
+                    labels = energy_labels,
+                    name = 'Season')+
+        xlab('Sample Length, days')+
+        theme(legend.position = 'left')
+      
+# time--------------------------- 
+meth <- 'time'
+dependent <- 'max_hour_diff'
+
+## pm25--------------------
+met <- 'pm25'
+coeff <- 15
+
+  a <- avg_pooled_scaled_entropy_df %>%
+    filter( metric == met & method == meth)
+
+b <- scaled_entropy_df %>% filter(
+                                  !is.na(get(independent)),
+                                  !is.na(get(dependent)))%>%
+  filter(metric == met)
+    
+      ggplot()+
+    geom_violin(data = b, aes(group = sample_length, x = sample_length,
+                       y = get(dependent)/coeff), color = 'grey')+
+    geom_boxplot(data = b, aes(group = sample_length, x = sample_length,
+                       y = get(dependent)/coeff), width=0.35, outlier.shape = NA,
+                 color = 'black',
+                 lwd = 0.5)+
+        scale_y_continuous(
+          breaks = c(0, 0.5, 1),
+                     minor_breaks = c(0.25, 0.75),
+          limits = c(0,1),
+          sec.axis = sec_axis(trans = ~.*coeff, name = dependent)
+        )+
+    # stat_summary(fun=median, geom="point", color="red")+
+    facet_wrap(vars(home))+
+              theme_bw()+
+    ylab(rep_measure)+
+        ggtitle(label = paste0('Representativeness and ', dependent,
+                              ' of ', met, ', Varying Sample Length, Scaled by ', max_method))+
+        geom_line(data = a, aes(x = sample_length,
+                 y = get(rep_measure),
+                       color = energy_cluster))+
+      geom_point(data = a, aes(x = sample_length,
+                 y = get(rep_measure),
+                       color = energy_cluster,
+                 size = n_samples_frac))+# make size of pooints proportional to n
+              scale_size_area(max_size = 2)+
+      # # add threshold lines
+      # geom_hline(yintercept=thresh_vector, linetype="dashed",
+      #            color = "black", size=0.5)+
+      # # to color threshold lines based on value
+      # lapply(c(1:3), function(i){
+      #         geom_hline(yintercept=thresh_vector[i],
+      #                    linetype="dashed", 
+      #            color = threshold_colors[i], size=0.5)
+      # })+
+      scale_x_continuous(breaks=seq(0,28,7))+
+    #   # add error bars
+    # geom_ribbon(aes(ymin = low_val, ymax = high_val,
+    #                 fill = energy_cluster),
+    #             alpha = 0.15, color = NA)+
+  scale_fill_manual(values = energy_colors,
+                    breaks = energy_breaks,
+                    labels = energy_labels,
+                    name = 'Season')+
+        scale_color_manual(values = energy_colors,
+                    breaks = energy_breaks,
+                    labels = energy_labels,
+                    name = 'Season')+
+        xlab('Sample Length, days')+
+        theme(legend.position = 'left')
+      
+## voc--------------------
+met <- 'voc'
+coeff <- 15
+
+
+  a <- avg_pooled_scaled_entropy_df %>%
+    filter( metric == met & method == meth)
+
+b <- scaled_entropy_df %>% filter(
+                                  !is.na(get(independent)),
+                                  !is.na(get(dependent)))%>%
+  filter(metric == met)
+    
+      ggplot()+
+    geom_violin(data = b, aes(group = sample_length, x = sample_length,
+                       y = get(dependent)/coeff), color = 'grey')+
+    geom_boxplot(data = b, aes(group = sample_length, x = sample_length,
+                       y = get(dependent)/coeff), width=0.35, outlier.shape = NA,
+                 color = 'black',
+                 lwd = 0.5)+
+        scale_y_continuous(
+          breaks = c(0, 0.5, 1),
+                     minor_breaks = c(0.25, 0.75),
+          limits = c(0,1),
+          sec.axis = sec_axis(trans = ~.*coeff, name = dependent)
+        )+
+    # stat_summary(fun=median, geom="point", color="red")+
+    facet_wrap(vars(home))+
+              theme_bw()+
+    ylab(rep_measure)+
+        ggtitle(label = paste0('Representativeness and ', dependent,
+                              ' of ', met, ', Varying Sample Length, Scaled by ', max_method))+
+        geom_line(data = a, aes(x = sample_length,
+                 y = get(rep_measure),
+                       color = energy_cluster))+
+      geom_point(data = a, aes(x = sample_length,
+                 y = get(rep_measure),
+                       color = energy_cluster,
+                 size = n_samples_frac))+# make size of pooints proportional to n
+              scale_size_area(max_size = 2)+
+      # # add threshold lines
+      # geom_hline(yintercept=thresh_vector, linetype="dashed",
+      #            color = "black", size=0.5)+
+      # # to color threshold lines based on value
+      # lapply(c(1:3), function(i){
+      #         geom_hline(yintercept=thresh_vector[i],
+      #                    linetype="dashed", 
+      #            color = threshold_colors[i], size=0.5)
+      # })+
+      scale_x_continuous(breaks=seq(0,28,7))+
+    #   # add error bars
+    # geom_ribbon(aes(ymin = low_val, ymax = high_val,
+    #                 fill = energy_cluster),
+    #             alpha = 0.15, color = NA)+
+  scale_fill_manual(values = energy_colors,
+                    breaks = energy_breaks,
+                    labels = energy_labels,
+                    name = 'Season')+
+        scale_color_manual(values = energy_colors,
+                    breaks = energy_breaks,
+                    labels = energy_labels,
+                    name = 'Season')+
+        xlab('Sample Length, days')+
+        theme(legend.position = 'left')      
 ```
 
