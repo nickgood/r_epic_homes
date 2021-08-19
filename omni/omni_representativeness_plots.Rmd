@@ -1912,19 +1912,22 @@ dependent <- 'median_diff'
 
 ## pm25--------------------
 met <- 'pm25'
-coeff <- 5
+coeff <- 10
 
   a <- avg_pooled_scaled_entropy_df %>%
-    filter( metric == met & method == meth)
+    filter( metric == met & method == meth,
+                                  sample_length %in% c(1,3,5,7:21))
 
 b <- scaled_entropy_df %>% filter(
                                   !is.na(get(independent)),
-                                  !is.na(get(dependent)))%>%
+                                  !is.na(get(dependent)),
+                                  sample_length %in% c(1,3,5,7:21))%>%
   filter(metric == met)
     
       ggplot()+
     geom_violin(data = b, aes(group = sample_length, x = sample_length,
-                       y = get(dependent)/coeff), color = 'grey')+
+                       y = get(dependent)/coeff), width = 1.75,
+                color = 'darkgrey')+
     geom_boxplot(data = b, aes(group = sample_length, x = sample_length,
                        y = get(dependent)/coeff), width=0.35, outlier.shape = NA,
                  color = 'black',
@@ -1958,7 +1961,7 @@ b <- scaled_entropy_df %>% filter(
       #                    linetype="dashed", 
       #            color = threshold_colors[i], size=0.5)
       # })+
-      scale_x_continuous(breaks=seq(0,28,7))+
+      scale_x_continuous(breaks=seq(0,21,7), limits = c(0,21))+
     #   # add error bars
     # geom_ribbon(aes(ymin = low_val, ymax = high_val,
     #                 fill = energy_cluster),
@@ -1976,20 +1979,23 @@ b <- scaled_entropy_df %>% filter(
       
 ## voc--------------------
 met <- 'voc'
-coeff <- 150
+coeff <- 1000
 
 
-  a <- avg_pooled_scaled_entropy_df %>%
-    filter( metric == met & method == meth)
+   a <- avg_pooled_scaled_entropy_df %>%
+    filter( metric == met & method == meth,
+                                  sample_length %in% c(1,3,5,7:21))
 
 b <- scaled_entropy_df %>% filter(
                                   !is.na(get(independent)),
-                                  !is.na(get(dependent)))%>%
+                                  !is.na(get(dependent)),
+                                  sample_length %in% c(1,3,5,7:21))%>%
   filter(metric == met)
     
       ggplot()+
     geom_violin(data = b, aes(group = sample_length, x = sample_length,
-                       y = get(dependent)/coeff), color = 'grey')+
+                       y = get(dependent)/coeff), width = 1.75,
+                color = 'darkgrey')+
     geom_boxplot(data = b, aes(group = sample_length, x = sample_length,
                        y = get(dependent)/coeff), width=0.35, outlier.shape = NA,
                  color = 'black',
@@ -2023,7 +2029,7 @@ b <- scaled_entropy_df %>% filter(
       #                    linetype="dashed", 
       #            color = threshold_colors[i], size=0.5)
       # })+
-      scale_x_continuous(breaks=seq(0,28,7))+
+      scale_x_continuous(breaks=seq(0,21,7), limits = c(0,21))+
     #   # add error bars
     # geom_ribbon(aes(ymin = low_val, ymax = high_val,
     #                 fill = energy_cluster),
@@ -2041,23 +2047,29 @@ b <- scaled_entropy_df %>% filter(
       
 # time--------------------------- 
 meth <- 'time'
-dependent <- 'max_hour_diff'
 
-## pm25--------------------
+## difference in peak hour times------------------
+      
+      dependent <- 'max_hour_diff'
+
+### pm25--------------------
 met <- 'pm25'
-coeff <- 15
+coeff <- 20
 
   a <- avg_pooled_scaled_entropy_df %>%
-    filter( metric == met & method == meth)
+    filter( metric == met & method == meth,
+                                  sample_length %in% c(1,3,5,7:21))
 
 b <- scaled_entropy_df %>% filter(
                                   !is.na(get(independent)),
-                                  !is.na(get(dependent)))%>%
+                                  !is.na(get(dependent)),
+                                  sample_length %in% c(1,3,5,7:21))%>%
   filter(metric == met)
     
-      ggplot()+
+           ggplot()+
     geom_violin(data = b, aes(group = sample_length, x = sample_length,
-                       y = get(dependent)/coeff), color = 'grey')+
+                       y = get(dependent)/coeff), width = 1.75,
+                color = 'darkgrey')+
     geom_boxplot(data = b, aes(group = sample_length, x = sample_length,
                        y = get(dependent)/coeff), width=0.35, outlier.shape = NA,
                  color = 'black',
@@ -2091,7 +2103,146 @@ b <- scaled_entropy_df %>% filter(
       #                    linetype="dashed", 
       #            color = threshold_colors[i], size=0.5)
       # })+
-      scale_x_continuous(breaks=seq(0,28,7))+
+      scale_x_continuous(breaks=seq(0,21,7), limits = c(0,21))+
+    #   # add error bars
+    # geom_ribbon(aes(ymin = low_val, ymax = high_val,
+    #                 fill = energy_cluster),
+    #             alpha = 0.15, color = NA)+
+  scale_fill_manual(values = energy_colors,
+                    breaks = energy_breaks,
+                    labels = energy_labels,
+                    name = 'Season')+
+        scale_color_manual(values = energy_colors,
+                    breaks = energy_breaks,
+                    labels = energy_labels,
+                    name = 'Season')+
+        xlab('Sample Length, days')+
+        theme(legend.position = 'left')
+      
+### voc--------------------
+met <- 'voc'
+coeff <- 20
+
+
+  a <- avg_pooled_scaled_entropy_df %>%
+    filter( metric == met & method == meth,
+                                  sample_length %in% c(1,3,5,7:21))
+
+b <- scaled_entropy_df %>% filter(
+                                  !is.na(get(independent)),
+                                  !is.na(get(dependent)),
+                                  sample_length %in% c(1,3,5,7:21))%>%
+  filter(metric == met)
+    
+      ggplot()+
+    geom_violin(data = b, aes(group = sample_length, x = sample_length,
+                       y = get(dependent)/coeff), width = 1.75,
+                color = 'darkgrey')+
+    geom_boxplot(data = b, aes(group = sample_length, x = sample_length,
+                       y = get(dependent)/coeff), width=0.35, outlier.shape = NA,
+                 color = 'black',
+                 lwd = 0.5)+
+        scale_y_continuous(
+          breaks = c(0, 0.5, 1),
+                     minor_breaks = c(0.25, 0.75),
+          limits = c(0,1),
+          sec.axis = sec_axis(trans = ~.*coeff, name = dependent)
+        )+
+    # stat_summary(fun=median, geom="point", color="red")+
+    facet_wrap(vars(home))+
+              theme_bw()+
+    ylab(rep_measure)+
+        ggtitle(label = paste0('Representativeness and ', dependent,
+                              ' of ', met, ', Varying Sample Length, Scaled by ', max_method))+
+        geom_line(data = a, aes(x = sample_length,
+                 y = get(rep_measure),
+                       color = energy_cluster))+
+      geom_point(data = a, aes(x = sample_length,
+                 y = get(rep_measure),
+                       color = energy_cluster,
+                 size = n_samples_frac))+# make size of pooints proportional to n
+              scale_size_area(max_size = 2)+
+      # # add threshold lines
+      # geom_hline(yintercept=thresh_vector, linetype="dashed",
+      #            color = "black", size=0.5)+
+      # # to color threshold lines based on value
+      # lapply(c(1:3), function(i){
+      #         geom_hline(yintercept=thresh_vector[i],
+      #                    linetype="dashed", 
+      #            color = threshold_colors[i], size=0.5)
+      # })+
+      scale_x_continuous(breaks=seq(0,21,7), limits = c(0,21))+
+    #   # add error bars
+    # geom_ribbon(aes(ymin = low_val, ymax = high_val,
+    #                 fill = energy_cluster),
+    #             alpha = 0.15, color = NA)+
+  scale_fill_manual(values = energy_colors,
+                    breaks = energy_breaks,
+                    labels = energy_labels,
+                    name = 'Season')+
+        scale_color_manual(values = energy_colors,
+                    breaks = energy_breaks,
+                    labels = energy_labels,
+                    name = 'Season')+
+        xlab('Sample Length, days')+
+        theme(legend.position = 'left')      
+      
+## difference in peak hour values------------------
+
+      dependent <- 'max_diff'
+
+## pm25--------------------
+met <- 'pm25'
+coeff <- 75
+
+  a <- avg_pooled_scaled_entropy_df %>%
+    filter( metric == met & method == meth,
+                                  sample_length %in% c(1,3,5,7:21))
+
+b <- scaled_entropy_df %>% filter(
+                                  !is.na(get(independent)),
+                                  !is.na(get(dependent)),
+                                  sample_length %in% c(1,3,5,7:21))%>%
+  filter(metric == met)
+    
+           ggplot()+
+    geom_violin(data = b, aes(group = sample_length, x = sample_length,
+                       y = get(dependent)/coeff), width = 1.75,
+                color = 'darkgrey')+
+    geom_boxplot(data = b, aes(group = sample_length, x = sample_length,
+                       y = get(dependent)/coeff), width=0.35, outlier.shape = NA,
+                 color = 'black',
+                 lwd = 0.5)+
+        scale_y_continuous(
+          breaks = c(0, 0.5, 1),
+                     minor_breaks = c(0.25, 0.75),
+          limits = c(0,1),
+          sec.axis = sec_axis(trans = ~.*coeff, name = dependent)
+        )+
+    # stat_summary(fun=median, geom="point", color="red")+
+    facet_wrap(vars(home))+
+              theme_bw()+
+    ylab(rep_measure)+
+        ggtitle(label = paste0('Representativeness and ', dependent,
+                              ' of ', met, ', Varying Sample Length, Scaled by ', max_method))+
+        geom_line(data = a, aes(x = sample_length,
+                 y = get(rep_measure),
+                       color = energy_cluster))+
+      geom_point(data = a, aes(x = sample_length,
+                 y = get(rep_measure),
+                       color = energy_cluster,
+                 size = n_samples_frac))+# make size of pooints proportional to n
+              scale_size_area(max_size = 2)+
+      # # add threshold lines
+      # geom_hline(yintercept=thresh_vector, linetype="dashed",
+      #            color = "black", size=0.5)+
+      # # to color threshold lines based on value
+      # lapply(c(1:3), function(i){
+      #         geom_hline(yintercept=thresh_vector[i],
+      #                    linetype="dashed", 
+      #            color = threshold_colors[i], size=0.5)
+      # })+
+      scale_x_continuous(breaks=seq(0,21,7), limits = c(0,21))+
     #   # add error bars
     # geom_ribbon(aes(ymin = low_val, ymax = high_val,
     #                 fill = energy_cluster),
@@ -2109,20 +2260,23 @@ b <- scaled_entropy_df %>% filter(
       
 ## voc--------------------
 met <- 'voc'
-coeff <- 15
+coeff <- 1250
 
 
   a <- avg_pooled_scaled_entropy_df %>%
-    filter( metric == met & method == meth)
+    filter( metric == met & method == meth,
+                                  sample_length %in% c(1,3,5,7:21))
 
 b <- scaled_entropy_df %>% filter(
                                   !is.na(get(independent)),
-                                  !is.na(get(dependent)))%>%
+                                  !is.na(get(dependent)),
+                                  sample_length %in% c(1,3,5,7:21))%>%
   filter(metric == met)
     
       ggplot()+
     geom_violin(data = b, aes(group = sample_length, x = sample_length,
-                       y = get(dependent)/coeff), color = 'grey')+
+                       y = get(dependent)/coeff), width = 1.75,
+                color = 'darkgrey')+
     geom_boxplot(data = b, aes(group = sample_length, x = sample_length,
                        y = get(dependent)/coeff), width=0.35, outlier.shape = NA,
                  color = 'black',
@@ -2156,7 +2310,7 @@ b <- scaled_entropy_df %>% filter(
       #                    linetype="dashed", 
       #            color = threshold_colors[i], size=0.5)
       # })+
-      scale_x_continuous(breaks=seq(0,28,7))+
+      scale_x_continuous(breaks=seq(0,21,7), limits = c(0,21))+
     #   # add error bars
     # geom_ribbon(aes(ymin = low_val, ymax = high_val,
     #                 fill = energy_cluster),
