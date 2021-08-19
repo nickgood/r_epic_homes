@@ -785,9 +785,9 @@ lapply(clust, function(cluster_type) {
 # 
 # loc <- 'living'
 # lapply(clust, function(cluster_type) {
-#   
+# 
 #   rep_data <-  lapply(homes_all, function(x_home) {
-#     
+# 
 #     start_date <- pick.start(x_home, cluster_type)
 #     end_date <- pick.end(x_home, cluster_type)
 #     sample_min <- pick.sample.min(met)
@@ -796,22 +796,22 @@ lapply(clust, function(cluster_type) {
 #       28,
 #       as.numeric(as.Date(end_date) - as.Date(start_date))
 #     )
-#     
+# 
 #     entropy.table.hourly(
 #       x_home, metric = met,
 #       date_ranges_entire = list(c(start_date,
 #                                   end_date)),
 #       tested_sample_sequence =
-        # c(c(1:7), 9, seq(11,27,4)),
+# c(c(1:7), 9, seq(11,27,4)),
 #       location_type = loc,
 #       all_time = all_time_choice) %>%
-#       
+# 
 #       # add in column for energy_cluster
-#       mutate(energy_cluster = cluster_type) 
+#       mutate(energy_cluster = cluster_type)
 #   }
 #   ) %>%
 #     bind_rows()
-#   
+# 
 #   # give a variable name to the created data
 #   assign(paste(met, loc, cluster_type, 'rep_data_time_hourly_pdf', sep = '_'),
 #          rep_data,
@@ -821,9 +821,9 @@ lapply(clust, function(cluster_type) {
 # 
 # loc <- 'kitchen'
 # lapply(clust, function(cluster_type) {
-#   
+# 
 #   rep_data <-  lapply(homes_all, function(x_home) {
-#     
+# 
 #     start_date <- pick.start(x_home, cluster_type)
 #     end_date <- pick.end(x_home, cluster_type)
 #     sample_min <- pick.sample.min(met)
@@ -832,22 +832,22 @@ lapply(clust, function(cluster_type) {
 #       28,
 #       as.numeric(as.Date(end_date) - as.Date(start_date))
 #     )
-#     
+# 
 #     entropy.table.hourly(
 #       x_home, metric = met,
 #       date_ranges_entire = list(c(start_date,
 #                                   end_date)),
 #       tested_sample_sequence =
-        # c(c(1:7), 9, seq(11,27,4)),
+# c(c(1:7), 9, seq(11,27,4)),
 #       location_type = loc,
 #       all_time = all_time_choice) %>%
-#       
+# 
 #       # add in column for energy_cluster
-#       mutate(energy_cluster = cluster_type) 
+#       mutate(energy_cluster = cluster_type)
 #   }
 #   ) %>%
 #     bind_rows()
-#   
+# 
 #   # give a variable name to the created data
 #   assign(paste(met, loc, cluster_type, 'rep_data_time_hourly_pdf', sep = '_'),
 #          rep_data,
@@ -857,9 +857,9 @@ lapply(clust, function(cluster_type) {
 # 
 # loc <- 'bedroom'
 # lapply(clust, function(cluster_type) {
-#   
+# 
 #   rep_data <-  lapply(homes_all, function(x_home) {
-#     
+# 
 #     start_date <- pick.start(x_home, cluster_type)
 #     end_date <- pick.end(x_home, cluster_type)
 #     sample_min <- pick.sample.min(met)
@@ -868,22 +868,22 @@ lapply(clust, function(cluster_type) {
 #       28,
 #       as.numeric(as.Date(end_date) - as.Date(start_date))
 #     )
-#     
+# 
 #     entropy.table.hourly(
 #       x_home, metric = met,
 #       date_ranges_entire = list(c(start_date,
 #                                   end_date)),
 #       tested_sample_sequence =
-        # c(c(1:7), 9, seq(11,27,4)),
+# c(c(1:7), 9, seq(11,27,4)),
 #       location_type = loc,
 #       all_time = all_time_choice) %>%
-#       
+# 
 #       # add in column for energy_cluster
-#       mutate(energy_cluster = cluster_type) 
+#       mutate(energy_cluster = cluster_type)
 #   }
 #   ) %>%
 #     bind_rows()
-#   
+# 
 #   # give a variable name to the created data
 #   assign(paste(met, loc, cluster_type, 'rep_data_time_hourly_pdf', sep = '_'),
 #          rep_data,

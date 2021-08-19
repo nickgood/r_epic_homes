@@ -919,7 +919,8 @@ entropy_shape_pdf_df <- bind_rows(
 #   voc_kitchen_shoulder_rep_data_shape_pdf,
 #   voc_bedroom_ac_rep_data_shape_pdf,
 #   voc_living_ac_rep_data_shape_pdf,
-#   voc_kitchen_ac_rep_data_shape_pdf)
+#   voc_kitchen_ac_rep_data_shape_pdf,
+# entropy_shape_pdf_df)
 
 # write csvs----------------------
 
