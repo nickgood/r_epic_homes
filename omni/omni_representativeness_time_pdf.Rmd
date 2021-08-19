@@ -599,16 +599,9 @@ entropy.table.hourly <- function(
 ```{r define_variables}
 
 # list of all home numbers
-homes_all <- home.list(1:17)
+homes_all <- home.list(1:16)
 clusters_all <- c('heat','shoulder', 'ac')
 locations_indoor <- c('living', 'kitchen', 'bedroom')
-
-# sequence of representative thresholds to test
-threshold_seq <- c(0.1, 0.2, 0.3)
-
-# sequence of days to test thresholds for time entropy values
-
-pdf_days <- c(3,7,10,14,21)
 
 
 ```
@@ -699,7 +692,7 @@ lapply(clust, function(cluster_type) {
       date_ranges_entire = list(c(start_date,
                                   end_date)),
       tested_sample_sequence =
-        c(1, seq(3,27,4)),
+        c(c(1:7), 9, seq(11,27,4)),
       location_type = loc,
       all_time = all_time_choice) %>%
       
@@ -735,7 +728,7 @@ lapply(clust, function(cluster_type) {
       date_ranges_entire = list(c(start_date,
                                   end_date)),
       tested_sample_sequence =
-        c(1, seq(3,27,4)),
+        c(c(1:7), 9, seq(11,27,4)),
       location_type = loc,
       all_time = all_time_choice) %>%
       
@@ -771,7 +764,7 @@ lapply(clust, function(cluster_type) {
       date_ranges_entire = list(c(start_date,
                                   end_date)),
       tested_sample_sequence =
-        c(1, seq(3,27,4)),
+        c(c(1:7), 9, seq(11,27,4)),
       location_type = loc,
       all_time = all_time_choice) %>%
       
@@ -809,7 +802,7 @@ lapply(clust, function(cluster_type) {
 #       date_ranges_entire = list(c(start_date,
 #                                   end_date)),
 #       tested_sample_sequence =
-#         c(1, seq(3,27,4)),
+        # c(c(1:7), 9, seq(11,27,4)),
 #       location_type = loc,
 #       all_time = all_time_choice) %>%
 #       
@@ -845,7 +838,7 @@ lapply(clust, function(cluster_type) {
 #       date_ranges_entire = list(c(start_date,
 #                                   end_date)),
 #       tested_sample_sequence =
-#         c(1, seq(3,27,4)),
+        # c(c(1:7), 9, seq(11,27,4)),
 #       location_type = loc,
 #       all_time = all_time_choice) %>%
 #       
@@ -881,7 +874,7 @@ lapply(clust, function(cluster_type) {
 #       date_ranges_entire = list(c(start_date,
 #                                   end_date)),
 #       tested_sample_sequence =
-#         c(1, seq(3,27,4)),
+        # c(c(1:7), 9, seq(11,27,4)),
 #       location_type = loc,
 #       all_time = all_time_choice) %>%
 #       
