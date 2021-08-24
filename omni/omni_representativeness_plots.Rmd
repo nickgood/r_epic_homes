@@ -129,7 +129,7 @@ frac_samp_required <- 0
 
 # method of scaling relative entropy to scaled entropy
 # 'universal' or 'conditional'
-max_method <- 'metric'
+max_method <- 'conditional'
 
 
 # list of all home numbers
@@ -305,7 +305,7 @@ kld_max_home <- kld_max_df_clean %>%
 
 kld_max_conditional <- kld_max_df_clean %>%
   group_by(sample_length, home, location, energy_cluster, metric, method) %>%
-      summarise(max_kld_cutoff = max(kld), .groups = 'drop') %>%
+      summarise(max_kld_cutoff = mean(kld), .groups = 'drop') %>%
   # summarise(max_kld_cutoff = median(kld), .groups = 'drop') %>%
   rename(sample_min = sample_length)
 
@@ -785,7 +785,7 @@ avg_pooled_kld_max_home <-  kld_max_df_clean %>%
 
 avg_pooled_kld_max_conditional <-  kld_max_df_clean %>%
   group_by(home, energy_cluster, metric, method) %>%
-    summarise(max_kld = max(kld), .groups = 'drop')
+    summarise(max_kld = mean(kld), .groups = 'drop')
 
 
 
@@ -817,7 +817,7 @@ avg_kld_max_home <-  kld_max_df_clean %>%
 
 avg_kld_max_conditional <-  kld_max_df_clean %>%
   group_by(home, energy_cluster, metric, method, location) %>%
-    summarise(max_kld = max(kld), .groups = 'drop')
+    summarise(max_kld = mean(kld), .groups = 'drop')
 
 
 ```
@@ -914,7 +914,6 @@ avg_kld_df %>%
                                'sample_length', 'method', 'avg_kld',
                                'n_samples', 'n_samples_max', 'n_samples_frac',
                                'location'))
-
 ```
 
 
@@ -1256,11 +1255,11 @@ grid.arrange(grobs = c(plots_t2, plots_t3),
 
 ```{r correlation, eval = FALSE}
 # for one condition
-a <- entropy_df_clean %>% filter(method == 'shape', home == '001',
-                                 location == 'living', metric == 'pm25',
-                                 energy_cluster == 'heat')
-test <- cor.test(a$kld, a$median_diff, method = 'spearman')%>% suppressWarnings()
-list('coeff' = test$estimate, 'p_val' = test$p.value)
+# a <- entropy_df_clean %>% filter(method == 'shape', home == '001',
+#                                  location == 'living', metric == 'pm25',
+#                                  energy_cluster == 'heat')
+# test <- cor.test(a$kld, a$median_diff, method = 'spearman')%>% suppressWarnings()
+# list('coeff' = test$estimate, 'p_val' = test$p.value)
 
 
 
@@ -1380,9 +1379,9 @@ cor.table <- function(pooled){
 
 # make a correlation table merging different pooling methods
 cor_table <- bind_rows(
-  # cor.table('all'),
-                       cor.table('metric')
-                       # cor.table('none')
+  cor.table('all'),
+                       cor.table('metric'),
+                       cor.table('none')
                        )
 
 # function to plot correlations for given pooling method
@@ -1401,7 +1400,9 @@ cor.plot('kld', 'max_hour_diff')
 
 # cor.plot('scaled_kld_metric', 'median_diff')
 cor.plot('scaled_kld_conditional', 'median_diff')
-# cor.plot('scaled_kld_metric', 'variance_diff')
+# cor.plot('scaled_kld_metric', 'median_diff')
+cor.plot('scaled_kld_conditional', 'mean_diff')
+# cor.plot('scaled_kld_metric', 'mean_diff')
 cor.plot('scaled_kld_conditional', 'variance_diff')
 # cor.plot('scaled_kld_metric', 'max_diff')
 cor.plot('scaled_kld_conditional', 'max_diff')
@@ -1805,6 +1806,8 @@ a <- scaled_entropy_df %>% filter(metric == met,
 ```
 
 ## Combine Average Representativeness with Deviation Measures
+
+### Boxplots include pooled seasons
 
 ### Example Plot
 
