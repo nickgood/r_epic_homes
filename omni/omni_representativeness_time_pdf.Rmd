@@ -177,6 +177,7 @@ entropy.table.hourly <- function(
   date_ranges_entire,
   tested_sample_sequence, # sequence of tested short sampling period lengths (in days)
   location_type, # sensor location (living, bedroom, or kitchen)
+  overlap, # if FALSE, only use samples made of ditinct days
   all_time = TRUE, # if TRUE, compare each short sampling period to entire monitoring year of home
     longterm_avail_limit = 0, # only use data from a long-term period if it has at least this fraction of data available (0 means no periods are omitted if they have any data)
   sample_avail_limit = 0, # only use data from a sample period if it has at least this fraction of data available (0 means no periods are omitted if they have any data)
@@ -374,9 +375,13 @@ entropy.table.hourly <- function(
       a <-
         runner(
           all_dates_season,
-          k = days*24, # number of hour periods in short sampling period
-          # only evaluate windows that are full (ignore partial windows at start)
-          at = seq(days*24, length(all_dates_season), 24),
+          k = days*24, 
+          # number of hour periods in short sampling period
+               # only evaluate windows that are full
+               # (ignore partial windows at start)
+               # only use disticnt days if overlap == FALSE
+               at = seq(days*24, length(all_dates_season),
+                        {if(overlap == TRUE) 24 else days*24}),
           f = function(y) { # y = window, vector (length = k) of specified days per iteration
             
             # filter out only given room
@@ -536,7 +541,9 @@ entropy.table.hourly <- function(
            home = home_num,
            metric = metric,
            location = location_type,
-           period_compare = ifelse(all_time == TRUE, 'year', 'season'))
+           period_compare = ifelse(all_time == TRUE, 'year', 'season'),
+                      overlap = overlap
+           )
   
   
   entropy_data_season  # scaled_entropy for all specified date ranges
@@ -544,16 +551,13 @@ entropy.table.hourly <- function(
 }
 
  
-    
-    # test <- bind_rows(entropy_data_list[c(1:27)])
-
 
 # test function--------------------------
 
 # start <- Sys.time()
 # 
 # test<- entropy.table.hourly('012', 'pm25',
-# 
+#                             overlap = FALSE,
 #                            date_ranges_entire = list(
 #                              c('2020-09-26', '2020-10-22')),
 #                            tested_sample_sequence = c(1,3,7,11,15,19,23,27),
