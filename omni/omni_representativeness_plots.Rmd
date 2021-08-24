@@ -2478,3 +2478,107 @@ b <- scaled_entropy_df %>% filter(
         theme(legend.position = 'left')      
 ```
 
+### Boxplots separated by season and room
+
+### Example Plot
+
+```{r fig.height=3, fig.width = 6}
+
+if(max_method == 'universal'){
+      independent <- 'scaled_kld_universal'
+      rep_measure <- 'avg_kld_scaled_universal'
+    } else if(max_method == 'metric'){
+            independent <- 'scaled_kld_metric'
+      rep_measure <- 'avg_kld_scaled_metric'
+    } else if(max_method == 'home'){
+            independent <- 'scaled_kld_home'
+      rep_measure <- 'avg_kld_scaled_home'
+            } else if(max_method == 'conditional'){
+            independent <- 'scaled_kld_conditional'
+      rep_measure <- 'avg_kld_scaled_conditional'
+            }
+# shape--------------------------- 
+meth <- 'shape'
+
+
+## pm25--------------------
+met <- 'pm25'
+coeff <- 10
+hm <- '001'
+cluster <- 'heat'
+room <- 'living'
+
+  a <- avg_scaled_entropy_df %>%
+    filter( metric == met & method == meth,
+                                  sample_length %in% c(1,3,5,7:21),
+            home == hm,
+         energy_cluster == cluster,
+         location == room)
+
+b <- scaled_entropy_df %>% filter(
+                                  !is.na(get(independent)),
+                                  !is.na(get(dependent)),
+                                  sample_length %in% c(1,3,5,7:21))%>%
+  filter(metric == met,
+            home == hm,
+         energy_cluster == cluster,
+         location == room)
+    
+      ggplot()+
+    geom_violin(data = b, aes(group = sample_length, x = sample_length,
+                       y = median_sample/coeff), width = 1.75,
+                color = 'darkgrey')+
+    geom_boxplot(data = b, aes(group = sample_length, x = sample_length,
+                       y = median_sample/coeff,
+                       color = energy_cluster), width=0.35, outlier.shape = NA,
+                 color = 'black',
+                 lwd = 0.5)+
+        scale_y_continuous(
+          breaks = c(0, 0.5, 1),
+                     minor_breaks = c(0.25, 0.75),
+          limits = c(0,1),
+          sec.axis = sec_axis(trans = ~.*coeff, name = 'median_sample')
+        )+
+    # stat_summary(fun=median, geom="point", color="red")+
+    facet_wrap(vars(home))+
+              theme_bw()+
+    ylab(rep_measure)+
+        ggtitle(label = paste0('Representativeness and ', dependent,
+                              ' of ', met, ', Varying Sample Length, Scaled by ', max_method))+
+        geom_line(data = a, aes(x = sample_length,
+                 y = get(rep_measure),
+                       color = energy_cluster))+
+      geom_point(data = a, aes(x = sample_length,
+                 y = get(rep_measure),
+                       color = energy_cluster,
+                 size = n_samples_frac))+# make size of pooints proportional to n
+              scale_size_area(max_size = 2)+
+      # # add threshold lines
+      # geom_hline(yintercept=thresh_vector, linetype="dashed",
+      #            color = "black", size=0.5)+
+      # # to color threshold lines based on value
+      # lapply(c(1:3), function(i){
+      #         geom_hline(yintercept=thresh_vector[i],
+      #                    linetype="dashed", 
+      #            color = threshold_colors[i], size=0.5)
+      # })+
+      scale_x_continuous(breaks=seq(0,21,7), limits = c(0,21))+
+    #   # add error bars
+    # geom_ribbon(aes(ymin = low_val, ymax = high_val,
+    #                 fill = energy_cluster),
+    #             alpha = 0.15, color = NA)+
+  scale_fill_manual(values = energy_colors,
+                    breaks = energy_breaks,
+                    labels = energy_labels,
+                    name = 'Season')+
+        scale_color_manual(values = energy_colors,
+                    breaks = energy_breaks,
+                    labels = energy_labels,
+                    name = 'Season')+
+        xlab('Sample Length, days')+
+        theme(legend.position = 'left')+
+        geom_hline(data = b, aes(yintercept = median_entire/coeff))
+      
+
+```
+
