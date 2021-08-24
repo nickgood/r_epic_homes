@@ -565,15 +565,27 @@ list(
 # make functions to look up starting and ending date of
 # energy cluster period based on home
  pick.start <- function(x_home, x_cluster) {
+   if(x_cluster == 'all') {
+        omni_hourly_data %>%
+   filter(home == x_home) %>%
+   pull(datehour) %>% min()%>% date() %>% as.character()
+   } else {
    energy_cluster_df %>%
    filter(home == x_home & cluster_type == x_cluster) %>%
    pull(start_date) %>% as.character()
+     }
  }
- 
+
   pick.end <- function(x_home, x_cluster) {
+    if(x_cluster == 'all') {
+        omni_hourly_data %>%
+   filter(home == x_home) %>%
+   pull(datehour) %>% max()%>% date() %>% as.character()
+   } else {
    energy_cluster_df %>%
    filter(home == x_home & cluster_type == x_cluster) %>%
    pull(end_date) %>% as.character()
+   }
   }
   
   # fun to pick minimum sample length to test based on metric
