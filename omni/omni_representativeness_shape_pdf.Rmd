@@ -667,7 +667,7 @@ all_time_choice <- TRUE
       # make dfs for all homes--------------------
 
 all_time_choice <- TRUE
-    clust <- c('heat', 'shoulder', 'ac') # can do multiple
+    clust <- c('ac', 'shoulder', 'heat', 'all') # can do multiple
    
   
                 met <- 'pm25'
@@ -693,6 +693,7 @@ all_time_choice <- TRUE
           tested_sample_sequence = 
         c(c(1:7), 9, seq(11,27,4)),
           location_type = loc,
+        overlap = FALSE,
           all_time = all_time_choice) %>%
           
           # add in column for energy_cluster
@@ -731,6 +732,7 @@ all_time_choice <- TRUE
           tested_sample_sequence = 
         c(c(1:7), 9, seq(11,27,4)),
           location_type = loc,
+        overlap = FALSE,
           all_time = all_time_choice) %>%
           
           # add in column for energy_cluster
@@ -768,6 +770,7 @@ all_time_choice <- TRUE
           tested_sample_sequence = 
         c(c(1:7), 9, seq(11,27,4)),
           location_type = loc,
+        overlap = FALSE,
           all_time = all_time_choice) %>%
           
           # add in column for energy_cluster
@@ -808,6 +811,7 @@ met <- 'voc'
           tested_sample_sequence = 
         c(c(1:7), 9, seq(11,27,4)),
           location_type = loc,
+        overlap = FALSE,
           all_time = all_time_choice) %>%
           
           # add in column for energy_cluster
@@ -846,6 +850,7 @@ met <- 'voc'
           tested_sample_sequence = 
         c(c(1:7), 9, seq(11,27,4)),
           location_type = loc,
+        overlap = FALSE,
           all_time = all_time_choice) %>%
           
           # add in column for energy_cluster
@@ -883,6 +888,7 @@ met <- 'voc'
           tested_sample_sequence = 
         c(c(1:7), 9, seq(11,27,4)),
           location_type = loc,
+        overlap = FALSE,
           all_time = all_time_choice) %>%
           
           # add in column for energy_cluster
@@ -898,6 +904,8 @@ met <- 'voc'
     }
     )
     }
+                    
+                    
 entropy_shape_pdf_df <- bind_rows(
   pm25_bedroom_heat_rep_data_shape_pdf,
   pm25_living_heat_rep_data_shape_pdf,
