@@ -333,7 +333,9 @@ ggplot(bc %>% filter(!(location == "bedroom")), aes(x = location, y = bc)) +
 ```{r}
 # write_rds(bc, paste0("../output/bc/bc_",
 # Sys.Date(),".rds"))
-# write_rds(pm25, paste0("../output/pm25/pm25_",
+# # make data and backup
+# write_rds(pm25, paste0("../output_2021-07-14/pm25/pm25.rds"))
+# write_rds(pm25, paste0("../output_2021-07-14/pm25/pm25_",
 # Sys.Date(),".rds"))
 
 ```
