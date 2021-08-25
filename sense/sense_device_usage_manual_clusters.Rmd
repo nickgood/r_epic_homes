@@ -42,7 +42,11 @@ home.list <- function(x) sapply(x, threedig)
 ```
 
 ```{r data_import, eval = FALSE}
-data <- read_rds("../drive_sync/epic_homes/r_epic_homes/output/sense/sense_all.rds")
+data <- read_rds("../output_thesis/sense/sense_all.rds")
+
+# test <- data %>%
+#   group_by(job_id) %>%
+#   summarize(end = max(datetime))
 ```
 
 ---
@@ -465,8 +469,13 @@ daily_energy_data_clustered <-
   bind_rows()
 
 # make csv file (mutating date to character to avoid time change)
+# and backup
 write_csv(daily_energy_data_clustered %>%
             mutate(dateday = as.character(dateday)), './csv_created_sense/daily_energy_data_clustered.csv')
+
+write_csv(daily_energy_data_clustered %>%
+            mutate(dateday = as.character(dateday)), paste0('./csv_created_sense/daily_energy_data_clustered_', Sys.Date(),'.csv')
+)
 
 ```
 
