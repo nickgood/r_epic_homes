@@ -75,44 +75,14 @@ clean_data <- function(x){
 
 ```
 
-# 001 Outdoor
-
-```{r, eval = FALSE}
-
-id_home <- "001"
-location <- "outdoor"
-pattern = paste0(".*", id_home, "_", location, ".*.rds$")
-files <- list.files("../output/omni", pattern = pattern, full.names = TRUE)
-```
-
-```{r, eval = FALSE}
-data <- map(files, clean_data) %>%
-  bind_rows() %>%
-  mutate_at(vars(contains("time")), ymd_hms) %>%
-  filter(rowSums(is.na(.)) != ncol(.)) %>% # omit a row if every value is NA
-  mutate(home = id_home, location = location) # add home and location id
+```{r define_variables}
+#define the homes that will be used later in analysis
+homes_no5 <- c(
+  map(c(1:4,6:9), function(x) paste0('00', x)),
+  map(c(10:16), function(x) paste0('0', x))
+  )%>% unlist()
 
 ```
-
-```{r fig_pm25, fig.width=10, fig.height= 5, eval = FALSE}
-timeVariation(data %>% rename(date = datetime),
-              pollutant = "pm25",
-              ylab = "pm2.5 (ug/m3)")
-```
-
-```{r fig_co2, fig.width=10, fig.height= 5, eval = FALSE}
-timeVariation(data %>% rename(date = datetime),
-              pollutant = "co2",
-              ylab = "CO2 (ppmV)")
-```
-
-```{r fig_temp, fig.width=10, fig.height= 5, eval = FALSE}
-timeVariation(data %>% rename(date = datetime) %>% filter(temp < 45),
-              pollutant = "temp",
-              ylab = "Temperature (oC)")
-```
-
----
 
 # Search for files that cause errors when reading in
 
@@ -525,7 +495,7 @@ write_rds(omni_daily_data, paste0('./csv_created/pre-calibration/omni_daily_data
 # calibrate data with filter concentrations
 
 ```{r import_filter_data}
-filter_data <- read_rds('../output_2021-07-14/pm25/pm25_2021-07-14.rds')
+filter_data <- read_rds('../output_2021-07-14/pm25/pm25.rds')
 ```
 
 
@@ -533,19 +503,20 @@ filter_data <- read_rds('../output_2021-07-14/pm25/pm25_2021-07-14.rds')
 
 # add correciton factor to real-time pm2.5 data
 blank_data <- filter_data %>%
-  filter(location == 'blank') %>%
+  filter(location == 'blank'& id_home %in% homes_no5) %>%
   select(visit, id_home, d_mass_blank = d_mass)
 
 filter_data_correct <- filter_data %>%
-    filter(location != 'blank') %>%
+    filter(location != 'blank'& id_home %in% homes_no5) %>%
   left_join(blank_data, by = c('visit', 'id_home')) %>%
   mutate(conc_correct = if_else(duration >= 24, ((d_mass-d_mass_blank)*1000)/(volume/1000),
                                 NA_real_))%>%
   # duplicate results for livingroom to all indoor rooms
-  select(id_home, location, conc_correct) %>%
-  pivot_wider(names_from = location, values_from = conc_correct) %>%
+  select(id_home, location, visit, conc_correct) %>%
+  pivot_wider(names_from = c(location), values_from = conc_correct) %>%
   mutate(kitchen = living, bedroom = living) %>%
-  pivot_longer(cols = -c(id_home) , names_to = 'location', values_to = 'conc_correct')
+  pivot_longer(cols = -c(id_home, visit) , names_to = 'location',
+               values_to = 'conc_correct')
   
 
 
@@ -564,7 +535,8 @@ filter_data_correct <- filter_data %>%
 
 omni_data_precal <- 
   # read in uncalibrated data
-  read_rds(paste0('./csv_created/pre-calibration/omni_all_locations_pre-cal.rds'))
+  read_rds(paste0('./csv_created/pre-calibration/omni_all_locations_pre-cal.rds')) %>%
+  filter(home %in% homes_no5)
 
 # make dataframe of corrrection factors
 grav_cf_df <- omni_data_precal %>%
@@ -576,16 +548,24 @@ grav_cf_df <- omni_data_precal %>%
   # match filter-based concentration to TWA for each home/location
   left_join(filter_data_correct, by = c('home' = 'id_home', 'location')) %>%
   mutate(
-    grav_cf = twa/conc_correct,
-         # fill in NA values with median correction factor
-         grav_cf = ifelse(is.na(conc_correct), median(grav_cf, na.rm = TRUE),
-                          grav_cf)
+    grav_cf = twa/conc_correct
+         # # fill in NA values with median correction factor
+         # grav_cf = ifelse(is.na(conc_correct), median(grav_cf, na.rm = TRUE),
+         #                  grav_cf)
   )
+
+# check spread of correction factor values
+ggplot(grav_cf_df, aes(y = grav_cf))+
+  geom_boxplot()
+
   
+# find the median value of correction factors (exclude negatives)
+# and use that to correct all households
+grav_cf_median <- grav_cf_df %>% filter(!is.na(grav_cf) & grav_cf>0) %>%
+  pull(grav_cf) %>% median()
 
 omni_data_cal <- omni_data_precal %>%
-  left_join(grav_cf_df, by = c('home', 'location')) %>%
-  mutate(pm25 = pm25/grav_cf)
+  mutate(pm25 = pm25/grav_cf_median)
 
 
 # make rds file and backup-----------
@@ -625,6 +605,7 @@ write_rds(omni_daily_data, paste0('./csv_created/omni_daily_calibrated_',
 Sys.Date(),'.rds'))
 
 write_rds(omni_daily_data, paste0('./csv_created/omni_daily_calibrated.rds'))
+
 
 ```
 
