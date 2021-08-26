@@ -166,10 +166,11 @@ cbbPalette <- c('black' = "#000000",
 # define colors for energy clusters
 energy_colors <- c(cbbPalette['light_blue'],
                    cbbPalette['green'],
-                   cbbPalette['dark_orange'])%>% unname()
+                   cbbPalette['dark_orange'],
+                   cbbPalette['black'])%>% unname()
 
-energy_breaks <- c('ac', 'shoulder', 'heat')
-energy_labels <- c('AC', 'Shoulder', 'Heat')
+energy_breaks <- c('ac', 'shoulder', 'heat', 'all')
+energy_labels <- c('AC', 'Shoulder', 'Heat', 'Entire Period')
 
 # define colors for sampling length
 length_colors <- c(cbbPalette['black'],
@@ -1043,7 +1044,7 @@ grid.plots <- function(plots, title,
 ```{r plot_single_home_avg_entropy, fig.width = 7, fig.height = 4}
 
 # plot results for one home
-entropy.plot('012', meth = 'time', scale_method = 'conditional'
+entropy.plot('012', meth = 'shape', scale_method = 'conditional'
              ,room = 'pooled')
 
 ```
@@ -1811,7 +1812,7 @@ a <- scaled_entropy_df %>% filter(metric == met,
 
 ### Example Plot
 
-```{r fig.height=3, fig.width = 6}
+```{r fig.height=3, fig.width = 6, eval = FALSE}
 
 if(max_method == 'universal'){
       independent <- 'scaled_kld_universal'
@@ -1903,7 +1904,7 @@ b <- scaled_entropy_df %>% filter(
 
 ```
 
-```{r fig.height=7, fig.width = 10.5}
+```{r fig.height=7, fig.width = 10.5, eval = FALSE}
 
 if(max_method == 'universal'){
       independent <- 'scaled_kld_universal'
@@ -2478,9 +2479,124 @@ b <- scaled_entropy_df %>% filter(
         theme(legend.position = 'left')      
 ```
 
-### Boxplots separated by season and room
+### Boxplots, rooms not pooled, non-overlapping samples
 
-### Example Plot
+```{r function_rep_deviation_define}
+# testing---------------------
+
+# met <- 'pm25'
+# meth <- 'shape'
+# cluster <- 'all'
+# coeff <- 5
+# room <- 'living'
+# dependent <- 'median'
+# omit_outliers <- TRUE
+
+# define function--------------------------
+
+line.boxplot <- function(met, meth, cluster, room, independent, dependent, rep_measure, coeff = 'auto', omit_outliers = FALSE){
+  
+a <- avg_scaled_entropy_df %>%
+    filter( metric == met & method == meth,
+                                  sample_length %in% c(1,3,5,7:21),
+         energy_cluster == cluster,
+         location == room)
+
+b <- scaled_entropy_df %>% filter(
+                                  !is.na(get(independent)),
+                                  !is.na(get(paste0(dependent,'_sample'))),
+                                  !is.na(get(paste0(dependent,'_entire'))),
+                                  sample_length %in% c(1,3,5,7:21))%>%
+  filter(metric == met, method == meth,
+         energy_cluster == cluster,
+         location == room) %>%
+  group_by(home, sample_length) %>%
+  #mark extreme outliers
+  mutate(ext_outlier = 
+                     case_when(  get(paste0(dependent,'_sample'))> 
+                    median(get(paste0(dependent,'_sample')))+
+                    3*IQR(get(paste0(dependent,'_sample')))~ TRUE,
+                    TRUE ~FALSE))
+
+# count the fraction of extreme outliers for each group
+ext_outlier_count <- b %>%
+  group_by(home, sample_length) %>%
+  summarize(ext_outlier_n = sum(ext_outlier == TRUE)/n())
+
+b <- left_join(b, ext_outlier_count, by = c('home', 'sample_length'))
+
+# omit extreme outliers from boxplot and violin if omit_outliers is TRUE
+b <- if(omit_outliers == FALSE) b else filter(b, ext_outlier == FALSE)
+
+coeff <- if(coeff == 'auto') {
+  select(b, sym(paste0(dependent,'_sample'))) %>% max()
+  } else coeff
+    
+      ggplot()+
+    geom_violin(data = b, aes(group = sample_length, x = sample_length,
+                       y = get(paste0(dependent,'_sample'))/coeff), width = 1.75,
+                color = 'darkgrey')+
+    geom_boxplot(data = b, aes(group = sample_length, x = sample_length,
+                       y = get(paste0(dependent,'_sample'))/coeff,
+                       color = energy_cluster), width=0.35, outlier.shape = NA,
+                 color = 'black',
+                 lwd = 0.5)+
+        scale_y_continuous(
+          breaks = c(0, 0.5, 1),
+                     minor_breaks = c(0.25, 0.75),
+          limits = c(0,1),
+          sec.axis = sec_axis(trans = ~.*coeff,
+                              name = paste0(dependent,'_sample'))
+        )+
+    facet_wrap(vars(home))+
+              theme_bw()+
+    ylab(rep_measure)+
+        ggtitle(label = paste0(ifelse(omit_outliers == TRUE,
+                                     'EXT OUTLIERS OMITTED- ',
+                                     ''),
+                               'Representativeness and ', dependent,
+                              ' of ', met, ' ', room, ', Varying Sample Length, Scaled by ', max_method))+
+        geom_line(data = a, aes(x = sample_length,
+                 y = get(rep_measure),
+                       color = energy_cluster))+
+      geom_point(data = a, aes(x = sample_length,
+                 y = get(rep_measure),
+                       color = energy_cluster,
+                 size = n_samples))+# make size of pooints proportional to n
+              scale_size_area(max_size = 2)+
+      # # add threshold lines
+      # geom_hline(yintercept=thresh_vector, linetype="dashed",
+      #            color = "black", size=0.5)+
+      # # to color threshold lines based on value
+      # lapply(c(1:3), function(i){
+      #         geom_hline(yintercept=thresh_vector[i],
+      #                    linetype="dashed", 
+      #            color = threshold_colors[i], size=0.5)
+      # })+
+      scale_x_continuous(breaks=seq(0,21,7), limits = c(0,21))+
+    #   # add error bars
+    # geom_ribbon(aes(ymin = low_val, ymax = high_val,
+    #                 fill = energy_cluster),
+    #             alpha = 0.15, color = NA)+
+  scale_fill_manual(values = energy_colors,
+                    breaks = energy_breaks,
+                    labels = energy_labels,
+                    name = 'Season')+
+        scale_color_manual(values = energy_colors,
+                    breaks = energy_breaks,
+                    labels = energy_labels,
+                    name = 'Season')+
+        xlab('Sample Length, days')+
+        theme(legend.position = 'left')+
+        geom_hline(data = b, aes(yintercept = get(paste0(dependent,'_entire'))/coeff),
+                   linetype = 'dashed')+
+            stat_summary(data = b,aes(x = sample_length,
+                 y = get(paste0(dependent,'_sample'))/coeff),
+                 fun = median, geom="point", color="red", size = 1)
+}
+```
+
+### Example Plot (One Home)
 
 ```{r fig.height=3, fig.width = 6}
 
@@ -2503,10 +2619,11 @@ meth <- 'shape'
 
 ## pm25--------------------
 met <- 'pm25'
-coeff <- 10
+coeff <- 5
 hm <- '001'
-cluster <- 'heat'
+cluster <- 'all'
 room <- 'living'
+dependent <- 'median'
 
   a <- avg_scaled_entropy_df %>%
     filter( metric == met & method == meth,
@@ -2539,19 +2656,18 @@ b <- scaled_entropy_df %>% filter(
           limits = c(0,1),
           sec.axis = sec_axis(trans = ~.*coeff, name = 'median_sample')
         )+
-    # stat_summary(fun=median, geom="point", color="red")+
     facet_wrap(vars(home))+
               theme_bw()+
     ylab(rep_measure)+
         ggtitle(label = paste0('Representativeness and ', dependent,
-                              ' of ', met, ', Varying Sample Length, Scaled by ', max_method))+
+                              ' of ', met, ' ', room, ', Varying Sample Length, Scaled by ', max_method))+
         geom_line(data = a, aes(x = sample_length,
                  y = get(rep_measure),
                        color = energy_cluster))+
       geom_point(data = a, aes(x = sample_length,
                  y = get(rep_measure),
                        color = energy_cluster,
-                 size = n_samples_frac))+# make size of pooints proportional to n
+                 size = n_samples))+# make size of pooints proportional to n
               scale_size_area(max_size = 2)+
       # # add threshold lines
       # geom_hline(yintercept=thresh_vector, linetype="dashed",
@@ -2577,8 +2693,535 @@ b <- scaled_entropy_df %>% filter(
                     name = 'Season')+
         xlab('Sample Length, days')+
         theme(legend.position = 'left')+
-        geom_hline(data = b, aes(yintercept = median_entire/coeff))
+        geom_hline(data = b, aes(yintercept = median_entire/coeff),
+                   linetype = 'dashed')+
+            stat_summary(data = b,aes(x = sample_length,
+                 y = median_sample/coeff),
+                 fun = median, geom="point", color="red", size = 1)
+
       
 
 ```
 
+### All homes, (One Room)
+```{r fig.height=7, fig.width = 10.5}
+
+# run for different variables--------------------------
+
+
+if(max_method == 'universal'){
+      independent <- 'scaled_kld_universal'
+      rep_measure <- 'avg_kld_scaled_universal'
+    } else if(max_method == 'metric'){
+            independent <- 'scaled_kld_metric'
+      rep_measure <- 'avg_kld_scaled_metric'
+    } else if(max_method == 'home'){
+            independent <- 'scaled_kld_home'
+      rep_measure <- 'avg_kld_scaled_home'
+            } else if(max_method == 'conditional'){
+            independent <- 'scaled_kld_conditional'
+      rep_measure <- 'avg_kld_scaled_conditional'
+            }
+
+
+## median---------------
+
+# pm25
+line.boxplot(
+  meth = 'shape',
+  met = 'pm25',
+  # coeff = 30,
+  cluster = 'all',
+  room = 'living',
+  dependent = 'median',
+  independent = independent,
+  rep_measure = rep_measure,
+  omit_outliers = TRUE
+  )
+
+ # voc
+
+line.boxplot(
+  meth = 'shape',
+  met = 'voc',
+  # coeff = 500,
+  cluster = 'all',
+  room = 'living',
+  dependent = 'median',
+  independent = independent,
+  rep_measure = rep_measure,
+  omit_outliers = TRUE
+  )
+## variance---------------
+
+# pm25
+line.boxplot(
+  meth = 'shape',
+  met = 'pm25',
+  # coeff = 500,
+  cluster = 'all',
+  room = 'living',
+  dependent = 'variance',
+  independent = independent,
+  rep_measure = rep_measure,
+  omit_outliers = TRUE
+  )
+
+# voc
+line.boxplot(
+  meth = 'shape',
+  met = 'voc',
+  # coeff = 2000,
+  cluster = 'all',
+  room = 'living',
+  dependent = 'variance',
+  independent = independent,
+  rep_measure = rep_measure,
+  omit_outliers = TRUE
+  )
+
+
+
+## max---------------
+
+# pm25
+line.boxplot(
+  meth = 'time',
+  met = 'pm25',
+  # coeff = 24,
+  cluster = 'all',
+  room = 'living',
+  dependent = 'max',
+  independent = independent,
+  rep_measure = rep_measure
+  )
+
+# voc
+line.boxplot(
+  meth = 'time',
+  met = 'voc',
+  # coeff = 2000,
+  cluster = 'all',
+  room = 'living',
+  dependent = 'max',
+  independent = independent,
+  rep_measure = rep_measure,
+  omit_outliers = TRUE
+  )
+
+
+
+
+## max_hour---------------
+
+# pm25
+line.boxplot(
+  meth = 'time',
+  met = 'pm25',
+  # coeff = 24,
+  cluster = 'all',
+  room = 'living',
+  dependent = 'max_hour',
+  independent = independent,
+  rep_measure = rep_measure
+  )
+
+# voc
+line.boxplot(
+  meth = 'time',
+  met = 'voc',
+  # coeff = 2000,
+  cluster = 'all',
+  room = 'living',
+  dependent = 'max_hour',
+  independent = independent,
+  rep_measure = rep_measure,
+  omit_outliers = TRUE
+  )
+
+
+
+```
+
+
+## Combine Representativeness with COV
+
+### rooms not pooled, non-overlapping samples
+
+```{r function_rep_cov_define}
+# define function--------------------------
+
+line.covplot <- function(met, meth, cluster, room, independent, dependent, rep_measure, coeff = 'auto'){
+  
+a <- avg_scaled_entropy_df %>%
+    filter( metric == met & method == meth,
+                                  sample_length %in% c(1,3,5,7:21),
+         energy_cluster == cluster,
+         location == room)
+
+b <- scaled_entropy_df %>% filter(
+                                  !is.na(get(independent)),
+                                  !is.na(get(paste0(dependent,'_sample'))),
+                                  !is.na(get(paste0(dependent,'_entire'))),
+                                  sample_length %in% c(1,3,5,7:21))%>%
+  filter(metric == met, method == meth,
+         energy_cluster == cluster,
+         location == room) %>%
+  group_by(home, sample_length) %>%
+  summarise(
+  cov = sd(get(paste0(dependent,'_sample')))/
+    mean(get(paste0(dependent,'_sample'))
+               ),
+  .groups = 'drop'
+          )
+
+coeff <- if(coeff == 'auto') {
+  select(b, cov) %>% max()
+  } else coeff
+    
+      ggplot()+
+    geom_col(data = b, aes(x = sample_length,
+                       y = cov/coeff),
+                 fill = cbbPalette['light_orange'], width = 1)+
+        scale_y_continuous(
+          breaks = c(0, 0.5, 1),
+                     minor_breaks = c(0.25, 0.75),
+          limits = c(0,1),
+          sec.axis = sec_axis(trans = ~.*coeff,
+                              name = paste0('COV of ', dependent,'_sample'))
+        )+
+    facet_wrap(vars(home))+
+              theme_bw()+
+    ylab(rep_measure)+
+        ggtitle(label = paste0(
+                               'Representativeness and ', dependent,
+                              ' of ', met, ' ', room,
+                              ', Varying Sample Length, Scaled by ',
+                              max_method))+
+        geom_line(data = a, aes(x = sample_length,
+                 y = get(rep_measure),
+                       color = energy_cluster))+
+      geom_point(data = a, aes(x = sample_length,
+                 y = get(rep_measure),
+                       color = energy_cluster,
+                 size = n_samples))+# make size of pooints proportional to n
+              scale_size_area(max_size = 2)+
+      # # add threshold lines
+      # geom_hline(yintercept=thresh_vector, linetype="dashed",
+      #            color = "black", size=0.5)+
+      # # to color threshold lines based on value
+      # lapply(c(1:3), function(i){
+      #         geom_hline(yintercept=thresh_vector[i],
+      #                    linetype="dashed", 
+      #            color = threshold_colors[i], size=0.5)
+      # })+
+      scale_x_continuous(breaks=seq(0,21,7), limits = c(0,21))+
+    #   # add error bars
+    # geom_ribbon(aes(ymin = low_val, ymax = high_val,
+    #                 fill = energy_cluster),
+    #             alpha = 0.15, color = NA)+
+  scale_fill_manual(values = energy_colors,
+                    breaks = energy_breaks,
+                    labels = energy_labels,
+                    name = 'Season')+
+        scale_color_manual(values = energy_colors,
+                    breaks = energy_breaks,
+                    labels = energy_labels,
+                    name = 'Season')+
+        xlab('Sample Length, days')+
+        theme(legend.position = 'left')
+}
+```
+
+
+
+### All homes, (One Room)
+```{r fig.height=7, fig.width = 10.5}
+
+# run for different variables--------------------------
+
+
+if(max_method == 'universal'){
+      independent <- 'scaled_kld_universal'
+      rep_measure <- 'avg_kld_scaled_universal'
+    } else if(max_method == 'metric'){
+            independent <- 'scaled_kld_metric'
+      rep_measure <- 'avg_kld_scaled_metric'
+    } else if(max_method == 'home'){
+            independent <- 'scaled_kld_home'
+      rep_measure <- 'avg_kld_scaled_home'
+            } else if(max_method == 'conditional'){
+            independent <- 'scaled_kld_conditional'
+      rep_measure <- 'avg_kld_scaled_conditional'
+            }
+
+
+## median---------------
+
+# pm25
+line.covplot(
+  meth = 'shape',
+  met = 'pm25',
+  # coeff = 30,
+  cluster = 'all',
+  room = 'living',
+  dependent = 'median',
+  independent = independent,
+  rep_measure = rep_measure)
+
+ # voc
+
+line.covplot(
+  meth = 'shape',
+  met = 'voc',
+  # coeff = 500,
+  cluster = 'all',
+  room = 'living',
+  dependent = 'median',
+  independent = independent,
+  rep_measure = rep_measure  )
+## variance---------------
+
+# pm25
+line.covplot(
+  meth = 'shape',
+  met = 'pm25',
+  # coeff = 500,
+  cluster = 'all',
+  room = 'living',
+  dependent = 'variance',
+  independent = independent,
+  rep_measure = rep_measure  )
+
+# voc
+line.covplot(
+  meth = 'shape',
+  met = 'voc',
+  # coeff = 2000,
+  cluster = 'all',
+  room = 'living',
+  dependent = 'variance',
+  independent = independent,
+  rep_measure = rep_measure  )
+
+## max---------------
+
+# pm25
+line.covplot(
+  meth = 'time',
+  met = 'pm25',
+  # coeff = 24,
+  cluster = 'all',
+  room = 'living',
+  dependent = 'max',
+  independent = independent,
+  rep_measure = rep_measure
+  )
+
+# voc
+line.covplot(
+  meth = 'time',
+  met = 'voc',
+  # coeff = 2000,
+  cluster = 'all',
+  room = 'living',
+  dependent = 'max',
+  independent = independent,
+  rep_measure = rep_measure  )
+
+
+
+
+## max_hour---------------
+
+# pm25
+line.covplot(
+  meth = 'time',
+  met = 'pm25',
+  # coeff = 24,
+  cluster = 'all',
+  room = 'living',
+  dependent = 'max_hour',
+  independent = independent,
+  rep_measure = rep_measure
+  )
+
+# voc
+line.covplot(
+  meth = 'time',
+  met = 'voc',
+  # coeff = 2000,
+  cluster = 'all',
+  room = 'living',
+  dependent = 'max_hour',
+  independent = independent,
+  rep_measure = rep_measure,
+  )
+
+
+
+
+```
+
+
+
+
+```{r correlation_no_seasons, eval = FALSE}
+# for one condition
+# a <- entropy_df_clean %>% filter(method == 'shape', home == '001',
+#                                  location == 'living', metric == 'pm25',
+#                                  energy_cluster == 'heat')
+# test <- cor.test(a$kld, a$median_diff, method = 'spearman')%>% suppressWarnings()
+# list('coeff' = test$estimate, 'p_val' = test$p.value)
+
+
+
+# combinations <- expand.grid(homes_all, metrics_all, locations_indoor, clusters_all)
+# apply(combinations, 1, function(x_home, x_location, x_metric, x_cluster){
+#   a <- entropy_df_clean %>% filter(method == 'shape', home == x_home,
+#                                  location == x_location, metric == x_metric,
+#                                  energy_cluster == x_cluster)
+#   if (nrow(a)>3) {
+#     cor.test(a$kld, a$median_diff, method = 'spearman') } else NULL
+#   
+# }
+# )
+
+variables_dependent <- c(
+  'median_diff', 'variance_diff', 'mean_diff'
+  # 'max_hour_diff', 'max_diff'
+                           )
+
+
+
+
+
+# for all conditions
+cor.table <- function(pooled){
+  map(variables_dependent, function(dependent){
+      
+      # if pooled is all, don't separate by any condition
+      if(pooled == 'all'){
+            map(c('kld', 'scaled_kld_universal'), function(independent){
+              
+        a <- scaled_entropy_df
+        test <- cor.test(a %>% pull(independent),
+                         a %>% pull(dependent), method = 'spearman')%>%
+          suppressWarnings()
+        
+        #return
+        list('coeff' = test$estimate, 'p_val' = test$p.value,
+             'independent' = independent, 'dependent' = dependent,
+             'home' = NA, 'location' = NA,
+             'metric' = NA, 'energy_cluster' = NA,
+             'kld_max_method' = 'universal', 'pooled' = pooled)
+            }) %>% bind_rows()
+        
+      } else if (pooled == 'none') {
+        
+            map(c('kld', 'scaled_kld_conditional'), function(independent){
+        map(homes_no5, function(x_home){
+          map(locations_indoor, function(x_location){
+            map('all', function(x_cluster){
+              map(metrics_all, function(x_metric){
+                # make a row for the case of an error
+                result_error <- 
+                  list('coeff' = NA, 'p_val' = NA,
+                       'independent' = independent, 
+                       'dependent' = dependent, 'home' = x_home,
+                       'location' = x_location,
+                       'metric' = x_metric, 'energy_cluster' = x_cluster,
+                       'kld_max_method' = 'conditional',  'pooled' = pooled)
+                
+                a <- scaled_entropy_df %>% filter( home == x_home,
+                                                   location == x_location,
+                                                   metric == x_metric,
+                                                   energy_cluster == x_cluster)
+                
+                if (nrow(a)>3) {
+                  test <- cor.test(a %>% pull(independent), a %>% pull(dependent), method = 'spearman')%>%
+                    suppressWarnings()
+                  
+                  # return
+                  list('coeff' = test$estimate, 'p_val' = test$p.value,
+                       'independent' = independent, 'dependent' = dependent, 'home' = x_home, 'location' = x_location,
+                       'metric' = x_metric, 'energy_cluster' = x_cluster, 
+                       'kld_max_method' = 'conditional', 'pooled' = pooled)
+                }
+                else result_error
+        }) %>% bind_rows()
+              }) %>% bind_rows()
+            }) %>% bind_rows()
+          }) %>% bind_rows()
+        }) %>% bind_rows()
+        
+      } else if (pooled == 'metric') {
+        
+            map(c('kld', 'scaled_kld_metric'), function(independent){
+        map(metrics_all, function(x_metric){
+          
+          # make a row for the case of an error
+          result_error <- 
+            list('coeff' = NA, 'p_val' = NA,
+                 'independent' = independent, 'dependent' = dependent,
+                 'home' = NA, 'location' = NA,
+                 'metric' = x_metric, 'energy_cluster' = NA,
+                 'kld_max_method' = 'metric',  'pooled' = pooled)
+          
+          a <- scaled_entropy_df %>% filter( metric == x_metric)
+          
+          if (nrow(a)>3) {
+            test <- cor.test(a %>% pull(independent), a %>% pull(dependent), method = 'spearman')%>%
+              suppressWarnings()
+            
+            # return
+            list('coeff' = test$estimate, 'p_val' = test$p.value,
+                 'independent' = independent, 'dependent' = dependent,
+                 'home' = NA, 'location' = NA,
+                 'metric' = x_metric, 
+                 'kld_max_method' = 'metric', 'pooled' = pooled)
+          }
+          else result_error
+          
+        }) %>% bind_rows()
+            }) %>% bind_rows()
+      }
+    }) %>% bind_rows()
+}
+
+
+# make a correlation table merging different pooling methods
+cor_table <- bind_rows(
+  # cor.table('all')
+                       # cor.table('metric'),
+                       cor.table('none')
+                       )
+
+# function to plot correlations for given pooling method
+cor.plot <- function(var_indep, var_dep){
+a <- cor_table %>%
+  filter(dependent == var_dep, independent == var_indep, !is.na(coeff))
+
+ggplot(data = a)+
+  geom_histogram(aes(x = coeff))+
+  ggtitle(label = paste('Correlation'))
+}
+
+
+cor.plot('kld', 'median_diff')
+cor.plot('kld', 'variance_diff')
+cor.plot('kld', 'max_diff')
+cor.plot('kld', 'max_hour_diff')
+
+# cor.plot('scaled_kld_metric', 'median_diff')
+cor.plot('scaled_kld_conditional', 'median_diff')
+# cor.plot('scaled_kld_metric', 'median_diff')
+cor.plot('scaled_kld_conditional', 'mean_diff')
+# cor.plot('scaled_kld_metric', 'mean_diff')
+cor.plot('scaled_kld_conditional', 'variance_diff')
+# cor.plot('scaled_kld_metric', 'max_diff')
+cor.plot('scaled_kld_conditional', 'max_diff')
+# cor.plot('scaled_kld_metric', 'max_hour_diff')
+cor.plot('scaled_kld_conditional', 'max_hour_diff')
+
+```
