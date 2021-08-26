@@ -630,7 +630,7 @@ locations_indoor <- c('living', 'kitchen', 'bedroom')
 
 ```{r data_maker_hourly, eval = FALSE}
 
-# test function for multiple homes
+# test function for multiple homes-----------------
       all_time_choice <- TRUE
    test_homes <- c('007', '012')
     test_cluster <- c('ac') # can do multiple
@@ -927,7 +927,9 @@ entropy_time_hourly_pdf_df <- bind_rows(
   pm25_bedroom_ac_rep_data_time_hourly_pdf,
   pm25_living_ac_rep_data_time_hourly_pdf,
   pm25_kitchen_ac_rep_data_time_hourly_pdf,
-  voc_bedroom_heat_rep_data_time_hourly_pdf,
+pm25_bedroom_all_rep_data_time_hourly_pdf,
+  pm25_living_all_rep_data_time_hourly_pdf,
+  pm25_kitchen_all_rep_data_time_hourly_pdf,  voc_bedroom_heat_rep_data_time_hourly_pdf,
   voc_living_heat_rep_data_time_hourly_pdf,
   voc_kitchen_heat_rep_data_time_hourly_pdf,
   voc_bedroom_shoulder_rep_data_time_hourly_pdf,
@@ -935,7 +937,10 @@ entropy_time_hourly_pdf_df <- bind_rows(
   voc_kitchen_shoulder_rep_data_time_hourly_pdf,
   voc_bedroom_ac_rep_data_time_hourly_pdf,
   voc_living_ac_rep_data_time_hourly_pdf,
-  voc_kitchen_ac_rep_data_time_hourly_pdf
+  voc_kitchen_ac_rep_data_time_hourly_pdf,
+  voc_bedroom_all_rep_data_time_hourly_pdf,
+  voc_living_all_rep_data_time_hourly_pdf,
+  voc_kitchen_all_rep_data_time_hourly_pdf
 )
 
 # rm(
