@@ -2487,10 +2487,13 @@ b <- scaled_entropy_df %>% filter(
 # met <- 'pm25'
 # meth <- 'shape'
 # cluster <- 'all'
-# coeff <- 5
+# coeff <- 'auto'
 # room <- 'living'
 # dependent <- 'median'
-# omit_outliers <- TRUE
+# omit_outliers <- FALSE
+# 
+# rm(
+#   met, meth, cluster, coeff, room, dependent, omit_outliers)
 
 # define function--------------------------
 
@@ -2521,7 +2524,7 @@ b <- scaled_entropy_df %>% filter(
 # count the fraction of extreme outliers for each group
 ext_outlier_count <- b %>%
   group_by(home, sample_length) %>%
-  summarize(ext_outlier_n = sum(ext_outlier == TRUE)/n())
+  summarize(ext_outlier_n = sum(ext_outlier == TRUE)/n(), .groups = 'drop')
 
 b <- left_join(b, ext_outlier_count, by = c('home', 'sample_length'))
 
@@ -2529,7 +2532,7 @@ b <- left_join(b, ext_outlier_count, by = c('home', 'sample_length'))
 b <- if(omit_outliers == FALSE) b else filter(b, ext_outlier == FALSE)
 
 coeff <- if(coeff == 'auto') {
-  select(b, sym(paste0(dependent,'_sample'))) %>% max()
+  pull(b, sym(paste0(dependent,'_sample'))) %>% max()
   } else coeff
     
       ggplot()+
@@ -2876,7 +2879,7 @@ b <- scaled_entropy_df %>% filter(
           )
 
 coeff <- if(coeff == 'auto') {
-  select(b, cov) %>% max()
+  pull(b, cov) %>% max()
   } else coeff
     
       ggplot()+
