@@ -2755,7 +2755,7 @@ line.boxplot(
   rep_measure = rep_measure,
   omit_outliers = TRUE
   )
-## variance---------------
+## iqr---------------
 
 # pm25
 line.boxplot(
@@ -2764,7 +2764,7 @@ line.boxplot(
   # coeff = 500,
   cluster = 'all',
   room = 'living',
-  dependent = 'variance',
+  dependent = 'iqr',
   independent = independent,
   rep_measure = rep_measure,
   omit_outliers = TRUE
@@ -2777,7 +2777,7 @@ line.boxplot(
   # coeff = 2000,
   cluster = 'all',
   room = 'living',
-  dependent = 'variance',
+  dependent = 'iqr',
   independent = independent,
   rep_measure = rep_measure,
   omit_outliers = TRUE
@@ -2796,7 +2796,8 @@ line.boxplot(
   room = 'living',
   dependent = 'max',
   independent = independent,
-  rep_measure = rep_measure
+  rep_measure = rep_measure,
+  omit_outliers = TRUE
   )
 
 # voc
@@ -2838,8 +2839,7 @@ line.boxplot(
   room = 'living',
   dependent = 'max_hour',
   independent = independent,
-  rep_measure = rep_measure,
-  omit_outliers = TRUE
+  rep_measure = rep_measure
   )
 
 
@@ -2992,7 +2992,7 @@ line.covplot(
   # coeff = 500,
   cluster = 'all',
   room = 'living',
-  dependent = 'variance',
+  dependent = 'iqr',
   independent = independent,
   rep_measure = rep_measure  )
 
@@ -3003,7 +3003,7 @@ line.covplot(
   # coeff = 2000,
   cluster = 'all',
   room = 'living',
-  dependent = 'variance',
+  dependent = 'iqr',
   independent = independent,
   rep_measure = rep_measure  )
 
