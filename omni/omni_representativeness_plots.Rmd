@@ -242,13 +242,14 @@ entropy_df_clean <- entropy_df%>%
 # omit home 011 in shoulder season for severe lack of data
   filter(!(home =='011' & location == 'bedroom' & energy_cluster == 'shoulder')) %>%
     mutate(
-      median_diff = abs(median_sample - median_entire),
-      mean_diff = abs(mean_sample - mean_entire),
+      median_diff_pct = abs(median_sample - median_entire)/median_entire*100,
+      mean_diff_pct = abs(mean_sample - mean_entire)/mean_entire*100,
       # median_ratio = median_sample/median_entire,
       # variance_ratio = variance_sample/variance_entire,
-      variance_diff = abs(variance_sample-variance_entire),
+      iqr_diff_pct = abs(iqr_sample-iqr_entire)/iqr_entire*100,
+      variance_diff_pct = abs(variance_sample-variance_entire)/variance_entire*100,
       max_hour_diff = abs(max_hour_sample - max_hour_entire),
-      max_diff = abs(max_sample - max_entire),
+      max_diff_pct = abs(max_sample - max_entire)/max_entire*100
       # max_ratio = max_sample/max_entire,
       
            )
@@ -263,7 +264,7 @@ kld_max_df_clean <- entropy_df_clean %>%
 
 # make box plots of values in each group
 ggplot(kld_max_df_clean, aes(y = kld,
-                       group = interaction(home, location, energy_cluster)))+
+                       group = interaction(home, location, energy_cluster, period_compare)))+
   geom_boxplot()+
   facet_wrap(vars(method, metric, energy_cluster))
 
@@ -271,7 +272,7 @@ ggplot(kld_max_df_clean, aes(y = kld,
 
 kld_max_shape <-  kld_max_df_clean %>%
   filter(method== 'shape') %>%
-  group_by(home, location, energy_cluster, metric) %>%
+  group_by(home, location, energy_cluster, metric, period_compare) %>%
     summarise(cutoff = mean(kld), .groups = 'drop') %>%
   # summarise(cutoff = median(kld)+1.5*IQR(kld), .groups = 'drop') %>%
   pull(cutoff) %>%max()
@@ -279,25 +280,25 @@ kld_max_shape <-  kld_max_df_clean %>%
 
 kld_max_time <-  kld_max_df_clean %>%
   filter(method== 'time') %>%
-  group_by(home, location, energy_cluster, metric) %>%
+  group_by(home, location, energy_cluster, metric, period_compare) %>%
     summarise(cutoff = mean(kld), .groups = 'drop') %>%
   # summarise(cutoff = median(kld)+1.5*IQR(kld), .groups = 'drop') %>%
   pull(cutoff) %>%max()
 
 # one max per metric per kld method---------------
 kld_max_metric <- kld_max_df_clean %>%
-  group_by(sample_length, home, location, energy_cluster, metric, method) %>%
+  group_by(sample_length, home, location, energy_cluster, metric, method, period_compare) %>%
       summarise(cutoff = mean(kld), .groups = 'drop') %>%
-  group_by(sample_length, metric, method) %>%
+  group_by(sample_length, metric, method, period_compare) %>%
         summarise(max_kld_cutoff = max(cutoff), .groups = 'drop') %>%
     # summarise(max_kld_cutoff = median(kld), .groups = 'drop') %>%
   rename(sample_min = sample_length)
 
 # one max per metric per home per kld method---------------
 kld_max_home <- kld_max_df_clean %>%
-  group_by(sample_length, home, location, energy_cluster, metric, method) %>%
+  group_by(sample_length, home, location, energy_cluster, metric, method, period_compare) %>%
       summarise(cutoff = mean(kld), .groups = 'drop') %>%
-  group_by(sample_length, metric, method, home) %>%
+  group_by(sample_length, metric, method, home, period_compare) %>%
         summarise(max_kld_cutoff = max(cutoff), .groups = 'drop') %>%
     # summarise(max_kld_cutoff = median(kld), .groups = 'drop') %>%
   rename(sample_min = sample_length)
@@ -305,7 +306,7 @@ kld_max_home <- kld_max_df_clean %>%
 # one max per metric per sensor per time period per kld method -----------------
 
 kld_max_conditional <- kld_max_df_clean %>%
-  group_by(sample_length, home, location, energy_cluster, metric, method) %>%
+  group_by(sample_length, home, location, energy_cluster, metric, method, period_compare) %>%
       summarise(max_kld_cutoff = mean(kld), .groups = 'drop') %>%
   # summarise(max_kld_cutoff = median(kld), .groups = 'drop') %>%
   rename(sample_min = sample_length)
@@ -763,29 +764,29 @@ ggplot(a, aes(x = as.factor(sample_length), y = frac_greater,
 ## one max per kld method-----------------
 
 avg_pooled_kld_max_universal <-  kld_max_df_clean %>%
-  group_by(home, energy_cluster, metric, method) %>%
+  group_by(home, energy_cluster, metric, method, period_compare) %>%
     summarise(kld_cutoff = mean(kld), .groups = 'drop')%>%
-    group_by(method) %>%
+    group_by(method, period_compare) %>%
     summarise(max_kld = max(kld_cutoff), .groups = 'drop')
 
 ## one max per metric per kld method---------------
 avg_pooled_kld_max_metric <-  kld_max_df_clean %>%
-  group_by(home, energy_cluster, metric, method) %>%
+  group_by(home, energy_cluster, metric, method, period_compare) %>%
     summarise(kld_cutoff = mean(kld), .groups = 'drop')%>%
-    group_by(method, metric) %>%
+    group_by(method, metric, period_compare) %>%
     summarise(max_kld = max(kld_cutoff), .groups = 'drop')
 
 ## one max per metric per home per kld method---------------
 avg_pooled_kld_max_home <-  kld_max_df_clean %>%
-  group_by(home, energy_cluster, metric, method) %>%
+  group_by(home, energy_cluster, metric, method, period_compare) %>%
     summarise(kld_cutoff = mean(kld), .groups = 'drop')%>%
-    group_by(method, metric, home) %>%
+    group_by(method, metric, home, period_compare) %>%
     summarise(max_kld = max(kld_cutoff), .groups = 'drop')
 
 ## one max per metric per sensor per time period per kld method -----------------
 
 avg_pooled_kld_max_conditional <-  kld_max_df_clean %>%
-  group_by(home, energy_cluster, metric, method) %>%
+  group_by(home, energy_cluster, metric, method, period_compare) %>%
     summarise(max_kld = mean(kld), .groups = 'drop')
 
 
@@ -795,29 +796,29 @@ avg_pooled_kld_max_conditional <-  kld_max_df_clean %>%
 ## one max per kld method-----------------
 
 avg_kld_max_universal <-  kld_max_df_clean %>%
-  group_by(home, energy_cluster, metric, method, location) %>%
+  group_by(home, energy_cluster, metric, method, location, period_compare) %>%
     summarise(kld_cutoff = mean(kld), .groups = 'drop')%>%
-    group_by(method) %>%
+    group_by(method, period_compare) %>%
     summarise(max_kld = max(kld_cutoff), .groups = 'drop')
 
 ## one max per metric per kld method---------------
 avg_kld_max_metric <-  kld_max_df_clean %>%
-  group_by(home, energy_cluster, metric, method, location) %>%
+  group_by(home, energy_cluster, metric, method, location, period_compare) %>%
     summarise(kld_cutoff = mean(kld), .groups = 'drop')%>%
-    group_by(method, metric) %>%
+    group_by(method, metric, period_compare) %>%
     summarise(max_kld = max(kld_cutoff), .groups = 'drop')
 
 ## one max per metric per home per kld method---------------
 avg_kld_max_home <-  kld_max_df_clean %>%
-  group_by(home, energy_cluster, metric, method, location) %>%
+  group_by(home, energy_cluster, metric, method, location, period_compare) %>%
     summarise(kld_cutoff = mean(kld), .groups = 'drop')%>%
-    group_by(method, metric, home) %>%
+    group_by(method, metric, home, period_compare) %>%
     summarise(max_kld = max(kld_cutoff), .groups = 'drop')
 
 ## one max per metric per sensor per time period per kld method -----------------
 
 avg_kld_max_conditional <-  kld_max_df_clean %>%
-  group_by(home, energy_cluster, metric, method, location) %>%
+  group_by(home, energy_cluster, metric, method, location, period_compare) %>%
     summarise(max_kld = mean(kld), .groups = 'drop')
 
 
@@ -828,10 +829,10 @@ avg_kld_max_conditional <-  kld_max_df_clean %>%
 # rooms pooled------------------------
 
 avg_pooled_kld_df <- entropy_df_clean %>%
-  group_by(metric, home, energy_cluster, sample_length, method) %>%
+  group_by(metric, home, energy_cluster, sample_length, method, period_compare) %>%
   summarize(
     avg_kld = mean(kld), n_samples = n(), .groups = 'drop')%>%
-    group_by(metric, home, energy_cluster, method) %>%
+    group_by(metric, home, energy_cluster, method, period_compare) %>%
   mutate(n_samples_max = max(n_samples),
          n_samples_frac = n_samples/n_samples_max) %>%
   ungroup()
@@ -840,21 +841,21 @@ avg_pooled_scaled_entropy_df <- list(
   #scaled only per method (time/shape)
 avg_pooled_kld_df%>%
     left_join(avg_pooled_kld_max_universal,
-              by = c('method')) %>%
+              by = c('method', 'period_compare')) %>%
   mutate(avg_kld_scaled_universal = 1-avg_kld/max_kld)%>%
   select(-max_kld),
 
   # scaled per metric as well
 avg_pooled_kld_df %>%
     left_join(avg_pooled_kld_max_metric,
-              by = c('method', 'metric')) %>%
+              by = c('method', 'metric', 'period_compare')) %>%
   mutate(avg_kld_scaled_metric = 1-avg_kld/max_kld)%>%
   select(-max_kld),
 
   # scaled per home as well
 avg_pooled_kld_df %>%
     left_join(avg_pooled_kld_max_home,
-              by = c('method', 'metric', 'home')) %>%
+              by = c('method', 'metric', 'home', 'period_compare')) %>%
   mutate(avg_kld_scaled_home = 1-avg_kld/max_kld)%>%
   select(-max_kld),
 
@@ -862,21 +863,22 @@ avg_pooled_kld_df %>%
 avg_pooled_kld_df %>%
     left_join(avg_pooled_kld_max_conditional,
               by = c('metric', 'home', 'energy_cluster',
-                     'method')) %>%
+                     'method', 'period_compare')) %>%
   mutate(avg_kld_scaled_conditional = 1-avg_kld/max_kld)%>%
   select(-max_kld)
 
 ) %>% reduce(full_join, by = c('metric', 'home', 'energy_cluster',
                                'sample_length', 'method', 'avg_kld',
-                               'n_samples', 'n_samples_max', 'n_samples_frac'))
+                               'n_samples', 'n_samples_max', 'n_samples_frac',
+                               'period_compare'))
   
   
  # rooms not pooled ----------------- 
   avg_kld_df <- entropy_df_clean %>%
-  group_by(metric, home, energy_cluster, sample_length, method, location) %>%
+  group_by(metric, home, energy_cluster, sample_length, method, location, period_compare) %>%
   summarize(
     avg_kld = mean(kld), n_samples = n(), .groups = 'drop')%>%
-    group_by(metric, home, energy_cluster, method, location) %>%
+    group_by(metric, home, energy_cluster, method, location, period_compare) %>%
   mutate(n_samples_max = max(n_samples),
          n_samples_frac = n_samples/n_samples_max) %>%
   ungroup()
@@ -885,21 +887,21 @@ avg_scaled_entropy_df <- list(
   #scaled only per method (time/shape)
 avg_kld_df%>%
     left_join(avg_kld_max_universal,
-              by = c('method')) %>%
+              by = c('method', 'period_compare')) %>%
   mutate(avg_kld_scaled_universal = 1-avg_kld/max_kld)%>%
   select(-max_kld),
 
   # scaled per metric as well
 avg_kld_df %>%
     left_join(avg_kld_max_metric,
-              by = c('method', 'metric')) %>%
+              by = c('method', 'metric', 'period_compare')) %>%
   mutate(avg_kld_scaled_metric = 1-avg_kld/max_kld)%>%
   select(-max_kld),
 
   # scaled per metric as well
 avg_kld_df %>%
     left_join(avg_kld_max_home,
-              by = c('method', 'metric', 'home')) %>%
+              by = c('method', 'metric', 'home', 'period_compare')) %>%
   mutate(avg_kld_scaled_home = 1-avg_kld/max_kld)%>%
   select(-max_kld),
 
@@ -907,14 +909,14 @@ avg_kld_df %>%
 avg_kld_df %>%
     left_join(avg_kld_max_conditional,
               by = c('metric', 'home', 'energy_cluster',
-                     'method', 'location')) %>%
+                     'method', 'location', 'period_compare')) %>%
   mutate(avg_kld_scaled_conditional = 1-avg_kld/max_kld)%>%
   select(-max_kld)
 
 ) %>% reduce(full_join, by = c('metric', 'home', 'energy_cluster',
                                'sample_length', 'method', 'avg_kld',
                                'n_samples', 'n_samples_max', 'n_samples_frac',
-                               'location'))
+                               'location', 'period_compare'))
 ```
 
 
@@ -930,7 +932,7 @@ entropy.plot <- function (
   simple = FALSE,
   metrics = c('pm25', 'voc'),
   room = 'pooled' # or choose a room
-) {
+  ) {
   
   data <- if(room == 'pooled') avg_pooled_scaled_entropy_df else{
                  avg_scaled_entropy_df %>% filter(location == room)}
@@ -1089,7 +1091,7 @@ map(homes_all, function (x_home) {
 ```
 
 * arranged by tier
-```{r grid_plot_avg_entropy_tiers, fig.height=4, fig.width = 10.5}
+```{r grid_plot_avg_entropy_tiers, fig.height=4, fig.width = 10.5, eval = FALSE}
 # time-------------------
 meth <- 'time'
 
@@ -1185,7 +1187,7 @@ entropy.plot(hm = x_home, simple = TRUE, meth = meth,
 ```
 
 * arranged by tier
-```{r grid_plot_avg_entropy_tiers_rooms, fig.height=4, fig.width = 10.5}
+```{r grid_plot_avg_entropy_tiers_rooms, fig.height=4, fig.width = 10.5, eval = FALSE}
 # time-------------------
 meth <- 'time'
 
@@ -2481,7 +2483,7 @@ b <- scaled_entropy_df %>% filter(
 
 ### Boxplots, rooms not pooled, non-overlapping samples
 
-```{r function_rep_deviation_define}
+```{r function_rep_deviation_boxplot}
 # testing---------------------
 
 # met <- 'pm25'
@@ -2707,7 +2709,7 @@ b <- scaled_entropy_df %>% filter(
 ```
 
 ### All homes, (One Room)
-```{r fig.height=7, fig.width = 10.5}
+```{r plot_rep_deviation_boxplot, fig.height=7, fig.width = 10.5, eval = FALSE}
 
 # run for different variables--------------------------
 
@@ -2847,11 +2849,276 @@ line.boxplot(
 ```
 
 
+### fraction of samples within threshold
+```{r function_plot_rep_deviation_fraction_samples}
+# testing---------------------
+
+# met <- 'pm25'
+# meth <- 'shape'
+# cluster <- 'all'
+# room <- 'living'
+# dependent <- 'median'
+# threshold <- 10
+# independent <- 'scaled_kld_conditional'
+# rep_measure <- 'avg_kld_scaled_conditional'
+# 
+# rm(
+#   met, meth, cluster, coeff, room, dependent, threshold)
+
+# define function--------------------------
+
+line.fracplot <- function(met, meth, cluster, room, independent, dependent,
+                         rep_measure, threshold, long_term_period = 'year'
+                         # coeff = 'auto'
+                         ){
+  
+  difference <- if(dependent == 'max_hour') '_diff' else '_diff_pct'
+  
+a <- avg_scaled_entropy_df %>%
+    filter( metric == met & method == meth,
+                                  sample_length %in% c(1,3,5,7:21),
+         energy_cluster == cluster,
+         location == room
+         # period_compare == long_term_period
+         )
+
+b <- scaled_entropy_df %>% filter(
+                                  !is.na(get(independent)),
+                                  !is.na(get(paste0(dependent, difference))),
+                                  sample_length %in% c(1,3,5,7:21))%>%
+  filter(metric == met, method == meth,
+         energy_cluster == cluster,
+         location == room,
+         period_compare == long_term_period) %>%
+  # count fraction of samples within threshold percentage
+  # of long period value (within each home/sample length)
+  mutate(within_threshold = ifelse(get(paste0(dependent, difference))<=threshold,
+                             TRUE, FALSE))%>%
+    group_by(home, sample_length)%>%
+  summarise(frac_within = sum(within_threshold == TRUE)/n(), .groups = 'drop')
+
+# #test
+# ggplot(b %>% filter(home == '001'))+
+#   geom_point(aes(x = sample_length, y = get(paste0(dependent, difference)),
+#                  color = within_threshold))+
+#   geom_hline(aes(yintercept = get(paste0(dependent,'_entire'))), linetype = 'dashed')
+
+coeff <- 1
+
+      ggplot()+
+    geom_col(data = b, aes(x = sample_length,
+                       y = frac_within/coeff),
+                 fill = cbbPalette['light_blue'], width = 1)+
+        scale_y_continuous(
+          breaks = c(0, 0.5, 1),
+                     minor_breaks = c(0.25, 0.75),
+          limits = c(0,1),
+          sec.axis = sec_axis(trans = ~.*coeff,
+                              name = paste('Fraction within',dependent,'Threshold'))
+        )+
+    facet_wrap(vars(home))+
+              theme_bw()+
+    ylab(rep_measure)+
+        ggtitle(label = paste(
+                               'Representativeness and faction of samples within',
+                               threshold, '% of overall', met, dependent,
+                              'in', room, '- Scaled by', max_method))+
+        geom_line(data = a, aes(x = sample_length,
+                 y = get(rep_measure),
+                       color = energy_cluster))+
+      geom_point(data = a, aes(x = sample_length,
+                 y = get(rep_measure),
+                       color = energy_cluster,
+                 size = n_samples))+# make size of pooints proportional to n
+              scale_size_area(max_size = 2)+
+      # # add threshold lines
+      # geom_hline(yintercept=thresh_vector, linetype="dashed",
+      #            color = "black", size=0.5)+
+      # # to color threshold lines based on value
+      # lapply(c(1:3), function(i){
+      #         geom_hline(yintercept=thresh_vector[i],
+      #                    linetype="dashed", 
+      #            color = threshold_colors[i], size=0.5)
+      # })+
+      scale_x_continuous(breaks=seq(0,21,7), limits = c(0,21))+
+  scale_fill_manual(values = energy_colors,
+                    breaks = energy_breaks,
+                    labels = energy_labels,
+                    name = 'Season')+
+        scale_color_manual(values = energy_colors,
+                    breaks = energy_breaks,
+                    labels = energy_labels,
+                    name = 'Season')+
+        xlab('Sample Length, days')+
+        theme(legend.position = 'left')
+        # geom_hline(data = b, aes(yintercept = get(paste0(dependent,'_entire'))/coeff),
+        #            linetype = 'dashed')
+}
+```
+
+```{r plot_rep_deviation_fraction_samples, fig.height=7, fig.width = 10.5}
+
+# run for different variables--------------------------
+
+
+if(max_method == 'universal'){
+      independent <- 'scaled_kld_universal'
+      rep_measure <- 'avg_kld_scaled_universal'
+    } else if(max_method == 'metric'){
+            independent <- 'scaled_kld_metric'
+      rep_measure <- 'avg_kld_scaled_metric'
+    } else if(max_method == 'home'){
+            independent <- 'scaled_kld_home'
+      rep_measure <- 'avg_kld_scaled_home'
+            } else if(max_method == 'conditional'){
+            independent <- 'scaled_kld_conditional'
+      rep_measure <- 'avg_kld_scaled_conditional'
+            }
+
+
+## median---------------
+
+# pm25
+line.fracplot(
+  meth = 'shape',
+  met = 'pm25',
+  # coeff = 30,
+  cluster = 'heat',
+  room = 'living',
+  dependent = 'median',
+  independent = independent,
+  rep_measure = rep_measure,
+  threshold = 10)
+
+# pm25
+line.fracplot(
+  meth = 'shape',
+  met = 'pm25',
+  # coeff = 30,
+  cluster = 'heat',
+  room = 'living',
+  dependent = 'median',
+  independent = independent,
+  rep_measure = rep_measure,
+  threshold = 40)
+
+
+ # voc
+
+line.fracplot(
+  meth = 'shape',
+  met = 'voc',
+  # coeff = 500,
+  cluster = 'all',
+  room = 'living',
+  dependent = 'median',
+  independent = independent,
+  rep_measure = rep_measure,
+  threshold = 10  )
+
+line.fracplot(
+  meth = 'shape',
+  met = 'voc',
+  # coeff = 500,
+  cluster = 'all',
+  room = 'living',
+  dependent = 'median',
+  independent = independent,
+  rep_measure = rep_measure,
+  threshold = 40  )
+## max---------------
+
+# pm25
+line.fracplot(
+  meth = 'time',
+  met = 'pm25',
+  # coeff = 24,
+  cluster = 'all',
+  room = 'living',
+  dependent = 'max',
+  independent = independent,
+  rep_measure = rep_measure,
+  threshold = 10
+  )
+
+# pm25
+line.fracplot(
+  meth = 'time',
+  met = 'pm25',
+  # coeff = 24,
+  cluster = 'all',
+  room = 'living',
+  dependent = 'max',
+  independent = independent,
+  rep_measure = rep_measure,
+  threshold = 40
+  )
+
+
+# voc
+line.fracplot(
+  meth = 'time',
+  met = 'voc',
+  # coeff = 2000,
+  cluster = 'all',
+  room = 'living',
+  dependent = 'max',
+  independent = independent,
+  rep_measure = rep_measure,
+  threshold = 10  )
+
+
+# voc
+line.fracplot(
+  meth = 'time',
+  met = 'voc',
+  # coeff = 2000,
+  cluster = 'all',
+  room = 'living',
+  dependent = 'max',
+  independent = independent,
+  rep_measure = rep_measure,
+  threshold = 40  )
+
+
+## max_hour---------------
+
+# pm25
+line.fracplot(
+  meth = 'time',
+  met = 'pm25',
+  # coeff = 24,
+  cluster = 'all',
+  room = 'living',
+  dependent = 'max_hour',
+  independent = independent,
+  rep_measure = rep_measure,
+  threshold = 1
+  )
+
+# voc
+line.fracplot(
+  meth = 'time',
+  met = 'voc',
+  # coeff = 2000,
+  cluster = 'all',
+  room = 'living',
+  dependent = 'max_hour',
+  independent = independent,
+  rep_measure = rep_measure,
+  threshold = 1
+  )
+
+
+
+
+```
+
 ## Combine Representativeness with COV
 
 ### rooms not pooled, non-overlapping samples
 
-```{r function_rep_cov_define}
+```{r function_plot_rep_cov}
 # define function--------------------------
 
 line.covplot <- function(met, meth, cluster, room, independent, dependent, rep_measure, coeff = 'auto'){
@@ -2939,7 +3206,7 @@ coeff <- if(coeff == 'auto') {
 
 
 ### All homes, (One Room)
-```{r fig.height=7, fig.width = 10.5}
+```{r plot_rep_cov, fig.height=7, fig.width = 10.5, eval = FALSE}
 
 # run for different variables--------------------------
 
@@ -3058,7 +3325,7 @@ line.covplot(
   room = 'living',
   dependent = 'max_hour',
   independent = independent,
-  rep_measure = rep_measure,
+  rep_measure = rep_measure
   )
 
 
@@ -3066,9 +3333,7 @@ line.covplot(
 
 ```
 
-
-
-
+## COrrelation without Seasons (no overlap)
 ```{r correlation_no_seasons, eval = FALSE}
 # for one condition
 # a <- entropy_df_clean %>% filter(method == 'shape', home == '001',
@@ -3228,3 +3493,4 @@ cor.plot('scaled_kld_conditional', 'max_diff')
 cor.plot('scaled_kld_conditional', 'max_hour_diff')
 
 ```
+
