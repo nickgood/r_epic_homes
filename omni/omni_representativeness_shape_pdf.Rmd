@@ -177,7 +177,7 @@ locations_indoor <- c('living', 'kitchen', 'bedroom')
 # overlap
 # )
 
-# entropy function minutely data ----------------------------
+# entropy function hourly data ----------------------------
 
     
 # function to calculate scaled entropy for a house
@@ -195,7 +195,7 @@ entropy.table.shape <- function(
   tested_sample_sequence, # sequence of tested short sampling period lengths (in days)
   location_type, # sensor location (living, bedroom, or kitchen)
   overlap, # if FALSE, only use samples made of ditinct days
-  all_time = TRUE, # if TRUE, compare each short sampling period to entire monitoring year of home
+  all_time, # if TRUE, compare each short sampling period to entire monitoring year of home
   longterm_avail_limit = 0, # only use data from a long-term period if it has at least this fraction of data available (0 means no periods are omitted if they have any data)
   sample_avail_limit = 0, # only use data from a sample period if it has at least this fraction of data available (0 means no periods are omitted if they have any data)
   data = omni_hourly_data) {
@@ -666,7 +666,7 @@ all_time_choice <- TRUE
 
       # make dfs for all homes--------------------
 
-all_time_choice <- TRUE
+all_time_choice <- FALSE
     clust <- c('ac', 'shoulder', 'heat', 'all') # can do multiple
    
   
@@ -966,12 +966,14 @@ entropy_shape_pdf_df <- bind_rows(
 
 
 # make csv of all data
+
 write_csv(entropy_shape_pdf_df, file =
-            paste0('./csv_created/representativeness_data/rep_data_shape_hourly_pdf.csv'))
+            paste0('./csv_created/representativeness_data/rep_data_shape_hourly_pdf', ifelse(all_time_choice == TRUE, '', '_season'), '.csv'))
 # make dated backup
 write_csv(entropy_shape_pdf_df, file =
             paste0('./csv_created/representativeness_data/rep_data_shape_hourly_pdf_',
-                   Sys.Date(), '.csv'))
+                   Sys.Date(), ifelse(all_time_choice == TRUE, '', '_season'),
+                   '.csv'))
 
 ```
 
