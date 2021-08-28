@@ -25,13 +25,18 @@ source("../functions_epic.R")
 # Read Metadata
 
 ```{r}
-grav_meta <- read_sheet("18_J7ZQgnuji-r6ovpTjmlvdz3xUGBYzy0u_ACadLG-c",
-                        sheet = "metadata")
+# grav_meta <- read_sheet("18_J7ZQgnuji-r6ovpTjmlvdz3xUGBYzy0u_ACadLG-c",
+#                         sheet = "metadata")
+grav_meta <- read_csv("../data_thesis/filters/gravimetric_metadata.csv")
 
-meta <- read_rds("../drive_sync/epic_homes/r_epic_homes/output/upas/upas_summary.rds")
+meta <- read_rds("../output_thesis/upas/upas_summary.rds")
 
-upas_log <- read_sheet("1PnPjgbYWljb5oXoSCBqpJb2pi7gU0Kzre5lx4H-3i70",
-                       sheet = "upas", col_types = "c")
+# upas_log <- read_sheet("1PnPjgbYWljb5oXoSCBqpJb2pi7gU0Kzre5lx4H-3i70",
+#                        sheet = "upas", col_types = "c")
+upas_log <- read_csv("../data_thesis/homes/instruments_deployed_upas.csv",
+                     col_types = cols(.default = 'c'))
+
+
 ```
 
 ---
@@ -41,8 +46,10 @@ upas_log <- read_sheet("1PnPjgbYWljb5oXoSCBqpJb2pi7gU0Kzre5lx4H-3i70",
 * Read Data
 
 ```{r}
-grav <- read_sheet("18_J7ZQgnuji-r6ovpTjmlvdz3xUGBYzy0u_ACadLG-c",
-                   sheet = "data", col_types = "c") %>%
+# grav <- read_sheet("18_J7ZQgnuji-r6ovpTjmlvdz3xUGBYzy0u_ACadLG-c",
+#                    sheet = "data", col_types = "c") 
+grav <- read_csv("../data_thesis/filters/gravimetric_data.csv",
+                     col_types = cols(.default = 'c')) %>%
   filter(date > as.Date("2021-01-01")) %>%
   mutate(id_filter = str_pad(id_filter, 4, "left", "0"),
          id_keeper = str_pad(id_keeper, 4, "left", "0"))
@@ -143,7 +150,7 @@ data <- pm25 %>%
   filter(!grepl("blank", location)) %>%
   na.omit() %>%
   mutate(pattern = paste("^omni.*", id_home, location, sep = "_"),
-         files = map2("../drive_sync/epic_homes/r_epic_homes/output/omni", pattern, list.files, full.names = TRUE),
+         files = map2("../output_thesis/omni", pattern, list.files, full.names = TRUE),
          start_ = as.Date(start) - 1,
          end_ = as.Date(end) + 1,
          dates = map2(start_, end_, seq.Date, by = "day"),
@@ -196,7 +203,7 @@ broom::tidy(model, conf.int = TRUE) %>%
 * read data
 
 ```{r}
-files <- list.files("../drive_sync/epic_homes/data/filters/soot_scan_csv", full.names = TRUE, pattern = ".csv$")
+files <- list.files("../data_thesis/filters/soot_scan_csv", full.names = TRUE, pattern = ".csv$")
 
 data_bc <- map(files, read_csv, col_types = cols(.default = "c")) %>%
   bind_rows() %>%
@@ -331,11 +338,11 @@ ggplot(bc %>% filter(!(location == "bedroom")), aes(x = location, y = bc)) +
 # Write Data
 
 ```{r}
-# write_rds(bc, paste0("../output/bc/bc_",
+# write_rds(bc, paste0("../output_thesis/bc/bc_",
 # Sys.Date(),".rds"))
 # # make data and backup
-# write_rds(pm25, paste0("../output_2021-07-14/pm25/pm25.rds"))
-# write_rds(pm25, paste0("../output_2021-07-14/pm25/pm25_",
+# write_rds(pm25, paste0("../output_thesis/pm25/pm25.rds"))
+# write_rds(pm25, paste0("../output_thesis/pm25/pm25_",
 # Sys.Date(),".rds"))
 
 ```
