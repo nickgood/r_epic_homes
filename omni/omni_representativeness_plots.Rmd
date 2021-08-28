@@ -54,28 +54,6 @@ library(ggpubr) # for tesing log-normality
 energy_cluster_df <- read_csv('../sense/csv_created_sense/energy_cluster_df.csv')
 ```
 
-```{r import_pdf_data}
-# read in csv files
-entropy_df <- bind_rows(
-  read_csv(file = './csv_created/representativeness_data/rep_data_shape_hourly_pdf.csv'),
-  read_csv(file = './csv_created/representativeness_data/rep_data_time_hourly_pdf.csv'))
-
-# test_time <- entropy_df %>% filter(method == 'time')
-# test_old_time <- read_csv('./csv_created/representativeness_data/rep_data_time_hourly_pdf_2021-08-08.csv')
-# test3 <- bind_cols(test %>% select('kld_old' = kld), test2 %>% select('kld_new' = kld))
-# 
-# a <- test_time %>% filter(is.na(kld))
-# # %>% group_by(home, location) %>% summarise(n = n())
-# b <- test_old_time %>% filter(is.na(kld))
-# # %>% group_by(home, location) %>% summarise(n = n())
-# c <- bind_cols(a, b[-c(1,2),])
-# all.equal(a, b[-c(1,2),])
-
-
-
-
-
-```
 
 
 ```{r import_assessment_data}
@@ -131,6 +109,7 @@ frac_samp_required <- 0
 # 'universal' or 'conditional'
 max_method <- 'conditional'
 
+long_term_period <- 'season'
 
 # list of all home numbers
 homes_all <- home.list(1:17)
@@ -197,6 +176,26 @@ large <- 24
 
 ```
 
+```{r import_pdf_data}
+# read in csv files
+entropy_df <-
+  if(long_term_period == 'year') {
+    
+    bind_rows(
+      read_csv(file = './csv_created/representativeness_data/rep_data_shape_hourly_pdf.csv'),
+      read_csv(file = './csv_created/representativeness_data/rep_data_time_hourly_pdf.csv'))
+    
+  }else if(long_term_period == 'season'){
+    
+    bind_rows(
+      read_csv(file = './csv_created/representativeness_data/rep_data_shape_hourly_pdf_season.csv'),
+      read_csv(file = './csv_created/representativeness_data/rep_data_time_hourly_pdf_season.csv'))
+  }
+
+
+
+```
+
 ```{r cleaning_omissions}
 # count omissions --------------
 
@@ -236,7 +235,7 @@ n_sensors_ac_ignore <- 3 # Home 011 ac usage ignored because only detected 5 day
 # kld values
 # remove na kld values from runs with insufficient data
 entropy_df_clean <- entropy_df%>% 
-  filter(period_compare == 'year', # only comparing sample to whole mon. period
+  filter(period_compare == long_term_period, # only comparing sample to whole mon. period
     !is.na(kld), # with insufficient data in cluster/year/no cluster
   n_samp_avail >= frac_samp_required) %>% # with less than certain percentage of available samples
 # omit home 011 in shoulder season for severe lack of data
@@ -2873,13 +2872,14 @@ line.fracplot <- function(met, meth, cluster, room, independent, dependent,
                          ){
   
   difference <- if(dependent == 'max_hour') '_diff' else '_diff_pct'
-  
-a <- avg_scaled_entropy_df %>%
+  difference_unit <- if(dependent == 'max_hour') 'hour' else '%'
+
+  a <- avg_scaled_entropy_df %>%
     filter( metric == met & method == meth,
                                   sample_length %in% c(1,3,5,7:21),
          energy_cluster == cluster,
-         location == room
-         # period_compare == long_term_period
+         location == room,
+         period_compare == long_term_period
          )
 
 b <- scaled_entropy_df %>% filter(
@@ -2921,7 +2921,7 @@ coeff <- 1
     ylab(rep_measure)+
         ggtitle(label = paste(
                                'Representativeness and faction of samples within',
-                               threshold, '% of overall', met, dependent,
+                               threshold, difference_unit, 'of overall', met, dependent,
                               'in', room, '- Scaled by', max_method))+
         geom_line(data = a, aes(x = sample_length,
                  y = get(rep_measure),
@@ -2950,6 +2950,10 @@ coeff <- 1
                     labels = energy_labels,
                     name = 'Season')+
         xlab('Sample Length, days')+
+        {if(long_term_period=='season') {
+          annotate(geom = 'text', label = paste('long=', long_term_period),
+                   x = Inf, y = Inf, hjust = 1, vjust = 1)}
+          }+
         theme(legend.position = 'left')
         # geom_hline(data = b, aes(yintercept = get(paste0(dependent,'_entire'))/coeff),
         #            linetype = 'dashed')
@@ -2957,6 +2961,9 @@ coeff <- 1
 ```
 
 ```{r plot_rep_deviation_fraction_samples, fig.height=7, fig.width = 10.5}
+
+season <- 'shoulder'
+
 
 # run for different variables--------------------------
 
@@ -2983,24 +2990,26 @@ line.fracplot(
   meth = 'shape',
   met = 'pm25',
   # coeff = 30,
-  cluster = 'heat',
+  cluster = season,
   room = 'living',
   dependent = 'median',
   independent = independent,
   rep_measure = rep_measure,
-  threshold = 10)
+  threshold = 10,
+  long_term_period = long_term_period)
 
 # pm25
 line.fracplot(
   meth = 'shape',
   met = 'pm25',
   # coeff = 30,
-  cluster = 'heat',
+  cluster = season,
   room = 'living',
   dependent = 'median',
   independent = independent,
   rep_measure = rep_measure,
-  threshold = 40)
+  threshold = 40,
+  long_term_period = long_term_period)
 
 
  # voc
@@ -3009,23 +3018,25 @@ line.fracplot(
   meth = 'shape',
   met = 'voc',
   # coeff = 500,
-  cluster = 'all',
+  cluster = season,
   room = 'living',
   dependent = 'median',
   independent = independent,
   rep_measure = rep_measure,
-  threshold = 10  )
+  threshold = 10,
+  long_term_period = long_term_period  )
 
 line.fracplot(
   meth = 'shape',
   met = 'voc',
   # coeff = 500,
-  cluster = 'all',
+  cluster = season,
   room = 'living',
   dependent = 'median',
   independent = independent,
   rep_measure = rep_measure,
-  threshold = 40  )
+  threshold = 40,
+  long_term_period = long_term_period  )
 ## max---------------
 
 # pm25
@@ -3033,12 +3044,13 @@ line.fracplot(
   meth = 'time',
   met = 'pm25',
   # coeff = 24,
-  cluster = 'all',
+  cluster = season,
   room = 'living',
   dependent = 'max',
   independent = independent,
   rep_measure = rep_measure,
-  threshold = 10
+  threshold = 10,
+  long_term_period = long_term_period
   )
 
 # pm25
@@ -3046,12 +3058,13 @@ line.fracplot(
   meth = 'time',
   met = 'pm25',
   # coeff = 24,
-  cluster = 'all',
+  cluster = season,
   room = 'living',
   dependent = 'max',
   independent = independent,
   rep_measure = rep_measure,
-  threshold = 40
+  threshold = 40,
+  long_term_period = long_term_period
   )
 
 
@@ -3060,12 +3073,13 @@ line.fracplot(
   meth = 'time',
   met = 'voc',
   # coeff = 2000,
-  cluster = 'all',
+  cluster = season,
   room = 'living',
   dependent = 'max',
   independent = independent,
   rep_measure = rep_measure,
-  threshold = 10  )
+  threshold = 10,
+  long_term_period = long_term_period  )
 
 
 # voc
@@ -3073,12 +3087,13 @@ line.fracplot(
   meth = 'time',
   met = 'voc',
   # coeff = 2000,
-  cluster = 'all',
+  cluster = season,
   room = 'living',
   dependent = 'max',
   independent = independent,
   rep_measure = rep_measure,
-  threshold = 40  )
+  threshold = 40,
+  long_term_period = long_term_period  )
 
 
 ## max_hour---------------
@@ -3088,12 +3103,42 @@ line.fracplot(
   meth = 'time',
   met = 'pm25',
   # coeff = 24,
-  cluster = 'all',
+  cluster = season,
   room = 'living',
   dependent = 'max_hour',
   independent = independent,
   rep_measure = rep_measure,
-  threshold = 1
+  threshold = 1,
+  long_term_period = long_term_period
+  )
+
+# pm25
+line.fracplot(
+  meth = 'time',
+  met = 'pm25',
+  # coeff = 24,
+  cluster = season,
+  room = 'living',
+  dependent = 'max_hour',
+  independent = independent,
+  rep_measure = rep_measure,
+  threshold = 2,
+  long_term_period = long_term_period
+  )
+
+
+# voc
+line.fracplot(
+  meth = 'time',
+  met = 'voc',
+  # coeff = 2000,
+  cluster = season,
+  room = 'living',
+  dependent = 'max_hour',
+  independent = independent,
+  rep_measure = rep_measure,
+  threshold = 1,
+  long_term_period = long_term_period
   )
 
 # voc
@@ -3101,15 +3146,14 @@ line.fracplot(
   meth = 'time',
   met = 'voc',
   # coeff = 2000,
-  cluster = 'all',
+  cluster = season,
   room = 'living',
   dependent = 'max_hour',
   independent = independent,
   rep_measure = rep_measure,
-  threshold = 1
+  threshold = 2,
+  long_term_period = long_term_period
   )
-
-
 
 
 ```
