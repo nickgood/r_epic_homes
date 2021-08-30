@@ -95,9 +95,15 @@ heating threshold set at `r heat_percentile_thresh` percentile for daily % time 
 ac threshold set at `r ac_usage_thresh`% for daily % time on
 
 ```{r function_cluster}
+# for testing--------------
 
+# home_id <- '009'
+# devices <- 'furnace'
+# measure <- 'pct'
+# 
+# rm(home_id, devices, measure)
 
-
+# functions-------------------
 cluster.manual <- function(home_id, devices,
                            include_zero, # if TRUE, include zero in calculation of quartile for daily heat-use
                            measure = 'pct', # pct (fraction on) or consumption
@@ -129,13 +135,20 @@ cluster.manual <- function(home_id, devices,
     rename_at(vars(contains('ac')), list(~sub('.*','ac',.)))
   
   # find heat threshold value based on percentile
-  heat_thresh_value <- if(include_zero == TRUE) {
-    a %>% pull(heat) %>% quantile(heat_percentile_thresh)
-  } else if(include_zero == FALSE){
-          a %>% filter(heat >0) %>% pull(heat)%>%
-      quantile(heat_percentile_thresh)
-
-    }
+  heat_thresh_value <-
+  #   if(include_zero == TRUE) {
+  #   a %>% pull(heat) %>% quantile(heat_percentile_thresh)
+  # } else if(include_zero == FALSE){
+  #         a %>% filter(heat >0) %>% pull(heat)%>%
+  #     quantile(heat_percentile_thresh)
+  #   }
+    a %>%
+    #find month with max avg daily heat pct on
+    # and make threshold 10% of that value
+    group_by(month = month(dateday, label = TRUE, abbr = TRUE)) %>%
+    summarise(avg_heat = mean(heat, na.rm = TRUE)) %>%
+    pull(avg_heat) %>%
+    max()*0.15
   
   # make a df with clusters
   a_cl <- a %>%
@@ -239,13 +252,21 @@ cluster.manual.heat <- function(home_id, devices,
     rename_at(vars(contains(c('heat', 'furnace'))), list(~sub('.*','heat',.)))
   
   
-    # find heat threshold value based on percentile
-  heat_thresh_value <- if(include_zero == TRUE) {
-    a %>% pull(heat) %>% quantile(heat_percentile_thresh)
-  } else if(include_zero == FALSE){
-          a %>% filter(heat >0) %>% pull(heat)%>%
-      quantile(heat_percentile_thresh)
-  }
+  # find heat threshold value based on percentile
+  heat_thresh_value <-
+  #   if(include_zero == TRUE) {
+  #   a %>% pull(heat) %>% quantile(heat_percentile_thresh)
+  # } else if(include_zero == FALSE){
+  #         a %>% filter(heat >0) %>% pull(heat)%>%
+  #     quantile(heat_percentile_thresh)
+  #   }
+    a %>%
+    #find month with max avg daily heat pct on
+    # and make threshold 10% of that value
+    group_by(month = month(dateday, label = TRUE, abbr = TRUE)) %>%
+    summarise(avg_heat = mean(heat, na.rm = TRUE)) %>%
+    pull(avg_heat) %>%
+    max()*0.15
   
   # make a df with clusters
   a_cl <- a %>%

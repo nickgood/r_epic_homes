@@ -120,7 +120,7 @@ geom_segment(aes(xend = dateday, y = 0, yend = consumption)) +
 
 ```
 
-```{r plot_daily_consum_overview}
+```{r plot_daily_consum_overview, eval = FALSE}
 # homes 3 and 16 do not have data available
 
 # apply above function to all homes
