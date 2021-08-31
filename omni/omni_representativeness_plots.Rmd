@@ -109,7 +109,11 @@ frac_samp_required <- 0
 # 'universal' or 'conditional'
 max_method <- 'conditional'
 
-long_term_period <- 'season'
+long_term_period <- 'year'
+
+# cluster to plot for deviation plots
+season <- 'all'
+
 
 # list of all home numbers
 homes_all <- home.list(1:17)
@@ -1669,6 +1673,8 @@ a <- scaled_entropy_df %>% filter(metric == met,
 
 ```
 
+
+
 ## Compare Deviations between differences of summary stats of sample and monitoring period to Sample Length
 
 ```{r plot_deviation_vs_sample_length, fig.height=7, fig.width = 10.5, eval = FALSE}
@@ -1806,6 +1812,14 @@ a <- scaled_entropy_df %>% filter(metric == met,
 # 
 
 ```
+
+
+
+
+
+
+
+
 
 ## Combine Average Representativeness with Deviation Measures
 
@@ -2708,7 +2722,7 @@ b <- scaled_entropy_df %>% filter(
 ```
 
 ### All homes, (One Room)
-```{r plot_rep_deviation_boxplot, fig.height=7, fig.width = 10.5, eval = FALSE}
+```{r plot_rep_deviation_boxplot, fig.height=7, fig.width = 10.5, eval = TRUE}
 
 # run for different variables--------------------------
 
@@ -2735,7 +2749,7 @@ line.boxplot(
   meth = 'shape',
   met = 'pm25',
   # coeff = 30,
-  cluster = 'all',
+  cluster = season,
   room = 'living',
   dependent = 'median',
   independent = independent,
@@ -2749,7 +2763,7 @@ line.boxplot(
   meth = 'shape',
   met = 'voc',
   # coeff = 500,
-  cluster = 'all',
+  cluster = season,
   room = 'living',
   dependent = 'median',
   independent = independent,
@@ -2763,7 +2777,7 @@ line.boxplot(
   meth = 'shape',
   met = 'pm25',
   # coeff = 500,
-  cluster = 'all',
+  cluster = season,
   room = 'living',
   dependent = 'iqr',
   independent = independent,
@@ -2776,7 +2790,7 @@ line.boxplot(
   meth = 'shape',
   met = 'voc',
   # coeff = 2000,
-  cluster = 'all',
+  cluster = season,
   room = 'living',
   dependent = 'iqr',
   independent = independent,
@@ -2793,7 +2807,7 @@ line.boxplot(
   meth = 'time',
   met = 'pm25',
   # coeff = 24,
-  cluster = 'all',
+  cluster = season,
   room = 'living',
   dependent = 'max',
   independent = independent,
@@ -2806,7 +2820,7 @@ line.boxplot(
   meth = 'time',
   met = 'voc',
   # coeff = 2000,
-  cluster = 'all',
+  cluster = season,
   room = 'living',
   dependent = 'max',
   independent = independent,
@@ -2824,7 +2838,7 @@ line.boxplot(
   meth = 'time',
   met = 'pm25',
   # coeff = 24,
-  cluster = 'all',
+  cluster = season,
   room = 'living',
   dependent = 'max_hour',
   independent = independent,
@@ -2836,7 +2850,7 @@ line.boxplot(
   meth = 'time',
   met = 'voc',
   # coeff = 2000,
-  cluster = 'all',
+  cluster = season,
   room = 'living',
   dependent = 'max_hour',
   independent = independent,
@@ -2960,9 +2974,7 @@ coeff <- 1
 }
 ```
 
-```{r plot_rep_deviation_fraction_samples, fig.height=7, fig.width = 10.5}
-
-season <- 'shoulder'
+```{r plot_rep_deviation_fraction_samples, fig.height=7, fig.width = 10.5, eval = FALSE}
 
 
 # run for different variables--------------------------
@@ -3252,6 +3264,7 @@ coeff <- if(coeff == 'auto') {
 ### All homes, (One Room)
 ```{r plot_rep_cov, fig.height=7, fig.width = 10.5, eval = FALSE}
 
+
 # run for different variables--------------------------
 
 
@@ -3277,7 +3290,7 @@ line.covplot(
   meth = 'shape',
   met = 'pm25',
   # coeff = 30,
-  cluster = 'all',
+  cluster = season,
   room = 'living',
   dependent = 'median',
   independent = independent,
@@ -3289,7 +3302,7 @@ line.covplot(
   meth = 'shape',
   met = 'voc',
   # coeff = 500,
-  cluster = 'all',
+  cluster = season,
   room = 'living',
   dependent = 'median',
   independent = independent,
@@ -3301,7 +3314,7 @@ line.covplot(
   meth = 'shape',
   met = 'pm25',
   # coeff = 500,
-  cluster = 'all',
+  cluster = season,
   room = 'living',
   dependent = 'iqr',
   independent = independent,
@@ -3312,7 +3325,7 @@ line.covplot(
   meth = 'shape',
   met = 'voc',
   # coeff = 2000,
-  cluster = 'all',
+  cluster = season,
   room = 'living',
   dependent = 'iqr',
   independent = independent,
@@ -3325,7 +3338,7 @@ line.covplot(
   meth = 'time',
   met = 'pm25',
   # coeff = 24,
-  cluster = 'all',
+  cluster = season,
   room = 'living',
   dependent = 'max',
   independent = independent,
@@ -3337,7 +3350,7 @@ line.covplot(
   meth = 'time',
   met = 'voc',
   # coeff = 2000,
-  cluster = 'all',
+  cluster = season,
   room = 'living',
   dependent = 'max',
   independent = independent,
@@ -3353,7 +3366,7 @@ line.covplot(
   meth = 'time',
   met = 'pm25',
   # coeff = 24,
-  cluster = 'all',
+  cluster = season,
   room = 'living',
   dependent = 'max_hour',
   independent = independent,
@@ -3365,7 +3378,7 @@ line.covplot(
   meth = 'time',
   met = 'voc',
   # coeff = 2000,
-  cluster = 'all',
+  cluster = season,
   room = 'living',
   dependent = 'max_hour',
   independent = independent,
@@ -3378,30 +3391,13 @@ line.covplot(
 ```
 
 ## COrrelation without Seasons (no overlap)
-```{r correlation_no_seasons, eval = FALSE}
-# for one condition
-# a <- entropy_df_clean %>% filter(method == 'shape', home == '001',
-#                                  location == 'living', metric == 'pm25',
-#                                  energy_cluster == 'heat')
-# test <- cor.test(a$kld, a$median_diff, method = 'spearman')%>% suppressWarnings()
-# list('coeff' = test$estimate, 'p_val' = test$p.value)
 
+```{r correlation_metric, eval = TRUE}
 
-
-# combinations <- expand.grid(homes_all, metrics_all, locations_indoor, clusters_all)
-# apply(combinations, 1, function(x_home, x_location, x_metric, x_cluster){
-#   a <- entropy_df_clean %>% filter(method == 'shape', home == x_home,
-#                                  location == x_location, metric == x_metric,
-#                                  energy_cluster == x_cluster)
-#   if (nrow(a)>3) {
-#     cor.test(a$kld, a$median_diff, method = 'spearman') } else NULL
-#   
-# }
-# )
 
 variables_dependent <- c(
-  'median_diff', 'variance_diff', 'mean_diff'
-  # 'max_hour_diff', 'max_diff'
+  'median', 'iqr',
+  'max_hour', 'max'
                            )
 
 
@@ -3409,67 +3405,15 @@ variables_dependent <- c(
 
 
 # for all conditions
-cor.table <- function(pooled){
+cor_table <- 
+
   map(variables_dependent, function(dependent){
       
-      # if pooled is all, don't separate by any condition
-      if(pooled == 'all'){
-            map(c('kld', 'scaled_kld_universal'), function(independent){
-              
-        a <- scaled_entropy_df
-        test <- cor.test(a %>% pull(independent),
-                         a %>% pull(dependent), method = 'spearman')%>%
-          suppressWarnings()
-        
-        #return
-        list('coeff' = test$estimate, 'p_val' = test$p.value,
-             'independent' = independent, 'dependent' = dependent,
-             'home' = NA, 'location' = NA,
-             'metric' = NA, 'energy_cluster' = NA,
-             'kld_max_method' = 'universal', 'pooled' = pooled)
-            }) %>% bind_rows()
-        
-      } else if (pooled == 'none') {
-        
-            map(c('kld', 'scaled_kld_conditional'), function(independent){
-        map(homes_no5, function(x_home){
-          map(locations_indoor, function(x_location){
-            map('all', function(x_cluster){
-              map(metrics_all, function(x_metric){
-                # make a row for the case of an error
-                result_error <- 
-                  list('coeff' = NA, 'p_val' = NA,
-                       'independent' = independent, 
-                       'dependent' = dependent, 'home' = x_home,
-                       'location' = x_location,
-                       'metric' = x_metric, 'energy_cluster' = x_cluster,
-                       'kld_max_method' = 'conditional',  'pooled' = pooled)
-                
-                a <- scaled_entropy_df %>% filter( home == x_home,
-                                                   location == x_location,
-                                                   metric == x_metric,
-                                                   energy_cluster == x_cluster)
-                
-                if (nrow(a)>3) {
-                  test <- cor.test(a %>% pull(independent), a %>% pull(dependent), method = 'spearman')%>%
-                    suppressWarnings()
-                  
-                  # return
-                  list('coeff' = test$estimate, 'p_val' = test$p.value,
-                       'independent' = independent, 'dependent' = dependent, 'home' = x_home, 'location' = x_location,
-                       'metric' = x_metric, 'energy_cluster' = x_cluster, 
-                       'kld_max_method' = 'conditional', 'pooled' = pooled)
-                }
-                else result_error
-        }) %>% bind_rows()
-              }) %>% bind_rows()
-            }) %>% bind_rows()
-          }) %>% bind_rows()
-        }) %>% bind_rows()
-        
-      } else if (pooled == 'metric') {
-        
-            map(c('kld', 'scaled_kld_metric'), function(independent){
+            map(c(
+              # 'kld',
+              'scaled_kld_metric'
+              ),
+              function(independent){
         map(metrics_all, function(x_metric){
           
           # make a row for the case of an error
@@ -3478,12 +3422,26 @@ cor.table <- function(pooled){
                  'independent' = independent, 'dependent' = dependent,
                  'home' = NA, 'location' = NA,
                  'metric' = x_metric, 'energy_cluster' = NA,
-                 'kld_max_method' = 'metric',  'pooled' = pooled)
+                 'kld_max_method' = 'metric')
           
-          a <- scaled_entropy_df %>% filter( metric == x_metric)
+          a <- scaled_entropy_df %>% filter(
+                                  !is.na(get(independent)),
+                                  !is.na(get(paste0(dependent,'_sample'))),
+                                  !is.na(get(paste0(dependent,'_entire'))),
+                                  sample_length %in% c(1,3,5,7:21))%>%
+  filter(metric == x_metric,
+         energy_cluster == season) %>%
+            group_by(home, sample_length, location) %>%
+  summarise(
+  cov = sd(get(paste0(dependent,'_sample')))/
+    mean(get(paste0(dependent,'_sample'),
+             )),
+  avg_scaled_kld = mean(get(independent)),
+  .groups = 'drop'
+          )
           
           if (nrow(a)>3) {
-            test <- cor.test(a %>% pull(independent), a %>% pull(dependent), method = 'spearman')%>%
+            test <- cor.test(a %>% pull(avg_scaled_kld), a %>% pull(cov), method = 'spearman')%>%
               suppressWarnings()
             
             # return
@@ -3491,50 +3449,19 @@ cor.table <- function(pooled){
                  'independent' = independent, 'dependent' = dependent,
                  'home' = NA, 'location' = NA,
                  'metric' = x_metric, 
-                 'kld_max_method' = 'metric', 'pooled' = pooled)
+                 'kld_max_method' = 'metric')
           }
           else result_error
           
         }) %>% bind_rows()
             }) %>% bind_rows()
-      }
+      
     }) %>% bind_rows()
-}
+
+cor_table
 
 
-# make a correlation table merging different pooling methods
-cor_table <- bind_rows(
-  # cor.table('all')
-                       # cor.table('metric'),
-                       cor.table('none')
-                       )
+write_csv(cor_table, './csv_created/cor_table.csv')
 
-# function to plot correlations for given pooling method
-cor.plot <- function(var_indep, var_dep){
-a <- cor_table %>%
-  filter(dependent == var_dep, independent == var_indep, !is.na(coeff))
-
-ggplot(data = a)+
-  geom_histogram(aes(x = coeff))+
-  ggtitle(label = paste('Correlation'))
-}
-
-
-cor.plot('kld', 'median_diff')
-cor.plot('kld', 'variance_diff')
-cor.plot('kld', 'max_diff')
-cor.plot('kld', 'max_hour_diff')
-
-# cor.plot('scaled_kld_metric', 'median_diff')
-cor.plot('scaled_kld_conditional', 'median_diff')
-# cor.plot('scaled_kld_metric', 'median_diff')
-cor.plot('scaled_kld_conditional', 'mean_diff')
-# cor.plot('scaled_kld_metric', 'mean_diff')
-cor.plot('scaled_kld_conditional', 'variance_diff')
-# cor.plot('scaled_kld_metric', 'max_diff')
-cor.plot('scaled_kld_conditional', 'max_diff')
-# cor.plot('scaled_kld_metric', 'max_hour_diff')
-cor.plot('scaled_kld_conditional', 'max_hour_diff')
 
 ```
-
