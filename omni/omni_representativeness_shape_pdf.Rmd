@@ -575,10 +575,16 @@ list(
         omni_hourly_data %>%
    filter(home == x_home) %>%
    pull(datehour) %>% min()%>% date() %>% as.character()
-   } else {
+   } else if( x_cluster %in% c('heat', 'shoulder', 'ac')){
    energy_cluster_df %>%
    filter(home == x_home & cluster_type == x_cluster) %>%
    pull(start_date) %>% as.character()
+   } else if ( x_cluster %in% month.abb[1:12]){
+       year <- if(x_cluster %in% month.abb[8:12]) '2020' else '2021'
+
+              as.character(ymd(paste(year, x_cluster, '15')) %>%
+                             floor_date('month'))
+
      }
  }
 
@@ -587,11 +593,17 @@ list(
         omni_hourly_data %>%
    filter(home == x_home) %>%
    pull(datehour) %>% max()%>% date() %>% as.character()
-   } else {
+   } else if( x_cluster %in% c('heat', 'shoulder', 'ac')){
    energy_cluster_df %>%
    filter(home == x_home & cluster_type == x_cluster) %>%
    pull(end_date) %>% as.character()
-   }
+   } else if ( x_cluster %in% month.abb[1:12]){
+       year <- if(x_cluster %in% month.abb[8:12]) '2020' else '2021'
+
+              as.character(ymd(paste(year, x_cluster, '15')) %>%
+                             ceiling_date('month') -days(1))
+
+     }
   }
   
   # fun to pick minimum sample length to test based on metric
@@ -605,6 +617,10 @@ list(
   # # test functions
    # pick.start('006', 'heat')
   # pick.end('004', 'heat')
+      # pick.start('001', 'Dec')
+      #       pick.end('001', 'Jan')
+
+
 ```
 
 
@@ -665,10 +681,11 @@ all_time_choice <- TRUE
 
 
       # make dfs for all homes--------------------
-
+    
 all_time_choice <- FALSE
-    clust <- c('ac', 'shoulder', 'heat', 'all') # can do multiple
-   
+    overlap_choice <- TRUE
+# clust <- c('all','heat', 'shoulder', 'ac') # can do multiple
+clust <- month.abb[1:12]
   
                 met <- 'pm25'
 
@@ -693,7 +710,7 @@ all_time_choice <- FALSE
           tested_sample_sequence = 
         c(c(1:7), 9, seq(11,27,4)),
           location_type = loc,
-        overlap = FALSE,
+        overlap = overlap_choice,
           all_time = all_time_choice) %>%
           
           # add in column for energy_cluster
@@ -732,7 +749,7 @@ all_time_choice <- FALSE
           tested_sample_sequence = 
         c(c(1:7), 9, seq(11,27,4)),
           location_type = loc,
-        overlap = FALSE,
+        overlap = overlap_choice,
           all_time = all_time_choice) %>%
           
           # add in column for energy_cluster
@@ -770,7 +787,7 @@ all_time_choice <- FALSE
           tested_sample_sequence = 
         c(c(1:7), 9, seq(11,27,4)),
           location_type = loc,
-        overlap = FALSE,
+        overlap = overlap_choice,
           all_time = all_time_choice) %>%
           
           # add in column for energy_cluster
@@ -811,7 +828,7 @@ met <- 'voc'
           tested_sample_sequence = 
         c(c(1:7), 9, seq(11,27,4)),
           location_type = loc,
-        overlap = FALSE,
+        overlap = overlap_choice,
           all_time = all_time_choice) %>%
           
           # add in column for energy_cluster
@@ -850,7 +867,7 @@ met <- 'voc'
           tested_sample_sequence = 
         c(c(1:7), 9, seq(11,27,4)),
           location_type = loc,
-        overlap = FALSE,
+        overlap = overlap_choice,
           all_time = all_time_choice) %>%
           
           # add in column for energy_cluster
@@ -888,7 +905,7 @@ met <- 'voc'
           tested_sample_sequence = 
         c(c(1:7), 9, seq(11,27,4)),
           location_type = loc,
-        overlap = FALSE,
+        overlap = overlap_choice,
           all_time = all_time_choice) %>%
           
           # add in column for energy_cluster
@@ -953,28 +970,37 @@ entropy_shape_pdf_df <- bind_rows(
 #   voc_kitchen_ac_rep_data_shape_pdf,
 # entropy_shape_pdf_df)
 
-# write csvs----------------------
 
-# # to bind new to old data
-# a_old <- read_csv('./csv_created/representativeness_data/rep_data_shape_pdf.csv')
-# 
-# a <- bind_rows(a_old, entropy_shape_pdf_df)
-# 
-# write_csv(a, file =
-#             paste0('./csv_created/representativeness_data/rep_data_shape_pdf_',
-#                    Sys.Date(), '.csv'))
+# if did months
+entropy_shape_pdf_df <-
+  map(c('pm25', 'voc'), function(x_metric) {
+    map(month.abb[1:12], function(x_cluster) {
+      map(locations_indoor, function(x_location){
+        get(paste(x_metric, x_location, x_cluster, 'rep_data_shape_pdf', sep = '_'))
+      }) %>% bind_rows()
+    }) %>% bind_rows()
+  }) %>% bind_rows()
+
+
+# write csvs----------------------
 
 
 # make csv of all data
 
 write_csv(entropy_shape_pdf_df, file =
-            paste0('./csv_created/representativeness_data/rep_data_shape_hourly_pdf', ifelse(all_time_choice == TRUE, '', '_season'), '.csv'))
+            paste0('./csv_created/representativeness_data/rep_data_shape_hourly_pdf',
+                   ifelse(all_time_choice == TRUE, '', '_season'),
+                   ifelse(overlap_choice == TRUE, '', '_no_overlap'),
+                   ifelse(clust[1] %in% month.abb[1:12], '_month', ''),
+                   '.csv'))
 # make dated backup
 write_csv(entropy_shape_pdf_df, file =
             paste0('./csv_created/representativeness_data/rep_data_shape_hourly_pdf_',
-                   Sys.Date(), ifelse(all_time_choice == TRUE, '', '_season'),
+                   Sys.Date(),
+                   ifelse(all_time_choice == TRUE, '', '_season'),
+                   ifelse(overlap_choice == TRUE, '', '_no_overlap'),
+                   ifelse(clust[1] %in% month.abb[1:12], '_month', ''),
                    '.csv'))
-
 ```
 
 

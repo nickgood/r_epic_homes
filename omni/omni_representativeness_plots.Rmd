@@ -111,6 +111,10 @@ max_method <- 'conditional'
 
 long_term_period <- 'year'
 
+month_cluster <- FALSE
+
+overlap <- TRUE
+
 # cluster to plot for deviation plots
 season <- 'all'
 
@@ -181,21 +185,39 @@ large <- 24
 ```
 
 ```{r import_pdf_data}
+
 # read in csv files
 entropy_df <-
-  if(long_term_period == 'year') {
+  if(long_term_period == 'year' & overlap == TRUE & month_cluster == FALSE) {
     
     bind_rows(
       read_csv(file = './csv_created/representativeness_data/rep_data_shape_hourly_pdf.csv'),
       read_csv(file = './csv_created/representativeness_data/rep_data_time_hourly_pdf.csv'))
     
-  }else if(long_term_period == 'season'){
+  }else if(long_term_period == 'season'& overlap == TRUE & month_cluster == FALSE){
     
     bind_rows(
       read_csv(file = './csv_created/representativeness_data/rep_data_shape_hourly_pdf_season.csv'),
       read_csv(file = './csv_created/representativeness_data/rep_data_time_hourly_pdf_season.csv'))
+    
+  }else if(long_term_period == 'year' & overlap == FALSE & month_cluster == FALSE){
+    
+    bind_rows(
+      read_csv(file = './csv_created/representativeness_data/rep_data_shape_hourly_pdf_no_overlap.csv'),
+      read_csv(file = './csv_created/representativeness_data/rep_data_time_hourly_pdf_no_overlap.csv'))
+    
+  }else if(long_term_period == 'season'& overlap == FALSE & month_cluster == FALSE){
+    
+    bind_rows(
+      read_csv(file = './csv_created/representativeness_data/rep_data_shape_hourly_pdf_season_no_overlap.csv'),
+      read_csv(file = './csv_created/representativeness_data/rep_data_time_hourly_pdf_season_no_overlap.csv'))
+    
+  }else if(long_term_period == 'season'& overlap == TRUE & month_cluster == TRUE){
+    
+    bind_rows(
+      read_csv(file = './csv_created/representativeness_data/rep_data_shape_hourly_pdf_season_month.csv'),
+      read_csv(file = './csv_created/representativeness_data/rep_data_time_hourly_pdf_season_month.csv'))
   }
-
 
 
 ```
