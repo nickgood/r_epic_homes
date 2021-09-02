@@ -14,6 +14,7 @@ knitr::opts_chunk$set(fig.path = 'figures/',
   echo = FALSE,
   fig.width = 10, fig.height = 3,
   cache = FALSE)
+
 ```
 
 ```{r libraries, include=FALSE}
@@ -159,6 +160,13 @@ na.result <- function(error, season = NA, sample_days = NA, samp_avail = NA) {
 # all_dates_season,
 # all_dates_year
 # )
+
+# # test runner function
+# test <- data.frame(x = c(1:30), y = 100*c(1:30))
+# test2<- runner(test$y,
+#        k = 16,
+#        at = seq(16,30,16),
+#        f = function(t) t)
 
 # entropy function hourly data ----------------------------
 
