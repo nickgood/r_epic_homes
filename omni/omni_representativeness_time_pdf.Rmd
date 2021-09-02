@@ -119,6 +119,17 @@ na.result <- function(error, season = NA, sample_days = NA, samp_avail = NA) {
 ```
 
 
+```{r define_variables}
+
+# list of all home numbers
+homes_all <- home.list(1:16)
+clusters_all <- c('heat','shoulder', 'ac', 'all')
+locations_indoor <- c('living', 'kitchen', 'bedroom')
+
+
+```
+
+
 
 ```{r function_pdf_time_hourly_master}
 # calculate kld for continuous probability distributions
@@ -184,7 +195,7 @@ entropy.table.hourly <- function(
   # data in start and end day included
   date_ranges_entire,
   tested_sample_sequence, # sequence of tested short sampling period lengths (in days)
-  location_type, # sensor location (living, bedroom, or kitchen)
+  location_type, # sensor location (living, bedroom, kitchen, or pooled)
   overlap, # if FALSE, only use samples made of ditinct days
   all_time, # if TRUE, compare each short sampling period to entire monitoring year of home
     longterm_avail_limit = 0, # only use data from a long-term period if it has at least this fraction of data available (0 means no periods are omitted if they have any data)
@@ -244,9 +255,19 @@ entropy.table.hourly <- function(
     # make df of entire monitoring period (approx. a year)
     # recorded from given location
     data_year <- data %>%
-      filter(home == home_num & location == location_type) %>%
-      mutate(hour = hour(datehour),
-             datehour = floor_date(datehour, unit = 'hour'))
+      filter(home == home_num)
+    
+    data_year <-
+      if(location_type == 'pooled') {
+        data_year %>% filter(location %in% locations_indoor)
+      } else{
+        data_year %>% filter(location == location_type)
+      }
+    
+    data_year <- data_year %>%
+      mutate(hour = hour(datehour)
+             # datehour = floor_date(datehour, unit = 'hour')
+             )
     
     
     
@@ -395,11 +416,20 @@ entropy.table.hourly <- function(
             # filter out only given room
             # and the days specified by the days in window y
             sample <- data_season %>%
-              filter( location == location_type & datehour %in% y)
+              filter(
+                datehour %in% y
+              )
+            
+            sample <- 
+              if(location_type == 'pooled') {
+                sample %>% filter(location %in% locations_indoor)
+              } else{
+                sample %>% filter(location == location_type)
+              }
             
             # omit sampling period if missing more than
-            # 25 % of sampling period
-            if(nrow(sample) < sample_avail_limit * days*24) {
+            # __ % of sampling period
+            if(length(sample$datehour %>%unique()) < sample_avail_limit * days*24) {
               
               a <- rep(NA, 24) %>% as.integer()
               
@@ -564,13 +594,14 @@ entropy.table.hourly <- function(
 
 # start <- Sys.time()
 # 
-# test<- entropy.table.hourly('012', 'pm25',
+# test<- entropy.table.hourly('009', 'pm25',
 #                             overlap = FALSE,
 #                            date_ranges_entire = list(
 #                              c('2020-09-26', '2020-10-22')),
-#                            tested_sample_sequence = c(1,3,7,11,15,19,23,27),
-#                            location_type = 'living',
+#                            tested_sample_sequence = c(2, 28),
+#                            location_type = 'pooled',
 #                            all_time = TRUE)
+# 
 # 
 # end <- Sys.time()
 # run2 <- end- start
@@ -631,17 +662,6 @@ entropy.table.hourly <- function(
   # pick.end('004', 'heat')
       # pick.start('001', 'Dec')
       #       pick.end('001', 'Jan')
-
-
-```
-
-
-```{r define_variables}
-
-# list of all home numbers
-homes_all <- home.list(1:16)
-clusters_all <- c('heat','shoulder', 'ac')
-locations_indoor <- c('living', 'kitchen', 'bedroom')
 
 
 ```
@@ -708,9 +728,9 @@ locations_indoor <- c('living', 'kitchen', 'bedroom')
       # make dfs--------------------
 
 all_time_choice <- FALSE
-    overlap_choice <- TRUE
+    overlap_choice <- FALSE
 # clust <- c('all','heat', 'shoulder', 'ac') # can do multiple
-clust <- month.abb[1:12]
+clust <- clusters_all
 
 met <- 'pm25'
 
@@ -827,11 +847,46 @@ lapply(clust, function(cluster_type) {
 )
 
 
-
+loc <- 'pooled'
+lapply(clust, function(cluster_type) {
+  
+  rep_data <-  lapply(homes_all, function(x_home) {
+    
+    start_date <- pick.start(x_home, cluster_type)
+    end_date <- pick.end(x_home, cluster_type)
+    sample_min <- pick.sample.min(met)
+    sample_max <- if_else(
+      as.numeric(as.Date(end_date) - as.Date(start_date))>=28,
+      28,
+      as.numeric(as.Date(end_date) - as.Date(start_date))
+    )
+    
+    entropy.table.hourly(
+      x_home, metric = met,
+      date_ranges_entire = list(c(start_date,
+                                  end_date)),
+      tested_sample_sequence =
+        c(c(1:7), 9, seq(11,27,4)),
+      location_type = loc,
+        overlap = overlap_choice,
+      all_time = all_time_choice) %>%
+      
+      # add in column for energy_cluster
+      mutate(energy_cluster = cluster_type) 
+  }
+  ) %>%
+    bind_rows()
+  
+  # give a variable name to the created data
+  assign(paste(met, loc, cluster_type, 'rep_data_time_hourly_pdf', sep = '_'),
+         rep_data,
+         envir = .GlobalEnv)
+}
+)
 
 met <- 'voc'
  
-loc <- 'living'
+loc <- 'pooled'
 lapply(clust, function(cluster_type) {
   
   rep_data <-  lapply(homes_all, function(x_home) {
@@ -954,7 +1009,8 @@ entropy_time_hourly_pdf_df <- bind_rows(
   pm25_kitchen_ac_rep_data_time_hourly_pdf,
 pm25_bedroom_all_rep_data_time_hourly_pdf,
   pm25_living_all_rep_data_time_hourly_pdf,
-  pm25_kitchen_all_rep_data_time_hourly_pdf,  voc_bedroom_heat_rep_data_time_hourly_pdf,
+  pm25_kitchen_all_rep_data_time_hourly_pdf,
+voc_bedroom_heat_rep_data_time_hourly_pdf,
   voc_living_heat_rep_data_time_hourly_pdf,
   voc_kitchen_heat_rep_data_time_hourly_pdf,
   voc_bedroom_shoulder_rep_data_time_hourly_pdf,
@@ -978,6 +1034,19 @@ pm25_bedroom_all_rep_data_time_hourly_pdf,
 #     }) %>% bind_rows()
 #   }) %>% bind_rows()
 
+# # if did pooled
+# entropy_time_hourly_pdf_df <- bind_rows(
+#   pm25_pooled_heat_rep_data_time_hourly_pdf,
+#   pm25_pooled_shoulder_rep_data_time_hourly_pdf,
+#   pm25_pooled_ac_rep_data_time_hourly_pdf,
+#   pm25_pooled_all_rep_data_time_hourly_pdf,
+#   voc_pooled_heat_rep_data_time_hourly_pdf,
+#   voc_pooled_shoulder_rep_data_time_hourly_pdf,
+#   voc_pooled_ac_rep_data_time_hourly_pdf,
+#   voc_pooled_all_rep_data_time_hourly_pdf
+# )
+
+
 # rm(
 #   pm25_bedroom_heat_rep_data_time_hourly_pdf,
 #   pm25_living_heat_rep_data_time_hourly_pdf,
@@ -999,6 +1068,8 @@ pm25_bedroom_all_rep_data_time_hourly_pdf,
 #   voc_kitchen_ac_rep_data_time_hourly_pdf,
 #   entropy_time_hourly_pdf_df
 # )
+
+
 
 # write csv files------------------------
 
