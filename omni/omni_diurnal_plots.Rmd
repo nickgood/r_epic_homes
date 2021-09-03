@@ -1,0 +1,993 @@
+---
+title: "omni_diurnal"
+author: "Andrew Purgiel"
+date: "7/22/2021"
+output: html_document
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.path = 'figures/',
+  warning = FALSE,
+  message = FALSE,
+  echo = FALSE,
+  fig.width = 10, fig.height = 3,
+  cache = FALSE)
+```
+
+---
+
+```{r libraries}
+library(dplyr)
+library(purrr)
+library(tidyr)
+library(openair)
+library(ggplot2)
+library(readr)
+library(googlesheets4)
+library(lubridate)
+library(gridExtra)
+```
+
+```{r data_import}
+rtdata <- read_rds('./csv_created/omni_calibrated.rds')
+```
+
+
+```{r define_functions}
+
+##Define a char vector of home numbers using a number vector,
+##ex: x <- home.list(c(1:15)) for homes 1-15
+threedig <- function(x) {
+  if (nchar(x) == 1) {a <- paste0('00', x)
+  return(a)
+  }
+  
+  if (nchar(x) == 2) {a<- paste0('0', x)
+  return(a)
+  }
+  else return(a)
+}
+
+home.list <- function(x) sapply(x, threedig)
+
+
+ # function to extract a legend from one plot for use in whole plot grid
+ # reference: https://stackoverflow.com/questions/13649473/add-a-common-legend-for-combined-ggplots
+ g_legend<-function(a.gplot){
+    tmp <- ggplot_gtable(ggplot_build(a.gplot))
+    leg <- which(sapply(tmp$grobs, function(x) x$name) == "guide-box")
+    legend <- tmp$grobs[[leg]]
+    return(legend)}
+ 
+ # misc------------------------------------------------
+
+##Define a char vector of home numbers using a number vector,
+##ex: x <- home.list(c(1:15)) for homes 1-15
+threedig <- function(x) {
+  if (nchar(x) == 1) {a <- paste0('00', x)
+  return(a)
+  }
+  
+  if (nchar(x) == 2) {a<- paste0('0', x)
+  return(a)
+  }
+  else return(a)
+}
+
+home.list <- function(x) sapply(x, threedig)
+
+
+#function to make density plot of variable x (a column)
+dens.plot <- function(data, x) {
+  
+ggdensity(pull(data, all_of(x)), 
+          main = paste("Density plot of", x),
+          xlab = x)
+}
+
+
+
+#Mean and sd functions to ignore NA values
+mean_NA <- function(x, na.rm = na.rm) {
+  mean(x, na.rm = TRUE)}
+
+sd_NA <- function(x, na.rm = na.rm) {
+  sd(x, na.rm = TRUE)}
+
+#Function to only display 3 significant figures (for tables)
+signif3 <- function(x){
+  signif(x, digits = 3)
+}
+
+
+
+#Function found online for geometric mean to use for plots
+#webpage: https://stackoverflow.com/questions/2602583/geometric-mean-is-there-a-built-in
+#adjusted so zeros are not ignored, just added one, to all values and subtract at end
+#adjusted "length" to ignore values that are NA
+
+
+gm = function(x, na.rm=TRUE){
+  if(any(x < 0, na.rm = TRUE)){
+    return(NaN)
+  }
+  if(any(x == 0, na.rm = TRUE)){
+    exp(sum(log(x+1), na.rm=na.rm) / length(x[!is.na(x)]))-1
+  }
+  else {
+    exp(sum(log(x[x > 0]), na.rm=na.rm) / length(x[!is.na(x)]))
+  }
+}
+
+
+
+#make low and high sd "interval" functions
+low.sd = function(x){
+  mean_NA(x)-sd_NA(x)
+}
+
+high.sd = function(x){
+  mean_NA(x)+sd_NA(x)
+}
+
+
+#create function for standard error
+std.error = function(x, na.rm=TRUE){
+  sd_NA(x)/sqrt(length(x[!is.na(x)]))
+}
+
+##make low and high 95% conf interval (default 95%)
+low.conf = function(x){
+  gm(x)-1.96*std.error(x)
+}
+
+high.conf = function(x){
+  gm(x)+1.96*std.error(x)
+}
+
+
+##Function to make table for plots of real time OMNI data
+##averaged by hour of day, weekday, month, or a combination
+diurnal.table <- function(data,
+                       start_date = "1900-01-13 00:00:00",
+                       end_date = "9999-08-13 00:00:00",
+                       groupers = NULL, # vector of variables to group by
+                       # arithmetic mean if FALSE, geometric if TRUE 
+                       geometric = FALSE 
+                       ) {
+  
+  #use start and end date to define timespan during which to use data
+  a <- data %>%
+    filter(datetime > ymd_hms(start_date) &
+             datetime < ymd_hms(end_date))
+  
+  #if geo is FALSE (default), use arithmetic mean and standard deviation
+  #to plot line and error bars respectively
+  #if geo is TRUE, use geometric mean and 95% conf interval
+  #to plot line and error bars respectively
+  if(geometric == FALSE){
+    mean.val <- function(x) {mean_NA(x)}
+    high.val <- function(x) {high.sd(x)}
+    low.val <- function(x) {low.sd(x)}
+  } else {
+    mean.val <- function(x) {gm(x)}
+    high.val <- function(x) {high.conf(x)}
+    low.val <- function(x) {low.conf(x)}
+  }
+  
+  # average and plot values by hour of day
+    a <- a %>%
+      mutate(hour = hour(datetime))
+    
+    a <- a %>%
+      group_by_at(.vars= c('hour', groupers)) %>%
+      summarize_if(is.numeric, list(mean.val = mean.val,
+                                    low.val = low.val,
+                                    high.val = high.val)) %>%
+      left_join(
+        a %>%
+          group_by_at(.vars= c('hour', groupers)) %>%
+      summarize(n = n()),
+      by = c('hour', groupers)
+      )%>%
+      mutate(hour = as.numeric(hour))
+    
+  
+
+  return(a)
+
+}
+
+pooled_diurnal <- diurnal.table(rtdata)
+
+    # plot without labels and such
+    plot.diurnal <- function(dat, metric, err_ribbon = TRUE) {
+      
+      # define upper y-limit for plot based on metric
+      y_range <- case_when(
+        metric == 'pm25' ~ pm25_lim,
+        metric == 'voc' ~ voc_lim,
+        metric == 'co2' ~ co2_lim,
+        metric == 'temp' ~ temp_lim,
+        metric == 'humid' ~ humid_lim,
+        metric == 'lux' ~ lux_lim,
+        metric == 'spl_a' ~ spl_a_lim)
+      
+      ggplot(dat, aes(x = hour, y = get(paste0(metric, '_mean.val'))
+                      # color = home
+                      ))+
+        geom_line( size = line_size)+
+        ##geom_errorbar(aes(ymax = pm25_high.val, ymin = pm25_low.val))+ ##bars instead?
+        geom_ribbon(aes(ymax = get(paste0(metric, '_high.val')),
+                        ymin = get(paste0(metric, '_low.val'))
+                        # fill = home
+                        ),
+                    alpha = if_else(err_ribbon == TRUE, 0.2, 0), color = NA)+
+        labs(y = metric,
+             x = 'Hour of Day')+
+        scale_x_continuous(limits = c(0,24),
+                           breaks = c(0,6,12,18),
+                           expand = c(0,0))+
+        theme_bw()+
+        coord_cartesian(ylim = y_range)+
+        theme(plot.title = element_blank(),
+      axis.text.y = element_blank(),
+      axis.text.x = element_text(size = xsmall),
+      axis.title = element_blank(),
+      legend.position = 'none')+
+        # make point size proportional to # of obs, with 0 obs = size 0
+  geom_point(aes(size = n))+
+        scale_size_area(max_size = max_point_size)
+      
+    }
+
+    plot.diurnal(pooled_diurnal, 'pm25')  
+    
+```
+
+
+
+```{r define_variables}
+
+##For plot labeling pruposes
+xsmall <- 6
+small <- 15
+medium <- 20
+large <- 26
+line_size <- 0.5
+max_point_size <- 1.5
+
+# define y-limits for metrics (for time series plots)
+pm25_lim <- c(0,60)
+voc_lim <- c(0,1500)
+co2_lim <- c(0,2500)
+temp_lim <- c(0,25)
+humid_lim <- c(0,60)
+lux_lim <- c(0,1000)
+spl_a_lim <- c(40,70)
+
+# define y-limits for metrics (for difference of means plots)
+pm25_diff_lim <- c(-10,10)
+voc_diff_lim <- c(-400,700)
+co2_diff_lim <- c(-600,1000)
+temp_diff_lim <- c(-5,3.5)
+humid_diff_lim <- c(-9,9)
+lux_diff_lim <- c(-500,750)
+pm25_diff_lim <- c(-10,10)
+spl_a_diff_lim <- c(-9,9)
+
+## for zoom:
+#   pm25_lim <- c(0,40)
+# voc_lim <- c(0,1000)
+# co2_lim <- c(0,1500)
+# temp_lim <- c(15,25)
+# humid_lim <- c(20,60)
+# lux_lim <- c(0,500)
+# spl_a_lim <- c(40,70)
+
+
+
+
+homes_all <- home.list(c(1:16))
+homes_no5 <- home.list(c(1:4, 6:16))
+metrics_all <- c('pm25', 'voc', 'co2', 'temp','humid', 'lux', 'spl_a')
+locations_indoor <- c('living', 'bedroom', 'kitchen')
+
+periods_all <- c('hour', 'day', 'month')
+
+living_data <- rtdata %>% filter(location == 'living')
+kitchen_data <- rtdata %>% filter(location == 'kitchen')
+bedroom_data <- rtdata %>% filter(location == 'bedroom')
+outdoor_data <- rtdata %>% filter(location == 'outdoor')
+garage_data <- rtdata %>% filter(location == 'garage')
+
+
+# color blind pallette
+# check http://www.cookbook-r.com/Graphs/Colors_(ggplot2)/#a-colorblind-friendly-palette
+cbbPalette <- c('black' = "#000000",
+                'light_orange' = "#E69F00",
+                'light_blue' = "#56B4E9",
+                'green' = "#009E73",
+                'yellow' = "#F0E442",
+                'dark_blue' = "#0072B2",
+                'dark_orange' = "#D55E00",
+                'purple' = "#CC79A7"
+                )
+# define colors for room-comparisons
+room_colors <- c(cbbPalette['green'],
+                   cbbPalette['purple'],
+                   cbbPalette['light_orange']
+                   )%>% unname()
+
+room_breaks <- locations_indoor
+
+```
+
+```{r}
+time.table()
+```
+
+```{r grid_pdfs, eval = FALSE}
+
+hour.day.month.grid <- function(location, err_ribbon_plot1 = TRUE,
+                                note = NULL,
+                                start_date1 = "1900-01-13 00:00:00",
+                       end_date1 = "9999-08-13 00:00:00") {
+    a <- lapply(periods_all, time.plot,
+                data = get(paste0(location, '_data')), metrics = metrics_all,
+                groupers = c('home'),
+                err_ribbon_plot = err_ribbon_plot1,
+                start_date = start_date1,
+                       end_date = end_date1)
+    
+    a <- do.call('grid.arrange', c(a, ncol = 3,
+                                   top = paste(location, start_date1,
+                                               end_date1, note, sep = '_'))) 
+    
+    # change name of file if not using error ribbon
+            # add note to file name if specified
+
+    file_name <- if_else(
+      err_ribbon_plot1 == TRUE,
+      paste0('grid_', location, '_', Sys.Date(), '_', note, '.pdf'),
+      paste0('grid_', location, '_noribbon_', Sys.Date(), '_', note, '.pdf'))
+    
+    
+    # save file as pdf
+      ggsave(file_name,
+           plot = a , width = 8, height = 10.5, units = 'in')
+      
+}
+
+rm <- 'living'
+version <- 'all time'
+# test for all monitoring period
+hour.day.month.grid(rm, err_ribbon_plot1 = TRUE, note = version)
+
+
+season <- c('2020-9-22 00:00:00','2020-12-21 23:59:00')
+season_start <- season[1]
+season_end <- season[2]
+
+
+version <- 'fall'
+  
+rm <- 'living'
+# hour.day.month.grid(rm)
+hour.day.month.grid(rm, err_ribbon_plot1 = FALSE, note = version,
+                    start_date1 = season_start, end_date1 = season_end)
+
+rm <- 'kitchen'
+# hour.day.month.grid(rm)
+hour.day.month.grid(rm, err_ribbon_plot1 = FALSE, note = version,
+                    start_date1 = season_start, end_date1 = season_end)
+
+rm <- 'bedroom'
+# hour.day.month.grid(rm)
+hour.day.month.grid(rm, err_ribbon_plot1 = FALSE, note = version,
+                    start_date1 = season_start, end_date1 = season_end)
+
+rm <- 'outdoor'
+# hour.day.month.grid(rm)
+hour.day.month.grid(rm, err_ribbon_plot1 = FALSE, note= version, 
+                    start_date1 = season_start, end_date1 = season_end)
+
+rm <- 'garage'
+# hour.day.month.grid(rm)
+hour.day.month.grid(rm, err_ribbon_plot1 = FALSE, note = version,
+                    start_date1 = season_start, end_date1 = season_end)
+
+
+```
+
+## Note: all plots use averaged hourly data to calculate means and confidence intervals  
+
+
+# Hourly 
+
+## Overall
+
+```{r hourly_overall, eval = FALSE}
+
+
+
+{
+  a <- time.table(rtdata, 'hour', groupers = 'location')
+  
+##PM2.5
+
+
+   plotpm <- ggplot(a, aes(x = hour, y = pm25_mean.val))+
+    geom_line( size = 1)+
+    facet_wrap(~location)+
+    ##geom_errorbar(aes(ymax = pm25_high.val, ymin = pm25_low.val))+ ##bars instead?
+    geom_ribbon(aes(ymax = pm25_high.val, ymin = pm25_low.val),
+                alpha = 0.2, color = NA, fill = 'orange')+
+    labs(y = expression('PM'["2.5"]*'(ug/m'^3*')'),
+         x = "Time",
+         title = paste("PM in Homes"))+
+    scale_x_continuous(limits = c(0,24),
+                       breaks = c(0,6,12,18),
+                       labels = c('12am', '6am','noon', '6pm'),
+                       expand = c(0,0))+
+    theme_bw()+
+    coord_cartesian(ylim = c(0, 60))+
+    theme(plot.title = element_text(hjust = 0.5),
+          title = element_text(size = medium),
+          axis.text = element_text(size = small),
+          strip.text = element_text( size = medium),
+          axis.title = element_text(size = medium))+
+    geom_point(size = 2)+
+          ##for extra space between facets
+    theme(panel.spacing = unit(1, "lines"),
+          strip.background =element_blank())
+
+##VOC
+
+   plotvoc <- ggplot(a, aes(x = hour, y = voc_mean.val))+
+    geom_line(size = 1)+
+    facet_wrap(~location)+
+    ##geom_errorbar(aes(ymax = pm25_high.val, ymin = pm25_low.val))+ ##bars instead?
+    geom_ribbon(aes(ymax = voc_high.val, ymin = voc_low.val),
+                alpha = 0.2, color = NA, fill = 'orange')+
+    labs(y = 'TVOC (ppb)',
+         x = "Time",
+         title = paste("TVOCs in Homes"))+
+    scale_x_continuous(limits = c(0,24),
+                       breaks = c(0,6,12,18),
+                       labels = c('12am', '6am','noon', '6pm'),
+                       expand = c(0,0))+
+    coord_cartesian(ylim = c(0, 1200))+
+    theme_bw()+
+    theme(plot.title = element_text(hjust = 0.5),
+          title = element_text(size = medium),
+          axis.text = element_text(size = small),
+          strip.text = element_text( size = medium),
+          axis.title = element_text(size = medium))+
+    geom_point(size = 2)+
+     ##for extra space between facets
+    theme(panel.spacing = unit(1, "lines"),
+          strip.background =element_blank())
+  
+}
+plotpm
+plotvoc
+
+
+```
+
+## By Home
+
+```{r hourly_homes, eval = FALSE, fig.height=2.5, fig.width = 12}
+
+   # plot with details
+      plot.hourly <- function(metric, data, location = NULL) {
+     
+              # define upper y-limit for plot based on metric
+      y_range <- case_when(
+        metric == 'pm25' ~ pm25_lim,
+        metric == 'voc' ~ voc_lim,
+        metric == 'co2' ~ co2_lim,
+        metric == 'temp' ~ temp_lim,
+        metric == 'humid' ~ humid_lim,
+        metric == 'lux' ~ lux_lim,
+        metric == 'spl_a' ~ spl_a_lim)
+      
+        #     y_label <- case_when(
+        # metric == 'pm25' ~ expression('PM'[2.5]*', ppb'),
+        # metric == 'voc' ~ 'TVOC, ppb',
+        # metric == 'co2' ~ expression('CO'[2]*', ppb'),
+        # metric == 'temp' ~ 'Temperature, deg C',
+        # metric == 'humid' ~ 'Relative Humidity, %',
+        # metric == 'lux' ~ 'Light, lx',
+        # metric == 'spl_a' ~ 'Noise, dB')
+      
+     ggplot(data, aes(x = hour, y = get(paste0(metric, '_mean.val')), color = home))+
+    geom_line( size = 1)+
+    {if( is.null(location) | length(location) > 1) 
+      facet_wrap(~factor(location, levels = c('living', 'kitchen', 'bedroom',
+                                              'garage', 'outdoor')),
+                 ncol = 5)}+
+    ##geom_errorbar(aes(ymax = pm25_high.val, ymin = pm25_low.val))+ ##bars instead?
+    # geom_ribbon(aes(ymax = get(paste0(metric, '_high.val')),
+    #                 ymin = get(paste0(metric, '_low.val')), fill = home),
+    #             alpha = 0.2, color = NA)+
+    labs(y = paste('Average', metric),
+         x = "Hour of Day",
+         title = 'Hourly')+
+    scale_x_continuous(limits = c(0,24),
+                       breaks = c(0,6,12,18),
+                       labels = c('12am', '6am','noon', '6pm'),
+                       expand = c(0,0))+
+       scale_color_discrete(name = 'Home',
+                            guide = 'none'
+                            )+
+    theme_bw()+
+    theme(plot.title = element_blank(),
+          title = element_text(size = medium),
+          axis.text.y = element_text(size = small),
+          axis.text.x = element_text(size = small-3),
+          strip.text = element_text( size = medium),
+          axis.title = element_text(size = medium),
+          legend.title = element_text(size = medium-3),
+          panel.spacing.x = unit(1, 'lines') # add horiz space between facets
+          )+
+               coord_cartesian(ylim = y_range)+
+        # make point size proportional to # of obs, with 0 obs = size 0
+        # geom_point(aes(size = n))+
+        scale_size_area(max_size = max_point_size, guide = 'none')+
+       # guides(col = guide_legend(ncol = 2))+ #split up legend
+          ##for extra space between facets
+    theme(
+          strip.background =element_blank())
+      }
+
+a <- time.table(rtdata, 'hour', groupers = c('home','location'))%>%
+  filter(home %in% homes_no5)
+
+plot.hourly('pm25', data = a)
+plot.hourly('voc', data = a)
+plot.hourly('co2', data = a)
+plot.hourly('temp', data = a)
+
+
+
+
+```
+
+
+
+
+# Daily
+
+```{r date_day, eval = FALSE}
+
+
+
+{A <- time.table(rtdata, 'date.day', groupers = 'location')
+  
+##PM2.5
+
+
+   plotpm <- ggplot(A, aes(x = datetime, y = pm25_mean.val))+
+    geom_line( size = 1)+
+    ##geom_errorbar(aes(ymax = pm25_high.val, ymin = pm25_low.val))+ ##bars instead?
+    geom_ribbon(aes(ymax = pm25_high.val, ymin = pm25_low.val),
+                alpha = 0.2, color = NA, fill = 'orange')+
+    labs(y = expression('PM'["2.5"]*'(ug/m'^3*')'),
+         x = "Date",
+         title = paste("PM - Average of Daily Values for all Homes"))+
+    theme_bw()+
+    coord_cartesian(ylim = c(0, 60))+
+    theme(plot.title = element_text(hjust = 0.5),
+          title = element_text(size = small),
+          axis.text = element_text(size = medium),
+          strip.text = element_text( size = large),
+          axis.title = element_text(size = large))+
+    geom_point(size = 1)+
+         facet_wrap(~location)+
+          ##for extra space between facets
+    theme(panel.spacing = unit(1, "lines"),
+          strip.background =element_blank())
+
+##VOC
+
+   plotvoc <- ggplot(A, aes(x = datetime, y = voc_mean.val))+
+    geom_line(size = 1)+
+    ##geom_errorbar(aes(ymax = pm25_high.val, ymin = pm25_low.val))+ ##bars instead?
+    geom_ribbon(aes(ymax = voc_high.val, ymin = voc_low.val),
+                alpha = 0.2, color = NA, fill = 'orange')+
+    labs(y = 'TVOC (ppb)',
+         x = "Date",
+         title = paste("TVOCs - Average of Daily Values for all Homes)"))+
+    coord_cartesian(ylim = c(0, 1200))+
+    theme_bw()+
+    theme(plot.title = element_text(hjust = 0.5),
+          title = element_text(size = 18),
+          axis.text = element_text(size = medium),
+          strip.text = element_text( size = large),
+          axis.title = element_text(size = large))+
+    geom_point(size = 1)+
+         facet_wrap(~location)+
+          ##for extra space between facets
+    theme(panel.spacing = unit(1, "lines"),
+          strip.background =element_blank())
+  
+}
+plotpm
+plotvoc
+
+```
+
+
+# Weekday
+
+## By Home
+```{r weekday_homes, eval = FALSE, fig.height=2.5, fig.width = 12}
+
+   # plot with details
+      plot.weekday <- function(metric, data, location = NULL) {
+     
+              # define upper y-limit for plot based on metric
+      y_range <- case_when(
+        metric == 'pm25' ~ c(0,37),
+        metric == 'voc' ~ voc_lim,
+        metric == 'co2' ~ c(0,1250),
+        metric == 'temp' ~ temp_lim,
+        metric == 'humid' ~ humid_lim,
+        metric == 'lux' ~ lux_lim,
+        metric == 'spl_a' ~ spl_a_lim)
+      
+        #     y_label <- case_when(
+        # metric == 'pm25' ~ expression('PM'[2.5]*', ppb'),
+        # metric == 'voc' ~ 'TVOC, ppb',
+        # metric == 'co2' ~ expression('CO'[2]*', ppb'),
+        # metric == 'temp' ~ 'Temperature, deg C',
+        # metric == 'humid' ~ 'Relative Humidity, %',
+        # metric == 'lux' ~ 'Light, lx',
+        # metric == 'spl_a' ~ 'Noise, dB')
+      
+     ggplot(data, aes(x = weekday, y = get(paste0(metric, '_mean.val')), color = home))+
+    geom_line( aes(group = home), size = 1)+
+    {if( is.null(location) | length(location) > 1) 
+      facet_wrap(~factor(location, levels = c('living', 'kitchen', 'bedroom',
+                                              'garage', 'outdoor')),
+                 ncol = 5)}+
+    ##geom_errorbar(aes(ymax = pm25_high.val, ymin = pm25_low.val))+ ##bars instead?
+    # geom_ribbon(aes(ymax = get(paste0(metric, '_high.val')),
+    #                 ymin = get(paste0(metric, '_low.val')), fill = home),
+    #             alpha = 0.2, color = NA)+
+    labs(y = paste('Average', metric),
+         x = "Weekday",
+         title = 'Weekday')+
+    scale_x_discrete(
+                       labels = c('M', 'T', 'W', 'Th', 'F', 'Sa', 'Su')
+                       )+
+       scale_color_discrete(name = 'Home')+
+    theme_bw()+
+    theme(plot.title = element_blank(),
+          title = element_text(size = medium),
+          axis.text.y = element_text(size = small),
+          axis.text.x = element_text(size = small-3),
+          strip.text = element_text( size = medium),
+          axis.title = element_text(size = medium),
+          legend.title = element_text(size = medium-3),
+          panel.spacing.x = unit(1, 'lines') # add horiz space between facets
+          )+
+               coord_cartesian(ylim = y_range)+
+        # make point size proportional to # of obs, with 0 obs = size 0
+        # geom_point(aes(size = n))+
+        scale_size_area(max_size = max_point_size, guide = 'none')+
+          ##for extra space between facets
+    theme(
+          strip.background =element_blank())
+      }
+
+a <- time.table(rtdata, 'day', groupers = c('home','location'))%>%
+  filter(home %in% homes_no5)
+
+plot.weekday('pm25', data = a)
+plot.weekday('voc', data = a)
+plot.weekday('co2', data = a)
+plot.weekday('temp', data = a)
+
+
+```
+
+
+
+# Monthly
+
+## one room
+
+```{r monthly, eval = FALSE}
+
+
+
+rms <- c('living', 'outdoor')
+
+
+##### Boxplots
+
+# PM2.5
+
+  
+metric <- 'pm25'
+
+
+a <- rtdata %>%
+  filter(location %in% rms) %>%
+  mutate(month = lubridate::month(datetime, label = TRUE)) %>%
+  group_by(month, location) %>%
+  mutate(outlier = get(metric) > median(get(metric), na.rm = TRUE) +
+           IQR(get(metric), na.rm = TRUE) * 1.5) %>%
+  ungroup()
+
+
+ plotpm <- ggplot(a, aes(x = month, y = get(metric)))+
+    geom_boxplot(outlier.shape = NA)+ # don't plot outliers at first
+    labs(y = expression('PM'["2.5"]*'(ug/m'^3*')'),
+         x = "Month",
+         title = paste("PM in Homes"))+
+   facet_wrap(~location)+
+    theme_bw()+
+    coord_cartesian(ylim = c(0, 60))+
+    theme(plot.title = element_text(hjust = 0.5),
+          title = element_text(size = medium),
+          axis.text = element_text(size = small),
+          strip.text = element_text( size = medium),
+          axis.title = element_text(size = medium))+
+   geom_point(data = function(x) filter_(x, ~ outlier),
+              position = 'jitter', size = 1) # Outliers
+
+ 
+ plotpm
+ 
+ 
+ 
+##VOC
+
+   
+ metric <- 'voc'
+  
+a <- hourly %>%
+  filter(location %in% rms) %>%
+  mutate(month = lubridate::month(datetime, label = TRUE)) %>%
+  group_by(month, location) %>%
+  mutate(outlier = get(metric) > median(get(metric), na.rm = TRUE) +
+           IQR(get(metric), na.rm = TRUE) * 1.5) %>%
+  ungroup()
+ 
+   
+   plotvoc <- ggplot(a, aes(x = month, y = get(metric)))+
+    geom_boxplot(outlier.shape = NA)+ # don't plot outliers at first
+    labs(y = 'TVOC (ppb)',
+         x = "Month",
+         title = paste("TVOCs in Homes"))+
+    coord_cartesian(ylim = c(0, 1200))+
+        facet_wrap(~location)+
+    theme_bw()+
+    theme(plot.title = element_text(hjust = 0.5),
+          title = element_text(size = medium),
+          axis.text = element_text(size = small),
+          strip.text = element_text( size = medium),
+          axis.title = element_text(size = medium))+
+   geom_point(data = function(x) filter_(x, ~ outlier),
+              position = 'jitter', size = 1) # Outliers  
+
+   
+   
+
+plotvoc
+
+
+
+
+```
+
+## By Home
+
+```{r monthly_homes, eval = FALSE, fig.height=2.5, fig.width = 12}
+
+   # plot with details
+      plot.monthly <- function(metric, data, location = NULL) {
+     
+              # define upper y-limit for plot based on metric
+      y_range <- case_when(
+        metric == 'pm25' ~ c(0,40),
+        metric == 'voc' ~ voc_lim,
+        metric == 'co2' ~ c(0,2000),
+        metric == 'temp' ~ temp_lim,
+        metric == 'humid' ~ humid_lim,
+        metric == 'lux' ~ lux_lim,
+        metric == 'spl_a' ~ spl_a_lim)
+      
+        #     y_label <- case_when(
+        # metric == 'pm25' ~ expression('PM'[2.5]*', ppb'),
+        # metric == 'voc' ~ 'TVOC, ppb',
+        # metric == 'co2' ~ expression('CO'[2]*', ppb'),
+        # metric == 'temp' ~ 'Temperature, deg C',
+        # metric == 'humid' ~ 'Relative Humidity, %',
+        # metric == 'lux' ~ 'Light, lx',
+        # metric == 'spl_a' ~ 'Noise, dB')
+      
+     ggplot(data, aes(x = month, y = get(paste0(metric, '_mean.val')), color = home))+
+    geom_line( aes(group = home), size = 1)+
+    {if( is.null(location) | length(location) > 1) 
+      facet_wrap(~factor(location, levels = c('living', 'kitchen', 'bedroom',
+                                              'garage', 'outdoor')),
+                 ncol = 5)}+
+    ##geom_errorbar(aes(ymax = pm25_high.val, ymin = pm25_low.val))+ ##bars instead?
+    # geom_ribbon(aes(ymax = get(paste0(metric, '_high.val')),
+    #                 ymin = get(paste0(metric, '_low.val')), fill = home),
+    #             alpha = 0.2, color = NA)+
+    labs(y = paste('Average', metric),
+         x = "Month",
+         title = 'Monthly')+
+    scale_x_discrete(
+                       labels = sapply(month.abb[c(1:12)],
+                                       substr, start = 1, stop = 1) %>% unname()
+                       )+
+       scale_color_discrete(name = 'Home')+
+    theme_bw()+
+    theme(plot.title = element_blank(),
+          title = element_text(size = medium),
+          axis.text.y = element_text(size = small),
+          axis.text.x = element_text(size = small-3),
+          strip.text = element_text( size = medium),
+          axis.title = element_text(size = medium),
+          legend.title = element_text(size = medium-3),
+          panel.spacing.x = unit(1, 'lines') # add horiz space between facets
+          )+
+               coord_cartesian(ylim = y_range)+
+        # make point size proportional to # of obs, with 0 obs = size 0
+        # geom_point(aes(size = n))+
+        scale_size_area(max_size = max_point_size, guide = 'none')+
+          ##for extra space between facets
+    theme(
+          strip.background =element_blank())
+      }
+
+a <- time.table(rtdata, 'month', groupers = c('home','location'))%>%
+  filter(home %in% homes_no5)
+
+plot.monthly('pm25', data = a)
+plot.monthly('voc', data = a)
+plot.monthly('co2', data = a)
+plot.monthly('temp', data = a)
+
+
+```
+
+
+
+
+
+
+
+
+# Comparing variation between rooms
+
+```{r function_room_comparison}
+
+
+# function to compare diurnal trends of indoor rooms
+# for specified metric
+room.compare <- function(metric, data = rtdata,
+                         simple = TRUE) {
+  
+  # make data for plots
+a <- data %>%
+  select(home, location, datetime, all_of(metric)) %>%
+  filter(location %in% c('living', 'kitchen', 'bedroom'))
+
+# then find diurnal means and sd for each room
+locations <- time.table(a,
+                       'hour', groupers = c('home','location'))
+
+# find overall diurnal means and sd for pooled 
+avg <- time.table(a,
+                       'hour', groupers = c('home'))
+
+# join dataframes together
+compare_df <- full_join(
+  locations,
+  avg %>% select(home, hour, overall_mean = mean.val),
+  by = c('hour', 'home')) %>%
+  # subtract the overall mean from each of the room mean and interval values
+  mutate(mean = mean.val-overall_mean, high = high.val-overall_mean,
+         low = low.val-overall_mean)
+
+  # define plot y limits based on metric
+  y_limits <- case_when(
+        metric == 'pm25' ~ pm25_diff_lim,
+        metric == 'voc' ~ voc_diff_lim,
+        metric == 'co2' ~ co2_diff_lim,
+        metric == 'temp' ~ temp_diff_lim,
+        metric == 'humid' ~ humid_diff_lim,
+        metric == 'lux' ~ lux_diff_lim,
+        metric == 'spl_a' ~ spl_a_diff_lim)
+  
+
+  ggplot(compare_df, aes(x = hour, y = mean, color = location))+
+    geom_line( size = ifelse(simple == TRUE, 1, 1))+
+    labs(y = 'Room Mean - Pooled Mean',
+         x = "Hour of Day",
+         title = metric)+
+    scale_x_continuous(limits = c(0,24),
+                       breaks = c(0,6,12,18),
+                       labels = c('midnight', '6am','noon', '6pm'),
+                       expand = c(0,0))+
+    theme_bw()+
+    coord_cartesian(ylim = y_limits)+ # defined in beginngin of function
+    theme(plot.title = element_text(hjust = 0.5))+
+          {if(simple == TRUE) theme(
+            title = element_text(size = xsmall),
+          axis.text = element_text(size = xsmall+2),
+          strip.text = element_text( size = xsmall+2),
+          axis.title = element_text(size = xsmall+2),
+          legend.text = element_text(size = xsmall+2),
+          legend.title = element_text(size = xsmall+2)
+          ) else theme(
+            title = element_text(size = small-2),
+          axis.text = element_text(size = small),
+          strip.text = element_text( size = small+2),
+          axis.title = element_text(size = small-1)
+          )
+          }+
+    geom_point(size = ifelse(simple == TRUE, 1, 2))+
+          ##for extra space between facets
+    theme(panel.spacing = unit(1, "lines"),
+          strip.background =element_blank())+
+   facet_wrap(vars(home), ncol = 5)+
+   geom_hline(yintercept = 0, linetype = 'dashed')+
+     scale_color_manual(
+       values = room_colors,
+              breaks = room_breaks,
+       name = 'Room')
+  # use below lines if using error ribbon
+   # geom_ribbon(aes(ymax = high, ymin = low, fill = location),
+   #                  alpha = 0.2, color = NA)+
+   #      scale_fill_manual(
+   #     values = room_colors,
+   #            breaks = room_breaks,
+   #     name = 'Room')
+    
+    
+    # ggsave(paste0('room_compare_',metric, '_', Sys.Date(),'.pdf'), plot = a ,
+    #        width = 10.5, height = 8, units = 'in')
+  
+}
+
+# # test for one metric
+# room.compare('voc')
+
+
+
+```
+
+## For one home/metric
+
+```{r plot_room_comparison_example, fig.height=4, fig.width = 6}
+a <- rtdata %>% filter(home == '010')
+room.compare(metric = 'pm25', data = a, simple = FALSE)
+```
+
+## FOr all homes and metrics
+
+```{r plot_room_comparison_all, fig.height=6.5, fig.width = 10.5, results='asis'}
+
+a <- rtdata %>% filter( home %in% homes_no5)
+
+# # test for one metric
+# room.compare('pm25', data = a)
+
+# make comparison plots for all metrics
+lapply(metrics_all, function(x_metric) {
+  a <- room.compare(metric = x_metric, data = a)
+  print(a)
+  # insert page break between plots
+  cat("\n\n\\pagebreak\n")
+})
+```
+
