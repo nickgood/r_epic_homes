@@ -239,35 +239,10 @@ map(c('017'), function(x_home) {
 ```
 
 
-```{r function_data_merger, eval = FALSE}
-
-folder_date <- '2021-07-14'
-
-# make single csv file merging all homes/location rds files
-# that have digits in them
-pattern <- paste0("[0-9]*.rds$")
-files <- list.files(paste0("./csv_created/omni_raw_", folder_date),
-                    pattern = pattern, full.names = TRUE)
-
-omni_data<- map(files, function(x) {
-  read_rds(x) %>%
-    select(!contains('X1')) # remove X1 for dataframes that have rownames
-}
-) %>%
-  bind_rows() %>%
-      filter(rowSums(is.na(.)) != ncol(.)) # omit a row if every value is NA
-
-
-write_rds(omni_data, paste0('./csv_created/pre-calibration/omni_all_locations_raw_',
-                       Sys.Date(), '.rds'))
-
-
-```
-
 # Clean minutely data
 
 
-```{r import_all_data, eval = TRUE}
+```{r import_all_data, eval = FALSE}
 
 omni_data <- read_rds(paste0('./csv_created/pre-calibration/omni_all_locations_raw_',
 '2021-07-14.rds'))
@@ -275,7 +250,7 @@ omni_data <- read_rds(paste0('./csv_created/pre-calibration/omni_all_locations_r
 ```
 
 
-```{r clean_data_further}
+```{r clean_data_further, eval = FALSE}
 
  # remove unneeded columns
 omni_data_clean <- omni_data
@@ -459,7 +434,7 @@ write_rds(omni_data_clean, paste0('./csv_created/pre-calibration/omni_all_locati
 # create data of multiple resolutions from cleaned data
 
 
-```{r hourly_data_rds}
+```{r hourly_data_rds, eval = FALSE}
 
 omni_hourly_data <- omni_data_clean %>%
   group_by(datehour = floor_date(datetime, unit = 'hour'),
@@ -476,7 +451,7 @@ write_rds(omni_hourly_data, paste0('./csv_created/pre-calibration/omni_hourly_da
 
 ```
 
-```{r daily_data_rds}
+```{r daily_data_rds, eval = FALSE}
 
   omni_daily_data <- omni_data_clean %>%
   group_by(dateday = floor_date(datetime, unit = 'day'),
@@ -494,12 +469,21 @@ write_rds(omni_daily_data, paste0('./csv_created/pre-calibration/omni_daily_data
 
 # calibrate data with filter concentrations
 
+```{r import_uncalibrated_data}
+omni_data_precal <- 
+  # read in uncalibrated data
+  read_rds(paste0('./csv_created/pre-calibration/omni_all_locations_pre-cal.rds')) %>%
+  filter(home %in% homes_no5)
+
+```
+
 ```{r import_filter_data}
-filter_data <- read_rds('../output_2021-07-14/pm25/pm25.rds')
+filter_data <- read_rds('../output_thesis/pm25/pm25.rds')
 ```
 
 
-```{r create_correction_factor}
+# create correction factor
+```{r find_correction_ratios_for_all_sensors}
 
 # add correciton factor to real-time pm2.5 data
 blank_data <- filter_data %>%
@@ -520,23 +504,6 @@ filter_data_correct <- filter_data %>%
   
 
 
-# omni_data_cal <- 
-#   # read in uncalibrated data
-#   read_csv(paste0('./csv_created/pre-calibration/omni_all_locations_pre-cal.csv')) %>%
-#   left_join(
-#     #calculate TWA for pm2.5 for each home/location
-#     group_by(., home, location) %>%
-#       summarise_at(vars(pm25), funs(twa = mean, n_hours = n()/(60/5),
-#       )) %>%
-#       # match filter-based concentration to TWA for each home/location
-#       left_join(filter_data_correct, by = c('home' = 'id_home', 'location')) %>%
-#       mutate(grav_cf = twa/conc_correct)
-#   )
-
-omni_data_precal <- 
-  # read in uncalibrated data
-  read_rds(paste0('./csv_created/pre-calibration/omni_all_locations_pre-cal.rds')) %>%
-  filter(home %in% homes_no5)
 
 # make dataframe of corrrection factors
 grav_cf_df <- omni_data_precal %>%
@@ -554,11 +521,24 @@ grav_cf_df <- omni_data_precal %>%
          #                  grav_cf)
   )
 
+
+```
+
+*look at correction factor spread (for median)
+```{r}
 # check spread of correction factor values
 ggplot(grav_cf_df, aes(y = grav_cf))+
   geom_boxplot()
 
   
+```
+
+*look at regression of TWA to filter values
+
+
+
+* calibrate with decided method of correction factor
+```{r}
 # find the median value of correction factors (exclude negatives)
 # and use that to correct all households
 grav_cf_median <- grav_cf_df %>% filter(!is.na(grav_cf) & grav_cf>0) %>%
@@ -574,7 +554,6 @@ Sys.Date(),'.rds'))
 
 write_rds(omni_data_cal, paste0('./csv_created/omni_calibrated.rds'))
 ```
-
 
 ```{r hourly_cal_data_rds}
 
