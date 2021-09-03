@@ -33,22 +33,7 @@ rtdata <- read_rds('./csv_created/omni_calibrated.rds')
 ```
 
 
-```{r define_functions}
-
-##Define a char vector of home numbers using a number vector,
-##ex: x <- home.list(c(1:15)) for homes 1-15
-threedig <- function(x) {
-  if (nchar(x) == 1) {a <- paste0('00', x)
-  return(a)
-  }
-  
-  if (nchar(x) == 2) {a<- paste0('0', x)
-  return(a)
-  }
-  else return(a)
-}
-
-home.list <- function(x) sapply(x, threedig)
+```{r functions_misc}
 
 
  # function to extract a legend from one plot for use in whole plot grid
@@ -146,105 +131,9 @@ high.conf = function(x){
 }
 
 
-##Function to make table for plots of real time OMNI data
-##averaged by hour of day, weekday, month, or a combination
-diurnal.table <- function(data,
-                       start_date = "1900-01-13 00:00:00",
-                       end_date = "9999-08-13 00:00:00",
-                       groupers = NULL, # vector of variables to group by
-                       # arithmetic mean if FALSE, geometric if TRUE 
-                       geometric = FALSE 
-                       ) {
-  
-  #use start and end date to define timespan during which to use data
-  a <- data %>%
-    filter(datetime > ymd_hms(start_date) &
-             datetime < ymd_hms(end_date))
-  
-  #if geo is FALSE (default), use arithmetic mean and standard deviation
-  #to plot line and error bars respectively
-  #if geo is TRUE, use geometric mean and 95% conf interval
-  #to plot line and error bars respectively
-  if(geometric == FALSE){
-    mean.val <- function(x) {mean_NA(x)}
-    high.val <- function(x) {high.sd(x)}
-    low.val <- function(x) {low.sd(x)}
-  } else {
-    mean.val <- function(x) {gm(x)}
-    high.val <- function(x) {high.conf(x)}
-    low.val <- function(x) {low.conf(x)}
-  }
-  
-  # average and plot values by hour of day
-    a <- a %>%
-      mutate(hour = hour(datetime))
-    
-    a <- a %>%
-      group_by_at(.vars= c('hour', groupers)) %>%
-      summarize_if(is.numeric, list(mean.val = mean.val,
-                                    low.val = low.val,
-                                    high.val = high.val)) %>%
-      left_join(
-        a %>%
-          group_by_at(.vars= c('hour', groupers)) %>%
-      summarize(n = n()),
-      by = c('hour', groupers)
-      )%>%
-      mutate(hour = as.numeric(hour))
-    
-  
 
-  return(a)
-
-}
-
-pooled_diurnal <- diurnal.table(rtdata)
-
-    # plot without labels and such
-    plot.diurnal <- function(dat, metric, err_ribbon = TRUE) {
-      
-      # define upper y-limit for plot based on metric
-      y_range <- case_when(
-        metric == 'pm25' ~ pm25_lim,
-        metric == 'voc' ~ voc_lim,
-        metric == 'co2' ~ co2_lim,
-        metric == 'temp' ~ temp_lim,
-        metric == 'humid' ~ humid_lim,
-        metric == 'lux' ~ lux_lim,
-        metric == 'spl_a' ~ spl_a_lim)
-      
-      ggplot(dat, aes(x = hour, y = get(paste0(metric, '_mean.val'))
-                      # color = home
-                      ))+
-        geom_line( size = line_size)+
-        ##geom_errorbar(aes(ymax = pm25_high.val, ymin = pm25_low.val))+ ##bars instead?
-        geom_ribbon(aes(ymax = get(paste0(metric, '_high.val')),
-                        ymin = get(paste0(metric, '_low.val'))
-                        # fill = home
-                        ),
-                    alpha = if_else(err_ribbon == TRUE, 0.2, 0), color = NA)+
-        labs(y = metric,
-             x = 'Hour of Day')+
-        scale_x_continuous(limits = c(0,24),
-                           breaks = c(0,6,12,18),
-                           expand = c(0,0))+
-        theme_bw()+
-        coord_cartesian(ylim = y_range)+
-        theme(plot.title = element_blank(),
-      axis.text.y = element_blank(),
-      axis.text.x = element_text(size = xsmall),
-      axis.title = element_blank(),
-      legend.position = 'none')+
-        # make point size proportional to # of obs, with 0 obs = size 0
-  geom_point(aes(size = n))+
-        scale_size_area(max_size = max_point_size)
-      
-    }
-
-    plot.diurnal(pooled_diurnal, 'pm25')  
     
 ```
-
 
 
 ```{r define_variables}
@@ -323,8 +212,112 @@ room_breaks <- locations_indoor
 
 ```
 
+
+```{r functions_diurnal}
+##Function to make table for plots of real time OMNI data
+##averaged by hour of day, weekday, month, or a combination
+diurnal.table <- function(data,
+                       start_date = "1900-01-13 00:00:00",
+                       end_date = "9999-08-13 00:00:00",
+                       groupers = NULL, # vector of variables to group by
+                       # arithmetic mean if FALSE, geometric if TRUE
+                       locations = locations_indoor,
+                       geometric = FALSE 
+                       ) {
+  
+  #use start and end date to define timespan during which to use data
+  a <- data %>%
+    filter(datetime > ymd_hms(start_date) &
+             datetime < ymd_hms(end_date) &
+             location %in% locations_indoor)
+  
+  #if geo is FALSE (default), use arithmetic mean and standard deviation
+  #to plot line and error bars respectively
+  #if geo is TRUE, use geometric mean and 95% conf interval
+  #to plot line and error bars respectively
+  if(geometric == FALSE){
+    mean.val <- function(x) {mean_NA(x)}
+    high.val <- function(x) {high.sd(x)}
+    low.val <- function(x) {low.sd(x)}
+  } else {
+    mean.val <- function(x) {gm(x)}
+    high.val <- function(x) {high.conf(x)}
+    low.val <- function(x) {low.conf(x)}
+  }
+  
+  # average and plot values by hour of day
+    a <- a %>%
+      mutate(hour = hour(datetime))
+    
+    a <- a %>%
+      group_by_at(.vars= c('hour', groupers)) %>%
+      summarize_if(is.numeric, list(mean.val = mean.val,
+                                    low.val = low.val,
+                                    high.val = high.val)) %>%
+      left_join(
+        a %>%
+          group_by_at(.vars= c('hour', groupers)) %>%
+      summarize(n = n()),
+      by = c('hour', groupers)
+      )%>%
+      mutate(hour = as.numeric(hour))
+    
+  
+
+  return(a)
+
+}
+
+    # plot without labels and such
+    plot.diurnal <- function(dat, metric, err_ribbon = TRUE) {
+      
+      # define upper y-limit for plot based on metric
+      y_range <- case_when(
+        metric == 'pm25' ~ pm25_lim,
+        metric == 'voc' ~ voc_lim,
+        metric == 'co2' ~ co2_lim,
+        metric == 'temp' ~ temp_lim,
+        metric == 'humid' ~ humid_lim,
+        metric == 'lux' ~ lux_lim,
+        metric == 'spl_a' ~ spl_a_lim)
+      
+      ggplot(dat, aes(x = hour, y = get(paste0(metric, '_mean.val'))
+                      # color = home
+                      ))+
+        geom_line( size = line_size)+
+        ##geom_errorbar(aes(ymax = pm25_high.val, ymin = pm25_low.val))+ ##bars instead?
+        geom_ribbon(aes(ymax = get(paste0(metric, '_high.val')),
+                        ymin = get(paste0(metric, '_low.val'))
+                        # fill = home
+                        ),
+                    alpha = if_else(err_ribbon == TRUE, 0.2, 0), color = NA)+
+        labs(y = metric,
+             x = 'Hour of Day')+
+        scale_x_continuous(limits = c(0,24),
+                           breaks = c(0,6,12,18),
+                           expand = c(0,0))+
+        theme_bw()+
+        coord_cartesian(ylim = y_range)+
+        theme(plot.title = element_blank(),
+      axis.text.x = element_text(size = xsmall))+
+        # make point size proportional to # of obs, with 0 obs = size 0
+  geom_point(aes(size = n))+
+        scale_size_area(max_size = max_point_size)
+      
+    }
+
+    
+    pooled_diurnal <- diurnal.table(rtdata)
+
+    plot.diurnal(pooled_diurnal, 'pm25')
+    plot.diurnal(pooled_diurnal, 'voc')  
+
+```
+
 ```{r}
-time.table()
+
+# time.table()
+
 ```
 
 ```{r grid_pdfs, eval = FALSE}
