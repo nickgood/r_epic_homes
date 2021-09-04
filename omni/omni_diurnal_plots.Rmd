@@ -147,8 +147,8 @@ line_size <- 0.5
 max_point_size <- 1.5
 
 # define y-limits for metrics (for time series plots)
-pm25_lim <- c(0,60)
-voc_lim <- c(0,1500)
+pm25_lim <- c(0,90)
+voc_lim <- c(0,1200)
 co2_lim <- c(0,2500)
 temp_lim <- c(0,25)
 humid_lim <- c(0,60)
@@ -203,6 +203,15 @@ room_colors <- c(cbbPalette['green'],
                    )%>% unname()
 
 room_breaks <- locations_indoor
+
+# define colors for energy clusters
+energy_colors <- c(cbbPalette['light_blue'],
+                   cbbPalette['green'],
+                   cbbPalette['dark_orange'],
+                   cbbPalette['black'])%>% unname()
+
+energy_breaks <- c('ac', 'shoulder', 'heat', 'overall')
+energy_labels <- c('AC', 'Shoulder', 'Heat', 'Entire Period')
 
 ```
 
@@ -315,6 +324,10 @@ err_ribbon <- TRUE
 #pm25------------
  met <- 'pm25'
 
+     y_range <- case_when(
+        met == 'pm25' ~ pm25_lim,
+        met == 'voc' ~ voc_lim)
+     
       ggplot(a, aes(x = hour, y = get(paste0(met, '_mean.val'))
                       # color = home
                       ))+
@@ -331,17 +344,22 @@ err_ribbon <- TRUE
                            breaks = c(0,6,12,18),
                            expand = c(0,0))+
         theme_bw()+
-        coord_cartesian(ylim = c(0,NA))+
+        coord_cartesian(ylim = y_range)+
         theme(plot.title = element_blank(),
       axis.text.x = element_text(size = xsmall))+
         # make point size proportional to # of obs, with 0 obs = size 0
   geom_point(aes(size = n))+
-        scale_size_area(max_size = max_point_size) 
+        scale_size_area(max_size = max_point_size)
+        
    
       
 # voc--------------   
       met <- 'voc'
-
+      
+ y_range <- case_when(
+        met == 'pm25' ~ pm25_lim,
+        met == 'voc' ~ voc_lim)
+ 
       ggplot(a, aes(x = hour, y = get(paste0(met, '_mean.val'))
                       # color = home
                       ))+
@@ -358,7 +376,7 @@ err_ribbon <- TRUE
                            breaks = c(0,6,12,18),
                            expand = c(0,0))+
         theme_bw()+
-        coord_cartesian(ylim = c(0,NA))+
+        coord_cartesian(ylim = y_range)+
         theme(plot.title = element_blank(),
       axis.text.x = element_text(size = xsmall))+
         # make point size proportional to # of obs, with 0 obs = size 0
@@ -383,12 +401,14 @@ err_ribbon <- TRUE
                         mutate(energy_cluster = 'overall')
       )
 
-
-
-#pm25------------
- met <- 'pm25'
-
-      ggplot(a, aes(x = hour, y = get(paste0(met, '_mean.val')),
+clust.diurn <- function(met, data){
+  
+  y_range <- case_when(
+        met == 'pm25' ~ pm25_lim,
+        met == 'voc' ~ voc_lim)
+  
+  
+        ggplot(data, aes(x = hour, y = get(paste0(met, '_mean.val')),
                     fill = energy_cluster, color = energy_cluster
 ))+
         geom_line( size = line_size)+
@@ -404,39 +424,41 @@ err_ribbon <- TRUE
                            breaks = c(0,6,12,18),
                            expand = c(0,0))+
         theme_bw()+
-        coord_cartesian(ylim = c(0,NA))+
+        coord_cartesian(ylim = y_range)+
         theme(plot.title = element_blank(),
       axis.text.x = element_text(size = xsmall))+
         # make point size proportional to # of obs, with 0 obs = size 0
   geom_point(aes(size = n))+
-        scale_size_area(max_size = max_point_size)
-   
+        scale_size_area(max_size = max_point_size)+
+        annotate('text', x=Inf, y = Inf, hjust = 1, vjust = 1,
+                 label = '*Unclassified Days and Group 1 Homes omitted')+
+        scale_fill_manual(
+          breaks = energy_breaks,
+          values = energy_colors,
+          labels = energy_labels
+        )+
+        scale_color_manual(
+          breaks = energy_breaks,
+          values = energy_colors,
+          labels = energy_labels
+        ) 
+}
       
-# voc--------------   
-      met <- 'voc'
+      #pm25------------
+clust.diurn('pm25', a)
 
-      ggplot(a, aes(x = hour, y = get(paste0(met, '_mean.val')),
-                    fill = energy_cluster, color = energy_cluster
-))+
-        geom_line( size = line_size)+
-        ##geom_errorbar(aes(ymax = pm25_high.val, ymin = pm25_low.val))+ ##bars instead?
-        geom_ribbon(aes(ymax = get(paste0(met, '_high.val')),
-                        ymin = get(paste0(met, '_low.val'))
-                        # fill = home
-                        ),
-                    alpha = if_else(err_ribbon == TRUE, 0.2, 0), color = NA)+
-        labs(y = met,
-             x = 'Hour of Day')+
-        scale_x_continuous(limits = c(0,24),
-                           breaks = c(0,6,12,18),
-                           expand = c(0,0))+
-        theme_bw()+
-        coord_cartesian(ylim = c(0,NA))+
-        theme(plot.title = element_blank(),
-      axis.text.x = element_text(size = xsmall))+
-        # make point size proportional to # of obs, with 0 obs = size 0
-  geom_point(aes(size = n))+
-        scale_size_area(max_size = max_point_size) 
+clust.diurn('pm25', a%>%filter(energy_cluster == 'heat'))
+clust.diurn('pm25', a%>%filter(energy_cluster == 'shoulder'))
+clust.diurn('pm25', a%>%filter(energy_cluster == 'ac'))
+
+
+# voc--------------   
+     
+clust.diurn('voc', a)
+
+clust.diurn('voc', a%>%filter(energy_cluster == 'heat'))
+clust.diurn('voc', a%>%filter(energy_cluster == 'shoulder'))
+clust.diurn('voc', a%>%filter(energy_cluster == 'ac'))
 ```
 
 ### Diurnal plot by seasons define by month
@@ -464,58 +486,72 @@ a <- rtdata %>%
       )
 
 
+month.diurn <- function(met, data){
+  
+   y_range <- case_when(
+        met == 'pm25' ~ pm25_lim,
+        met == 'voc' ~ voc_lim)
+   
+  ggplot(data, aes(x = hour, y = get(paste0(met, '_mean.val')),
+                    fill = energy_cluster, color = energy_cluster
+))+
+        geom_line( size = line_size)+
+        ##geom_errorbar(aes(ymax = pm25_high.val, ymin = pm25_low.val))+ ##bars instead?
+        geom_ribbon(aes(ymax = get(paste0(met, '_high.val')),
+                        ymin = get(paste0(met, '_low.val'))
+                        # fill = home
+                        ),
+                    alpha = if_else(err_ribbon == TRUE, 0.2, 0), color = NA)+
+        labs(y = met,
+             x = 'Hour of Day')+
+        scale_x_continuous(limits = c(0,24),
+                           breaks = c(0,6,12,18),
+                           expand = c(0,0))+
+        theme_bw()+
+        coord_cartesian(ylim = y_range)+
+        theme(plot.title = element_blank(),
+      axis.text.x = element_text(size = xsmall))+
+        # make point size proportional to # of obs, with 0 obs = size 0
+  geom_point(aes(size = n))+
+        scale_size_area(max_size = max_point_size)+
+        annotate('text', x=Inf, y = Inf, hjust = 1, vjust = 1,
+                 label = '*Unclassified Days and Group 1 Homes omitted')+
+        scale_fill_manual(
+          breaks = c('summer', 'fall', 'winter', 'spring', 'overall'),
+          values = c(cbbPalette['light_blue'],
+                   cbbPalette['green'],
+                   cbbPalette['dark_orange'],
+                   cbbPalette['dark_blue'],
+                   cbbPalette['black'])%>% unname(),
+          labels = c('Summer', 'Fall', 'Winter', 'Spring', 'Entire Period')
+        )+
+        scale_color_manual(
+          breaks = c('summer', 'fall', 'winter', 'spring', 'overall'),
+          values = c(cbbPalette['light_blue'],
+                   cbbPalette['green'],
+                   cbbPalette['dark_orange'],
+                   cbbPalette['dark_blue'],
+                   cbbPalette['black'])%>% unname(),
+          labels = c('Summer', 'Fall', 'Winter', 'Spring', 'Entire Period')
+        )
+}
 
 #pm25------------
- met <- 'pm25'
+month.diurn('pm25', a)
 
-      ggplot(a, aes(x = hour, y = get(paste0(met, '_mean.val')),
-                    fill = energy_cluster, color = energy_cluster
-))+
-        geom_line( size = line_size)+
-        ##geom_errorbar(aes(ymax = pm25_high.val, ymin = pm25_low.val))+ ##bars instead?
-        geom_ribbon(aes(ymax = get(paste0(met, '_high.val')),
-                        ymin = get(paste0(met, '_low.val'))
-                        # fill = home
-                        ),
-                    alpha = if_else(err_ribbon == TRUE, 0.2, 0), color = NA)+
-        labs(y = met,
-             x = 'Hour of Day')+
-        scale_x_continuous(limits = c(0,24),
-                           breaks = c(0,6,12,18),
-                           expand = c(0,0))+
-        theme_bw()+
-        coord_cartesian(ylim = c(0,NA))+
-        theme(plot.title = element_blank(),
-      axis.text.x = element_text(size = xsmall))+
-        # make point size proportional to # of obs, with 0 obs = size 0
-  geom_point(aes(size = n))+
-        scale_size_area(max_size = max_point_size)
-   
-      
+month.diurn('pm25', a%>%filter(energy_cluster == 'winter'))
+month.diurn('pm25', a%>%filter(energy_cluster == 'fall'))
+month.diurn('pm25', a%>%filter(energy_cluster == 'spring'))
+month.diurn('pm25', a%>%filter(energy_cluster == 'summer'))
+
+
 # voc--------------   
-      met <- 'voc'
+     
+month.diurn('voc', a)
 
-      ggplot(a, aes(x = hour, y = get(paste0(met, '_mean.val')),
-                    fill = energy_cluster, color = energy_cluster
-))+
-        geom_line( size = line_size)+
-        ##geom_errorbar(aes(ymax = pm25_high.val, ymin = pm25_low.val))+ ##bars instead?
-        geom_ribbon(aes(ymax = get(paste0(met, '_high.val')),
-                        ymin = get(paste0(met, '_low.val'))
-                        # fill = home
-                        ),
-                    alpha = if_else(err_ribbon == TRUE, 0.2, 0), color = NA)+
-        labs(y = met,
-             x = 'Hour of Day')+
-        scale_x_continuous(limits = c(0,24),
-                           breaks = c(0,6,12,18),
-                           expand = c(0,0))+
-        theme_bw()+
-        coord_cartesian(ylim = c(0,NA))+
-        theme(plot.title = element_blank(),
-      axis.text.x = element_text(size = xsmall))+
-        # make point size proportional to # of obs, with 0 obs = size 0
-  geom_point(aes(size = n))+
-        scale_size_area(max_size = max_point_size) 
+month.diurn('voc', a%>%filter(energy_cluster == 'winter'))
+month.diurn('voc', a%>%filter(energy_cluster == 'fall'))
+month.diurn('voc', a%>%filter(energy_cluster == 'spring'))
+month.diurn('voc', a%>%filter(energy_cluster == 'summer'))
 ```
 
