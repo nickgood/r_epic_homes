@@ -126,7 +126,6 @@ homes_all <- home.list(1:16)
 clusters_all <- c('heat','shoulder', 'ac', 'all')
 locations_indoor <- c('living', 'kitchen', 'bedroom')
 
-
 ```
 
 
@@ -138,7 +137,7 @@ locations_indoor <- c('living', 'kitchen', 'bedroom')
 
 # date_ranges_entire <- list(c('2020-09-26','2020-10-22'))
 # tested_sample_sequence <- seq(1,27)
-# home_num <- '012'
+# home_num <- '009'
 # location_type <- 'kitchen'
 # data <- omni_hourly_data
 # monitor_season <- date_ranges_entire[1]
@@ -148,6 +147,7 @@ locations_indoor <- c('living', 'kitchen', 'bedroom')
 # all_time <- TRUE
 #     longterm_avail_limit <- 0
 #     sample_avail_limit <- 0
+#     overlap <- FALSE
 #     
 # 
 # 
@@ -502,7 +502,9 @@ entropy.table.hourly <- function(
         
         # return a list of values
         list('kld' = kld, 'max_sample' = max_sample,
-             'max_hour_sample' = max_hour_sample)
+             'max_hour_sample' = max_hour_sample,
+             'sample' = samp
+             )
       })
       
       # return all calculated kld values
@@ -513,15 +515,13 @@ entropy.table.hourly <- function(
                 'max_sample' = x[['max_sample']],
                 'max_hour_sample' = x[['max_hour_sample']],
            'max_entire' = rep(max_entire, length(x[[1]])),
-           'max_hour_entire' = rep(max_hour_entire, length(x[[1]]))
+           'max_hour_entire' = rep(max_hour_entire, length(x[[1]])),
+           'sample_data' = x[['sample']],
+           'entire_data' = rep(entire, length(x[[1]]))
               )
             })
       
-      # list('kld' = unlist(a),
-      #      'n_samp_avail' = rep(n_samp_avail, length(unlist(a))),
-      #      'max_entire' = rep(max_entire, length(unlist(a))),
-      #      'max_hour_entire' = rep(max_hour_entire, length(unlist(a)))
-      #       )
+
       
     }
     # # test kld.period function
@@ -552,6 +552,8 @@ entropy.table.hourly <- function(
             'max_hour_sample' = x[['max_hour_sample']],
             'max_entire' = x[['max_entire']],
             'max_hour_entire' = x[['max_hour_entire']],
+           'sample_data' = x['sample_data'],
+           'entire_data' = x['entire_data'],
             'error' = rep('none', length(x[[1]])),
             'warn' = rep(warn, length(x[[1]])) # return wrnaing if there was one triggered
         )
@@ -564,7 +566,7 @@ entropy.table.hourly <- function(
     # bind all into a dataframe scaled_entropy for one date range
    bind_rows(entropy_data_list)
     
-  }  %>%
+  } %>%
     # if season results in an error, return the error message in a df
     tryCatch(error = function(e) output)
   
@@ -675,7 +677,6 @@ entropy.table.hourly <- function(
 ```{r data_maker_hourly, eval = FALSE}
 
 # test function for multiple homes-----------------
-      all_time_choice <- TRUE
    test_homes <- c('007', '012')
     test_cluster <- c('ac') # can do multiple
 
@@ -727,7 +728,7 @@ entropy.table.hourly <- function(
 
       # make dfs--------------------
 
-all_time_choice <- FALSE
+all_time_choice <- TRUE
     overlap_choice <- FALSE
 # clust <- c('all','heat', 'shoulder', 'ac') # can do multiple
 clust <- clusters_all
@@ -886,7 +887,7 @@ lapply(clust, function(cluster_type) {
 
 met <- 'voc'
  
-loc <- 'pooled'
+loc <- 'living'
 lapply(clust, function(cluster_type) {
   
   rep_data <-  lapply(homes_all, function(x_home) {
@@ -1034,8 +1035,20 @@ voc_bedroom_heat_rep_data_time_hourly_pdf,
 #     }) %>% bind_rows()
 #   }) %>% bind_rows()
 
-# # if did pooled
-# entropy_time_hourly_pdf_df <- bind_rows(
+# if did pooled
+entropy_time_hourly_pdf_df_pooled <- bind_rows(
+  pm25_pooled_heat_rep_data_time_hourly_pdf,
+  pm25_pooled_shoulder_rep_data_time_hourly_pdf,
+  pm25_pooled_ac_rep_data_time_hourly_pdf,
+  pm25_pooled_all_rep_data_time_hourly_pdf,
+  voc_pooled_heat_rep_data_time_hourly_pdf,
+  voc_pooled_shoulder_rep_data_time_hourly_pdf,
+  voc_pooled_ac_rep_data_time_hourly_pdf,
+  voc_pooled_all_rep_data_time_hourly_pdf
+)
+
+
+# rm(
 #   pm25_pooled_heat_rep_data_time_hourly_pdf,
 #   pm25_pooled_shoulder_rep_data_time_hourly_pdf,
 #   pm25_pooled_ac_rep_data_time_hourly_pdf,
@@ -1043,9 +1056,9 @@ voc_bedroom_heat_rep_data_time_hourly_pdf,
 #   voc_pooled_heat_rep_data_time_hourly_pdf,
 #   voc_pooled_shoulder_rep_data_time_hourly_pdf,
 #   voc_pooled_ac_rep_data_time_hourly_pdf,
-#   voc_pooled_all_rep_data_time_hourly_pdf
-# )
-
+#   voc_pooled_all_rep_data_time_hourly_pdf,
+#   entropy_time_hourly_pdf_df
+#   )
 
 # rm(
 #   pm25_bedroom_heat_rep_data_time_hourly_pdf,
@@ -1073,20 +1086,39 @@ voc_bedroom_heat_rep_data_time_hourly_pdf,
 
 # write csv files------------------------
 
-write_csv(entropy_time_hourly_pdf_df, file =
+# if not pooled ---------------------
+write_rds(entropy_time_hourly_pdf_df, file =
             paste0('./csv_created/representativeness_data/rep_data_time_hourly_pdf',
                    ifelse(all_time_choice == TRUE, '', '_season'),
                    ifelse(overlap_choice == TRUE, '', '_no_overlap'),
                    ifelse(clust[1] %in% month.abb[1:12], '_month', ''),
-                   '.csv'))
+                   '.rds'))
 # make dated backup
-write_csv(entropy_time_hourly_pdf_df, file =
+write_rds(entropy_time_hourly_pdf_df, file =
             paste0('./csv_created/representativeness_data/rep_data_time_hourly_pdf_',
                    Sys.Date(),
                    ifelse(all_time_choice == TRUE, '', '_season'),
                    ifelse(overlap_choice == TRUE, '', '_no_overlap'),
                    ifelse(clust[1] %in% month.abb[1:12], '_month', ''),
-                   '.csv'))
+                   '.rds'))
+
+# if pooled--------
+write_rds(entropy_time_hourly_pdf_df_pooled, file =
+            paste0('./csv_created/representativeness_data/rep_data_time_hourly_pdf_pooled',
+                   ifelse(all_time_choice == TRUE, '', '_season'),
+                   ifelse(overlap_choice == TRUE, '', '_no_overlap'),
+                   ifelse(clust[1] %in% month.abb[1:12], '_month', ''),
+                   '.rds'))
+# make dated backup
+write_rds(entropy_time_hourly_pdf_df_pooled, file =
+            paste0('./csv_created/representativeness_data/rep_data_time_hourly_pdf_pooled_',
+                   Sys.Date(),
+                   ifelse(all_time_choice == TRUE, '', '_season'),
+                   ifelse(overlap_choice == TRUE, '', '_no_overlap'),
+                   ifelse(clust[1] %in% month.abb[1:12], '_month', ''),
+                   '.rds'))
+
+
 
 
 
