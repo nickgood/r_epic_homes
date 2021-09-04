@@ -28,6 +28,7 @@ library(readr)
 library(googlesheets4)
 library(lubridate)
 library(data.table)
+library(kableExtra)
 
 ```
 
@@ -502,9 +503,6 @@ filter_data_correct <- filter_data %>%
   pivot_longer(cols = -c(id_home, visit) , names_to = 'location',
                values_to = 'conc_correct')
   
-
-
-
 # make dataframe of corrrection factors
 grav_cf_df <- omni_data_precal %>%
   #calculate TWA for pm2.5 for each home/location
@@ -521,7 +519,6 @@ grav_cf_df <- omni_data_precal %>%
          #                  grav_cf)
   )
 
-
 ```
 
 *look at correction factor spread (for median)
@@ -530,24 +527,75 @@ grav_cf_df <- omni_data_precal %>%
 ggplot(grav_cf_df, aes(y = grav_cf))+
   geom_boxplot()
 
-  
 ```
+
+* after omitting negatives...
+```{r}
+grav_cf_df_clean <- grav_cf_df %>%
+  filter(!is.na(grav_cf) & grav_cf >0)
+
+# check spread of correction factor values
+ggplot(grav_cf_df_clean, aes(y = grav_cf))+
+  geom_boxplot()
+```
+
 
 *look at regression of TWA to filter values
 
+```{r}
+model <- lm("twa~conc_correct", data = grav_cf_df_clean)
+
+# print model results
+broom::tidy(model, conf.int = TRUE) %>%
+  kable(digits = c(NA, 1, 1, 1, 6 , 1, 1), caption = "OMNI vs. Filter PM2.5") %>%
+  kable_paper(bootstrap_options = "striped", full_width = F)
+```
+
+
+```{r fig_omni_vs_filter, fig.width=4.5, fig.height=4.5}
+
+# make predictions based on model
+predicted_df <- data.frame(twa_pred = predict(model, grav_cf_df_clean),
+                           conc_correct=grav_cf_df_clean$conc_correct)
+
+ggplot(grav_cf_df_clean, aes(x = conc_correct, y = twa)) +
+  geom_point(aes(color = location)) +
+  #geom_smooth(method = "lm", formula = "y ~ x", se = FALSE) +
+  theme_bw() +
+  geom_abline(slope = 1, intercept = 0) +
+  ylim(0,NA) + xlim(0,NA) +
+  ylab("OMNI (ug/m^3)") + xlab("Filter (ug/m^3)")+
+  geom_line(data = predicted_df, aes( y = twa_pred))
+
+  
+```
 
 
 * calibrate with decided method of correction factor
 ```{r}
 # find the median value of correction factors (exclude negatives)
 # and use that to correct all households
-grav_cf_median <- grav_cf_df %>% filter(!is.na(grav_cf) & grav_cf>0) %>%
+grav_cf_median <- grav_cf_df_clean %>%
   pull(grav_cf) %>% median()
 
 omni_data_cal <- omni_data_precal %>%
   mutate(pm25 = pm25/grav_cf_median)
 
+```
 
+# Add in energy cluster column
+
+```{r}
+daily_energy_df <- read_csv('../sense/csv_created_sense/daily_energy_data_clustered.csv')
+
+omni_data_cal <- omni_data_cal %>%
+  mutate(dateday = floor_date(datetime, unit = 'day')%>%as.Date())%>%
+  left_join(daily_energy_df, by = c('dateday', 'home'))
+
+```
+
+
+```{r}
 # make rds file and backup-----------
 write_rds(omni_data_cal, paste0('./csv_created/omni_calibrated_',
 Sys.Date(),'.rds'))
@@ -558,10 +606,13 @@ write_rds(omni_data_cal, paste0('./csv_created/omni_calibrated.rds'))
 ```{r hourly_cal_data_rds}
 
 omni_hourly_data <- omni_data_cal %>%
+  select(-heat, -ac) %>%
   group_by(datehour = floor_date(datetime, unit = 'hour'),
            home, location) %>%
   summarise_if(is.numeric, list(mean), na.rm = TRUE) %>%
-  ungroup()
+  ungroup() %>%
+  mutate(dateday = floor_date(datehour, unit = 'day')%>%as.Date())%>%
+  left_join(daily_energy_df, by = c('dateday', 'home'))
 
 # make rds file and backup-----------------
 write_rds(omni_hourly_data, paste0('./csv_created/omni_hourly_calibrated_',
@@ -574,10 +625,13 @@ write_rds(omni_hourly_data, paste0('./csv_created/omni_hourly_calibrated.rds'))
 ```{r daily_cal_data_rds}
 
   omni_daily_data <- omni_data_cal %>%
+    select(-heat, -ac) %>%
   group_by(dateday = floor_date(datetime, unit = 'day'),
            home, location) %>%
   summarise_if(is.numeric, list(mean), na.rm = TRUE) %>%
-  ungroup()
+  ungroup()%>%
+  mutate(dateday = dateday %>%as.Date())%>%
+  left_join(daily_energy_df, by = c('dateday', 'home'))
 
 # make rds file and backup-----------------
 write_rds(omni_daily_data, paste0('./csv_created/omni_daily_calibrated_',
