@@ -131,6 +131,8 @@ locations_indoor <- c('living', 'kitchen', 'bedroom')
 
 
 ```{r function_pdf_time_hourly_master}
+
+
 # calculate kld for continuous probability distributions
 
 # define variables for testing-----------------------
@@ -357,9 +359,12 @@ entropy.table.hourly <- function(
     
     entire <- entire %>%
       group_by(hour) %>%
-  summarise(mean = mean(get(metric)), .groups = 'drop') %>%
-      pull(mean)
+  summarise(mean = mean(get(metric)), sd = sd(get(metric)), n = n(),
+            .groups = 'drop')
     
+    entire_hourly_n <- entire %>% pull(n)
+    entire_hourly_sd <- entire %>% pull(sd)
+    entire <- entire %>% pull(mean)
     # ensure no na values
     if(any(is.na(entire))) {
       output <<- na.result('na_in_entire', period_label)
@@ -517,7 +522,9 @@ entropy.table.hourly <- function(
            'max_entire' = rep(max_entire, length(x[[1]])),
            'max_hour_entire' = rep(max_hour_entire, length(x[[1]])),
            'sample_data' = x[['sample']],
-           'entire_data' = rep(entire, length(x[[1]]))
+           'entire_data' = rep(entire, length(x[[1]])),
+           'entire_hourly_n' = rep(entire_hourly_n, length(x[[1]])),
+           'entire_hourly_sd' = rep(entire_hourly_sd, length(x[[1]]))
               )
             })
       
@@ -554,7 +561,9 @@ entropy.table.hourly <- function(
             'max_hour_entire' = x[['max_hour_entire']],
            'sample_data' = x['sample_data'],
            'entire_data' = x['entire_data'],
-            'error' = rep('none', length(x[[1]])),
+           'entire_hourly_n' = x['entire_hourly_n'],
+           'entire_hourly_sd' = x['entire_hourly_sd'],
+           'error' = rep('none', length(x[[1]])),
             'warn' = rep(warn, length(x[[1]])) # return wrnaing if there was one triggered
         )
         })
@@ -594,19 +603,19 @@ entropy.table.hourly <- function(
 
 # test function--------------------------
 
-# start <- Sys.time()
-# 
-# test<- entropy.table.hourly('009', 'pm25',
-#                             overlap = FALSE,
-#                            date_ranges_entire = list(
-#                              c('2020-09-26', '2020-10-22')),
-#                            tested_sample_sequence = c(2, 28),
-#                            location_type = 'pooled',
-#                            all_time = TRUE)
-# 
-# 
-# end <- Sys.time()
-# run2 <- end- start
+start <- Sys.time()
+
+test<- entropy.table.hourly('009', 'pm25',
+                            overlap = FALSE,
+                           date_ranges_entire = list(
+                             c('2020-09-26', '2020-10-22')),
+                           tested_sample_sequence = c(2, 28),
+                           location_type = 'pooled',
+                           all_time = TRUE)
+
+
+end <- Sys.time()
+run2 <- end- start
 
 ```
 
