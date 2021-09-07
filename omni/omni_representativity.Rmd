@@ -105,6 +105,11 @@ na.result <- function(error, location = NA, season = NA, n_data_avail = NA) {
 labeller.metrics <- as_labeller(c('pm25'='PM[2.5]', 'voc'="TVOC"),
                            default = label_parsed)
 
+# make function to label season names
+labeller.clusters <- as_labeller(c('ac'='AC', 'heat'="Heat",
+                                  'shoulder' ='Shoulder'),
+                           default = label_parsed)
+
 ```
 
 ```{r define_variables}
@@ -544,6 +549,7 @@ unwanted_scaled_na <- represent_df %>%
 
 ### `r unwanted_scaled_na %>% nrow()` unexpected missing values in representativity data
 
+## Boxplot of Values
 ```{r plot_rep_rooms, fig.width = 7, fig.height = 3}
 
 ggplot(represent_df, aes(x = location, y = represent))+
@@ -571,6 +577,10 @@ ggplot(represent_df, aes(x = location, y = represent))+
   ylab('Representativeness')
 ```
 
+
+## Rank Table of Values
+
+### All seasons together
 ```{r table_rank, fig.height = 3.5, fig.width = 8}
 
 a <- represent_df %>%
@@ -603,6 +613,71 @@ ggplot(a, (aes(x = home, y = rank)))+
 
 ```
 
+### Seasons Separate
+```{r table_rank_season, fig.height = 3.5, fig.width = 8}
+
+# rank.table <- function (x_energy_cluster){
+#   
+# a <- represent_df %>%
+#   filter(energy_cluster == x_energy_cluster) %>%
+#   group_by(home, energy_cluster, metric) %>%
+#   mutate(rank = rank(represent) %>% as.factor()) %>%
+#   ungroup() %>%
+#   mutate(
+#          loc_abbr = toupper(substring(location, 1,1)))
+# 
+# ggplot(a, (aes(x = home, y = rank)))+
+#   geom_text(aes(label = loc_abbr))+
+#   facet_wrap(vars(metric), labeller = labeller.metrics)+
+#   theme_minimal()+
+#   theme(panel.grid = element_blank())+
+#   scale_y_discrete(breaks = c('1','2','3'),
+#                    labels = c('Lowest', '', 'Highest'))+
+#   ylab('Representativeness Rank')+
+#   xlab('Home')+
+#   geom_vline(
+#     xintercept = seq(1.5,length(a %>% pull(home)%>%as.factor%>% levels)-0.5, 1),
+#     color = 'grey')+
+#   ggtitle(paste('Season:', x_energy_cluster))+
+#   theme(plot.title = element_text(hjust = 0.5))
+# }
+# 
+# rank.table('heat')
+# rank.table('ac')
+# rank.table('shoulder')
+
+
+rank.table <- function (x_metric){
+  
+a <- represent_df %>%
+  filter(metric == x_metric) %>%
+  group_by(home, energy_cluster, metric) %>%
+  mutate(rank = rank(represent) %>% as.factor()) %>%
+  ungroup() %>%
+  mutate(
+         loc_abbr = toupper(substring(location, 1,1)))
+
+ggplot(a, (aes(x = home, y = rank)))+
+  geom_text(aes(label = loc_abbr))+
+  facet_wrap(vars(energy_cluster), labeller = labeller.clusters,
+             scales = 'free_x')+
+  theme_minimal()+
+  theme(panel.grid = element_blank())+
+  scale_y_discrete(breaks = c('1','2','3'),
+                   labels = c('Lowest', '', 'Highest'))+
+  ylab('Representativeness Rank')+
+  xlab('Home')+
+  geom_vline(
+    xintercept = seq(1.5,length(a %>% pull(home)%>%as.factor%>% levels)-0.5, 1),
+    color = 'grey')+
+  ggtitle(x_metric)+
+  theme(plot.title = element_text(hjust = 0.5))
+}
+
+rank.table('pm25')
+rank.table('voc')
+
+```
 
 ```{r original_osses_method}
 

@@ -527,6 +527,7 @@ unwanted_scaled_na <- spec_df %>%
 
 ### `r unwanted_scaled_na %>% nrow()` unexpected missing values in scaled spec data
 
+## Boxplot values
 ```{r plot_spec_rooms, fig.width = 7, fig.height = 3}
 
 ggplot(spec_df, aes(x = location, y = specificity))+
@@ -553,6 +554,10 @@ ggplot(spec_df, aes(x = location, y = specificity))+
   ylab('Specificity')
 ```
 
+
+## Rank Table of Values
+
+### All seasons together
 ```{r table_rank, fig.height = 3.5, fig.width = 8}
 
 a <- spec_df %>%
@@ -586,446 +591,75 @@ ggplot(a, (aes(x = home, y = rank)))+
 
 ```
 
+### Seasons Separate
+```{r table_rank_season, fig.height = 3.5, fig.width = 8}
+
+# rank.table <- function (x_energy_cluster){
+#   
+# a <- spec_df %>%
+#   filter(energy_cluster == x_energy_cluster) %>%
+#   group_by(home, energy_cluster, metric) %>%
+#   mutate(rank = rank(specificity) %>% as.factor()) %>%
+#   ungroup() %>%
+#   mutate(
+#          loc_abbr = toupper(substring(location, 1,1)))
+# 
+# ggplot(a, (aes(x = home, y = rank)))+
+#   geom_text(aes(label = loc_abbr))+
+#   facet_wrap(vars(metric), labeller = labeller.metrics)+
+#   theme_minimal()+
+#   theme(panel.grid = element_blank())+
+#   scale_y_discrete(breaks = c('1','2','3'),
+#                    labels = c('Lowest', '', 'Highest'))+
+#   ylab('Specificity Rank')+
+#   xlab('Home')+
+#   geom_vline(
+#     xintercept = seq(1.5,length(a %>% pull(home)%>%as.factor%>% levels)-0.5, 1),
+#     color = 'grey')+
+#   ggtitle(paste('Season:', x_energy_cluster))+
+#   theme(plot.title = element_text(hjust = 0.5))
+# }
+# 
+# rank.table('heat')
+# rank.table('ac')
+# rank.table('shoulder')
+
+
+rank.table <- function (x_metric){
+  
+a <- spec_df %>%
+  filter(metric == x_metric) %>%
+  group_by(home, energy_cluster, metric) %>%
+  mutate(rank = rank(specificity) %>% as.factor()) %>%
+  ungroup() %>%
+  mutate(
+         loc_abbr = toupper(substring(location, 1,1)))
+
+ggplot(a, (aes(x = home, y = rank)))+
+  geom_text(aes(label = loc_abbr))+
+  facet_wrap(vars(energy_cluster), labeller = labeller.clusters,
+             scales = 'free_x')+
+  theme_minimal()+
+  theme(panel.grid = element_blank())+
+  scale_y_discrete(breaks = c('1','2','3'),
+                   labels = c('Lowest', '', 'Highest'))+
+  ylab('Specificity Rank')+
+  xlab('Home')+
+  geom_vline(
+    xintercept = seq(1.5,length(a %>% pull(home)%>%as.factor%>% levels)-0.5, 1),
+    color = 'grey')+
+  ggtitle(x_metric)+
+  theme(plot.title = element_text(hjust = 0.5))
+}
+
+rank.table('pm25')
+rank.table('voc')
+
+```
 
 
 # Testing
 * NOTE: MAY BE OLD FUNCTION
-```{r master_func_testing}
-
-# # define variables for testing-----------------------
-# 
-# date_ranges_entire <- list(c('2020-11-01', '2020-11-30'))
-# home_num <- '004'
-# data <- omni_hourly_data
-# monitor_season <- date_ranges_entire[1]
-# metric <- 'voc'
-# all_time <- TRUE
-# warn <- 'none'
-# room <- 'living'
-# season_avail_limit <- 0
-# # 
-# # 
-# # # remove variables after done testing
-# # rm(tested_sample_sequence,
-# #    date_ranges_entire,
-# # home_num,
-# # monitor_season,
-# # monitor_period,
-# # metric,
-# # days,
-# # days2,
-# # all_time,
-# # data,
-# # data_season,
-# # data_year,
-# # entire,
-# # date_col_season,
-# # date_col_year,
-# # all_dates_season,
-# # all_dates_year,
-# # room,
-# # season_avail_limit
-# # )
-# 
-# # entropy function hourly data ----------------------------
-# 
-#     
-# # function to calculate scaled entropy for a house
-# # during multiple different time periods
-# mutual.info.table <- function(
-#   home_num, metric,
-#   
-#   # date range of entire monitoring period
-#   # in the form: list(
-#   #                    c('YYYY-MM-DD', 'YYYY-MM-DD'),
-#   #                    c('YYYY-MM-DD', 'YYYY-MM-DD')
-#   #                  )
-#   # data in start and end day included
-#   date_ranges_entire,
-#   sample_length, # sampling period lengths (days)
-# season_avail_limit = 0, # only use data from a sensor if it has at least this fraction of data available (0 means no periods are omitted if they have any data)
-# all_time = TRUE, # if TRUE, compare each short sampling period to entire monitoring year of home
-# data = omni_hourly_data) {
-#   
-#   output <<- na.result(NA) # clear error output in case it was triggered previously
-#   warn <<- 'none'# clear warning output in case it was triggered previously
-#   
-#   if(metric %in% c('pm25', 'voc')) {
-#     # define LOD of metric to be 1/2 minimum detected (non-zero) value
-#     LOD <- data %>%
-#       filter(!!sym(metric)!=0) %>%
-#       pull(all_of(metric))%>%
-#       min()
-#   }
-#   
-#   
-#   # function to find scaled_entropy for samples in a given monitor season
-#   
-#   mutual.info.season <- function(monitor_season) {
-#     
-#     
-#     # must unlist the listed range that is used in lapply funnction
-#     monitor_season <- unlist(monitor_season)
-#     
-#     # stop if monitoring season is empty
-#     if(is_empty(monitor_season)) {
-#       output <<- na.result('likely_no_cluster')
-#       stop()
-#     } 
-#     
-#     
-#     #define label for later use in table
-#     period_label <- paste(as.Date(monitor_season[1]), '-',
-#                           as.Date(monitor_season[2]))
-#     
-#     # warn that times will be rounded to full day for entire monitoring period
-#     
-#     if(
-#       any( c(
-#         second(as.POSIXct(monitor_season[1])),
-#         minute(as.POSIXct(monitor_season[1])),
-#         hour(as.POSIXct(monitor_season[1])),
-#         
-#         second(as.POSIXct(monitor_season[2])),
-#         minute(as.POSIXct(monitor_season[2])),
-#         hour(as.POSIXct(monitor_season[2]))) > 0
-#       )
-#     ) {
-#       output <<- na.result('incorrect_date',
-#                            period_label)
-#       stop()
-#     }
-#     
-#     #     # make column of all dates (increments ofhour) within year
-#     # # including all locations
-#     # all_dates_year <- seq.POSIXt(
-#     #   from = as.POSIXct(
-#     #     data %>%
-#     #   filter(home == home_num &
-#     #            location %in% c('living', 'bedroom', 'kitchen'))%>%
-#     #     pull(datehour) %>% min(), tz = 'UTC'),
-#     # 
-#     #   to =  as.POSIXct( data %>%
-#     #   filter(home == home_num &
-#     #            location %in% c('living', 'bedroom', 'kitchen'))%>%
-#     #     pull(datehour) %>% max(), tz = 'UTC'),
-#     #   by = '5 min')
-#     
-#     # make column of all dates (increments ofhour) within season
-#     # including all locations
-#     all_dates_season <- seq.POSIXt(
-#       from = as.POSIXct(monitor_season[1],tz = 'UTC'),
-#       to =  floor_date(as.POSIXct( monitor_season[2],
-#                                    tz = 'UTC')+24*60*60-1,
-#                        unit = 'hour'), by = 'hour')
-#     
-#     # make df for recorded values in season for given location
-#     data <-   data %>%
-#       select(datehour, home, location, all_of(metric))%>%
-#       filter(home == home_num,location %in% locations_indoor) %>%
-#       # choose season date range
-#       filter(
-#         datehour >= ymd(monitor_season[1]) &
-#           datehour <= ymd(monitor_season[2])
-#       )
-#     
-#     if(metric %in% c('pm25', 'voc')) {
-#       # convert 0 values to LOD/2 in to allow for log-normal distrib. estimation
-#       data <- data %>%
-#         mutate_at(all_of(metric), function(x) ifelse(x==0, LOD/2, x))
-#     }
-#     
-#     # check data availability for entire season for each room
-#     # and define which rooms have enough data
-#     rooms_with_data <- data %>%
-#       group_by(location) %>%
-#       summarize(n_avail = n()/length(all_dates_season)) %>%
-#       filter(n_avail > season_avail_limit) %>%
-#       pull(location)
-#     
-#     # give error if not all three rooms have enough data
-#     if(length(rooms_with_data) < 3){
-#       output <<- na.result(paste0('only_data_',paste0(rooms_with_data,
-#                                                       collapse = '_')))
-#       stop()
-#     }
-#     
-#     
-#     data_wide <- data %>%
-#       pivot_wider(names_from = c(location),
-#                   values_from = all_of(metric))
-#     
-#     # function to be applied to each room individually
-#     # to determine covariance matrix, variance of each room, and relative mutual info
-#     
-#     # note location of missing values across all room data sets
-#     # so the variance can be corrected
-#     # in the mutual information calculation
-#     missing_indeces <- lapply(rooms_with_data, function(x) {
-#       data_wide %>% pull(x) %>% is.na() %>% which()
-#     }) %>%
-#       unlist()
-#     
-#     #remove incolmplete rows and take log
-#     data_wide_complete_log <- if(is_empty(missing_indeces)) {
-#       data_wide%>%
-#         mutate_if(is.numeric, log)
-#     } else{
-#       data_wide %>% slice(-c(missing_indeces)) %>%
-#         mutate_if(is.numeric, log)
-#     }
-#     
-#     # make matrix with cov function
-#     #NOTE: if a value is missing from one data set, the function will delete that value from all data-sets when calculating variance and covariance
-#     
-#     
-#     mutual_info_rooms <- 
-#       map(rooms_with_data,
-#           function(room){
-#             
-#             
-#             
-#             
-#             other_rooms <- rooms_with_data[-which(rooms_with_data == room)]
-#            ## Try mutinformation func----------------------- 
-#             # use with 2 normally dist vectors and compare with Osses formula---------
-#             room_norm <- rnorm(10000, -2.3, 2.3)
-#              complement_norm <- rnorm(10000, -2.5, 2.5)
-# 
-#                           
-#              # calculate from infotheo R package
-#             mut_info1 <- mutinformation(discretize(room_norm, nbins = 1000),
-#                                         discretize(complement_norm, nbins = 1000))
-#             # try with less bins in calc
-#             mut_info1b <- mutinformation(discretize(room_norm, nbins = 100),
-#                                         discretize(complement_norm, nbins = 100))
-#              #estimate using Osses Normal formula
-#              variance_room <- var(room_norm)
-#              variance_complement <- var(complement_norm)
-#              
-#             cov_matrix <- cov(
-#               matrix(c(room_norm, complement_norm), ncol = 2))
-#             
-#             cov_determinant <- det(cov_matrix)
-#             
-#             
-#               mut_info2 <- -0.5*log( cov_determinant/
-#                                        (variance_room*variance_complement) )
-#             
-#               # use with 3 normally dist vectors and compare with Osses formula---------
-#               room_norm <- rnorm(10000, -2.3, 7)
-#              complement1_norm <- rnorm(10000, -2.5, 7.2)
-#              complement2_norm <- rnorm(10000, -2.0, 7.1)
-#              complementall_norm <- matrix(c(complement1_norm, complement2_norm),
-#                                           ncol = 2)
-#              allrooms_norm <- matrix(c(room_norm, complementall_norm), ncol = 3)
-#              
-#              # calculate from infotheo R package
-#              ## try with complement matrix
-#             mut_info1 <- mutinformation(discretize(room_norm),
-#                                         discretize(complementall_norm))
-#              ## try with complement vector
-#             mut_info1b <- mutinformation(discretize(room_norm),
-#                                         discretize(c(
-#                                           complement1_norm,
-#                                           complement2_norm
-#                                         )))
-# 
-#              #estimate using Osses Normal formula
-#             cov_all <- cov(allrooms_norm)
-#              cov_complement <- cov(complementall_norm)
-#              variance_room <- var(room_norm)
-#              
-#              mut_info2 <- -0.5*log( det(cov_all)/
-#                                        (variance_room*det(cov_complement)))
-# 
-#             # look at function source code----------------------
-#             getAnywhere(mutinformation())
-#             getAnywhere(entropy())
-#             
-#             # download package to look at compiled code
-#             # download.packages(pkgs = "infotheo", 
-#             #       destdir = ".",
-#             #       type = "source")
-#             
-#             
-#             
-#             # test if number of bins matters------------------------
-#             # compare mi calculated from vector A to vector B
-#             # to vector 2A (A stacked on top of itself) to vector B
-#               data_room <- data_wide_complete_log %>%
-#               pull(all_of(other_rooms[1])) %>%
-#               discretize()
-#             
-#             data_complement1 <- data_wide_complete_log %>%
-#               pull(all_of(room)) %>%
-#               discretize()
-#             
-#             data_complement2 <- stack(data_wide_complete_log, c(room, room)) %>%
-#               pull(values) %>%
-#               discretize()
-#             
-#             data_complement3 <- stack(data_wide_complete_log, rep(room, 10)) %>%
-#               pull(values) %>%
-#               discretize()
-#             
-#             mutinformation(data_room, data_complement1)
-#             
-#             mutinformation(data_room, data_complement2)
-#                         mutinformation(data_room, data_complement3)
-# 
-# 
-#             
-#             # method 1: assume complement is two vectors, while room is one -----------
-#             data_room <- data_wide_complete_log %>%
-#               select(all_of(room)) %>%
-#               discretize()
-# 
-#             data_complement <- data_wide_complete_log %>%
-#               select(all_of(other_rooms))%>%
-#               discretize()
-# 
-#             mutinformation(data_room, data_complement)
-#             
-#             # method 2: assume complement vector is vector that is
-#             # double the length of room vector----------------
-#               data_room <- data_wide_complete_log %>%
-#               pull(all_of(room)) %>%
-#               discretize()
-#             
-#             
-#             data_complement <- stack(data_wide_complete_log, other_rooms) %>%
-#               pull(values) %>%
-#               discretize()
-# 
-#             mutinformation(data_room, data_complement)
-# 
-#             test <- discretize(USArrests)
-#             
-#             # testing mi.plugin func-------------------------
-#             
-#             room_norm <- rnorm(100000, -2.3, 7)
-#              complement_norm <- rnorm(100000, -2.3, 7)
-# 
-#              # set up cut-off values 
-# breaks <- seq(-2.3, 7, length.out = 101)
-# 
-# # bucketing values into bins
-# a <- cut(room_norm, 
-#                   breaks=breaks, 
-#                   include.lowest=TRUE, 
-#                   right=FALSE)
-# room_freqs <- summary(a) %>%as.data.frame() %>%mutate(prob = ./sum(.))
-#              
-# a <- cut(complement_norm, 
-#                   breaks=breaks, 
-#                   include.lowest=TRUE, 
-#                   right=FALSE)
-# complement_freqs <- summary(a) %>%as.data.frame()%>%mutate(prob = ./sum(.))
-# 
-#              
-#              # calculate from entropy R package
-#             mut_info1 <- entropy::mi.plugin(cbind(discretize(room_norm, nbins = 30),
-#                                             discretize(complement_norm, nbins = 30)))
-#              # calculate from infotheo package
-#             mut_info1b <- mutinformation(discretize(room_norm, nbins = 30),
-#                                         discretize(complement_norm, nbins = 30))
-#             
-#              #estimate using Osses Normal formula
-#              variance_room <- var(room_norm)
-#              variance_complement <- var(complement_norm)
-#              
-#             cov_matrix <- cov(
-#               matrix(c(room_norm, complement_norm), ncol = 2))
-#             
-#             cov_determinant <- det(cov_matrix)
-#             
-#             
-#               mut_info2 <- -0.5*log( cov_determinant/
-#                                        (variance_room*variance_complement) )
-#             
-#             # not testing mutinformation-----------------------
-#             # method 3: assume complement vector is vector of average values-------
-#             ## make complement data set by averaging each measurment between to rooms
-#             ## and find the covariance between these two rooms
-#             data_complement <- data_wide_complete_log %>%
-#               select(all_of(other_rooms))%>%
-#               mutate(mean = rowMeans(.)) %>% pull(mean)
-#             
-#             cov_complement <- cov(data_wide_complete_log %>% pull(other_rooms[1]),
-#                                   data_wide_complete_log %>% pull(other_rooms[2]))
-#             
-#             cov_matrix <- cov(
-#               matrix(c(data_wide_complete_log %>% pull(room),
-#                        data_complement), ncol = 2), 
-#               use = 'complete.obs')
-#             
-#             cov_determinant <- det(cov_matrix)
-#             
-#             variance_room <- var(data_wide_complete_log %>% pull(room))
-#             variance_complement <- (
-#               var(data_wide_complete_log %>% pull(other_rooms[1])) +
-#                 var(data_wide_complete_log %>% pull(other_rooms[2])) +
-#                 2*cov_complement
-#             )/length(other_rooms)^2
-#             
-#             mutual_info <-
-#               -0.5*log( cov_determinant/ (variance_room*variance_complement) )
-#             
-#             list('mutual_info' = mutual_info,
-#                  'location' = room,
-#                  'monitor_season' = period_label,
-#                  # amount of data points  for which all three rooms were available
-#                  'n_data_avail' = nrow(data_wide_complete_log) 
-#             )
-#           }
-#       ) %>%
-#       bind_rows()
-#     
-#     # add no error note, and warning if triggered
-#     c(
-#       mutual_info_rooms,
-#       list(
-#         'error' = rep('none', nrow(mutual_info_rooms)),
-#         'warn' = rep(warn, nrow(mutual_info_rooms))
-#       )
-#     )
-#     
-#     
-#   }%>%
-#     # if season results in an error, return the error message in a df
-#     tryCatch(error = function(e) output)
-#   
-#   # mutual_info for all specified date ranges  
-#   mutual_info_data_season <- lapply(date_ranges_entire, mutual.info.season)
-#   
-#   
-#   # bind all into a dataframe
-#   bind_rows(mutual_info_data_season) %>%
-#     mutate(
-#       home = home_num,
-#       metric = metric,
-#       period_compare = ifelse(all_time == TRUE, 'year', 'season'))
-# }
-# 
-#  
-# 
-# 
-# # test function--------------------------
-# 
-# # start <- Sys.time()
-# # 
-# # test<- mutual.info.table('004', 'pm25',
-# # 
-# #                            date_ranges_entire = list(
-# #                              c('2020-12-01', '2020-12-31'),
-# #                                                      c('2020-11-01',
-# #                                                        '2020-11-30')),
-# #                            all_time = TRUE)
-# # end <- Sys.time()
-# # run2 <- end- start
-
-```
 
 
 # Old FUnctions
