@@ -635,19 +635,19 @@ sample_results
 
 # test function--------------------------
 
-start <- Sys.time()
-
-test<- entropy.table.hourly('011', 'pm25',
-                            overlap = FALSE,
-                           date_ranges_entire = list(
-                             c('2020-09-26', '2020-10-22')),
-                           tested_sample_sequence = c(2,6,10,28),
-                           location_type = 'pooled',
-                           all_time = TRUE)
-
-
-end <- Sys.time()
-run2 <- end- start
+# start <- Sys.time()
+# 
+# test<- entropy.table.hourly('011', 'pm25',
+#                             overlap = FALSE,
+#                            date_ranges_entire = list(
+#                              c('2020-09-26', '2020-10-22')),
+#                            tested_sample_sequence = c(2,6,10,28),
+#                            location_type = 'pooled',
+#                            all_time = TRUE)
+# 
+# 
+# end <- Sys.time()
+# run2 <- end- start
 
 ```
 
