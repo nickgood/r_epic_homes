@@ -252,12 +252,13 @@ entropy.table.hourly <- function(
                            period_label)
       stop()
     }
-    
+
     
     # make df of entire monitoring period (approx. a year)
     # recorded from given location
     data_year <- data %>%
-      filter(home == home_num)
+      filter(home == home_num) %>%
+      arrange(datehour)
     
     data_year <-
       if(location_type == 'pooled') {
@@ -358,7 +359,8 @@ entropy.table.hourly <- function(
     entire <- entire %>%
       group_by(hour) %>%
   summarise(mean = mean(get(metric)), sd = sd(get(metric)), n = n(),
-            .groups = 'drop')
+            .groups = 'drop') %>%
+      arrange(hour)
     
     entire_hourly_n <- entire %>% pull(n)
     entire_hourly_sd <- entire %>% pull(sd)
@@ -446,7 +448,6 @@ entropy.table.hourly <- function(
                 sample %>% filter(location == location_type)
               }
             
-            ########## SORT HERE
             sample_period <- paste(
                 y[1] %>% ymd_hms() %>% floor_date( unit = 'day') %>% as.character(),
                 '-',
@@ -473,7 +474,8 @@ entropy.table.hourly <- function(
               sample <- sample %>%
                 group_by(hour) %>%
                 summarise(mean = mean(get(metric)), sd = sd(get(metric)), n = n(),
-            .groups = 'drop')
+            .groups = 'drop')%>%
+      arrange(hour)
               
               sample_hourly_n <- sample %>% pull(n)
               sample_hourly_sd <- sample %>% pull(sd)
