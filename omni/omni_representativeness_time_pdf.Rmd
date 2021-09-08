@@ -312,15 +312,13 @@ entropy.table.hourly <- function(
           datehour <= ymd(monitor_season[2])
       )
     
-    
     # make column of all dates (increments of 1 hour) within season
     all_dates_season <- seq.POSIXt(from = as.POSIXct( monitor_season[1], tz = 'UTC'),
                                    to =  floor_date(as.POSIXct( monitor_season[2],
                                                                 tz = 'UTC')+24*60*60-1,
                                                     unit = 'hour'),
                                    by = 'hour')
-    
-    
+
     # calculate missingness of data points in the season
     season_data_avail <-
       length(data_season %>% pull(datehour) %>% unique())/
@@ -396,19 +394,33 @@ entropy.table.hourly <- function(
     kld.period <- function(days) { # days = number of days in short samping period
       
       # for testing
-      # y<- all_dates_season[(159*24*12):((159+28)*24*12)]
-      
+      # y<- all_dates_season[(1*25):((1+15)*24)]
+
       # warn if not enough days in season to calculate for given sampling period length
       if(length(all_dates_season) <= days*24) {
         warn <<- 'short_season'
-        a <- rep(NA, 24) %>% as.integer() %>% as.data.frame()
-        colnames(a) <- days # give name to column just to suppress "new name" message
         
+              a <- list(
+                'sample_means' = NA %>% as.integer(),
+                'sample_hourly_n' = NA %>% as.integer(),
+                'sample_hourly_sd' = NA %>% as.integer(),
+                'sample_period' = NA%>% as.integer()
+
+              ) 
+
+              a <- tibble(
+                max_entire = max_entire,
+               max_hour_entire = max_hour_entire,
+               entire_hourly_n = list(entire_hourly_n),
+               entire_hourly_sd = list(entire_hourly_sd)
+              )
+  
+                      
       } else {
         
       a <-
         runner(
-          all_dates_season,
+          all_dates_season %>% as.character(),
           k = days*24, 
           # number of hour periods in short sampling period
                # only evaluate windows that are full
@@ -422,8 +434,10 @@ entropy.table.hourly <- function(
             # and the days specified by the days in window y
             sample <- data_season %>%
               filter(
-                datehour %in% y
+                (datehour %>% as.character()) %in% y
               )
+            
+            
             
             sample <- 
               if(location_type == 'pooled') {
@@ -432,110 +446,138 @@ entropy.table.hourly <- function(
                 sample %>% filter(location == location_type)
               }
             
+            ########## SORT HERE
+            sample_period <- paste(
+                y[1] %>% ymd_hms() %>% floor_date( unit = 'day') %>% as.character(),
+                '-',
+                y[length(y)] %>% ymd_hms() %>%
+                  floor_date( unit = 'day') %>% as.character()
+              )
+            
             # omit sampling period if missing more than
             # __ % of sampling period
             if(length(sample$datehour %>%unique()) < sample_avail_limit * days*24) {
               
-              a <- rep(NA, 24) %>% as.integer()
-              
+              sample_results <- list(
+                'sample_means' = rep(NA, 24) %>% as.integer(),
+                'sample_hourly_n' = rep(NA, 24) %>% as.integer(),
+                'sample_hourly_sd' = rep(NA, 24) %>% as.integer(),
+                'sample_period' = sample_period
+
+              )
               
               
               # if not missing certain % of sampling period...
             } else {
               
-              a <- sample %>%
+              sample <- sample %>%
                 group_by(hour) %>%
-                summarise(mean = mean(get(metric)), .groups = 'drop') %>%
-                pull(mean)
+                summarise(mean = mean(get(metric)), sd = sd(get(metric)), n = n(),
+            .groups = 'drop')
+              
+              sample_hourly_n <- sample %>% pull(n)
+              sample_hourly_sd <- sample %>% pull(sd)
+              
+              sample <- sample %>% pull(mean)
+              
+              sample_results <- list(
+                'sample_means' = sample, 'sample_hourly_n' = sample_hourly_n,
+                'sample_hourly_sd' = sample_hourly_sd,
+                'sample_period' = sample_period
+              )
               
               # ensure no na values
-              if(any(is.na(a))) {
+              if(any(is.na(sample_results[['sample_means']]))) {
                 output <<- na.result('na_in_sample', period_label)
                 stop()
               }
               
               # omit sampling period if there is not an avg value
-              # for all 5-min period bins in the period
-              if(length(a)<24) {
-                a <- rep(NA, 24) %>% as.integer()
-              }
+              # for all hour bins in the period
+              if(length(sample_results[['sample_means']])<24) {
+              sample_results <- list(
+                'sample_means' = rep(NA, 24) %>% as.integer(),
+                'sample_hourly_n' = rep(NA, 24) %>% as.integer(),
+                'sample_hourly_sd' = rep(NA, 24) %>% as.integer(),
+                'sample_period' = sample_period
+
+              )              }
               
             }  
-            
-            # return values for one running window
-            a <- as.data.frame(a)
-            colnames(a) <- y[1] # give name to column just to suppress "new name" message
-            
-            a
+
+sample_results
           }
         )
-      }
       
-      # bind all elements of list into a dataframe
-      a <- bind_cols(a)
 
-      n_samples_possible <- ncol(a)
-      # omit columns that have NA values (didn't have enough data)
-      if(ncol(a)>1) a <- a[ , colSums(is.na(a)) == 0]
+     
+      
+      a <- as.data.frame(a)
+      
+      
+      a <- map(colnames(a), function(x) {
+        tibble('sample_period' = a[[x]][['sample_period']],
+               'sample_means' = a[[x]]['sample_means'],
+               'sample_hourly_n' = a[[x]]['sample_hourly_n'],
+               'sample_hourly_sd' = a[[x]]['sample_hourly_sd'],
+        )
+      })
+      
+      n_samples_possible <- length(a)
+      # omit sample results from samples that have NA means (didn't have enough data)
+      
+      a <- a[
+        !map(a, function(x){ any(is.na(x[['sample_means']][['sample_means']]))
+        }
+        ) %>% unlist()
+      ]
+      
+      
+      
       
       # count number of sampling periods created (columns)
-      n_samples <- ncol(a)
+      n_samples <- length(a)
       
       # calculate proportion of samples that had sufficient data
       # for given short sampling frame length
       n_samp_avail <- n_samples/n_samples_possible
-      
-      
-      a <- lapply(colnames(a), function(x) {
-        samp <- a %>%
-          pull(x)
-        
-        kld <- samp %>%
-          kld(entire)
-                      
-        # find max and where it occurs
-        max_sample <- max(samp)
-        max_hour_sample <- ifelse(!is.na(max_sample),
-                                  which(samp ==max(samp)), NA)
-
-        # stop if max occurs at multiple hours
-        if(length(max_hour_sample) >1) {
-          output <<- na.result(paste0(length(max_hour_sample),
-                                      '_max_hours'), period_label, days)
-          stop()
-        }
-        
-        # return a list of values
-        list('kld' = kld, 'max_sample' = max_sample,
-             'max_hour_sample' = max_hour_sample,
-             'sample' = samp
-             )
-      })
-      
-      # return all calculated kld values
-            map(a, function(x){
-              list(
-                'n_samp_avail' = rep(n_samp_avail, length(x[[1]])),
-                'kld' = x[['kld']],
-                'max_sample' = x[['max_sample']],
-                'max_hour_sample' = x[['max_hour_sample']],
-           'max_entire' = rep(max_entire, length(x[[1]])),
-           'max_hour_entire' = rep(max_hour_entire, length(x[[1]])),
-           'sample_data' = x[['sample']],
-           'entire_data' = rep(entire, length(x[[1]])),
-           'entire_hourly_n' = rep(entire_hourly_n, length(x[[1]])),
-           'entire_hourly_sd' = rep(entire_hourly_sd, length(x[[1]]))
-              )
-            })
+      a <- bind_rows(a)
       
 
       
+      # # stop if max occurs at multiple hours
+      # if(length(max_hour_sample) >1) {
+      #   output <<- na.result(paste0(length(max_hour_sample),
+      #                               '_max_hours'), period_label, days)
+      #   stop()
+      # }
+
+              # return all calculated kld values
+      
+      a <- a %>%
+        rowwise()%>%
+        mutate(
+          kld = kld(sample_means, entire),
+          max_sample = max(sample_means),
+          max_hour_sample = ifelse(!is.na(max_sample),
+                                   which(sample_means ==max_sample), NA))
+      a<- a %>%
+        mutate(n_samp_avail = n_samp_avail,
+               max_entire = max_entire,
+               max_hour_entire = max_hour_entire,
+               entire_hourly_n = list(entire_hourly_n),
+               entire_hourly_sd = list(entire_hourly_sd)) %>%
+        rename(sample_data = sample_means)
+      
+
+      }      
+
+    a  
     }
     # # test kld.period function
     # test <- kld.period(27)
-    
-    
-    # apply function to find scaled_entropy dataframe for
+
+            # apply function to find scaled_entropy dataframe for
     # sampling period of length "days2" to range of days in tested_sample_sequence
     entropy_data_list <- lapply(
       tested_sample_sequence,
@@ -548,25 +590,13 @@ entropy.table.hourly <- function(
         # short sampling period of length "days2"
         a <- kld.period(days2)
 
-        map(a, function(x){
-
-          list(
-            'sample_length' = rep(days2, length(x[[1]])),
-            'monitor_season' = rep(period_label, length(x[[1]])),
-            'n_samp_avail' = x[['n_samp_avail']],
-            'kld' = x[['kld']], # entropy value
-            'max_sample' = x[['max_sample']],
-            'max_hour_sample' = x[['max_hour_sample']],
-            'max_entire' = x[['max_entire']],
-            'max_hour_entire' = x[['max_hour_entire']],
-           'sample_data' = x['sample_data'],
-           'entire_data' = x['entire_data'],
-           'entire_hourly_n' = x['entire_hourly_n'],
-           'entire_hourly_sd' = x['entire_hourly_sd'],
-           'error' = rep('none', length(x[[1]])),
-            'warn' = rep(warn, length(x[[1]])) # return wrnaing if there was one triggered
+        a %>% mutate(
+          sample_length = days2,
+          monitor_season = period_label,
+          error = 'none',
+          warn = warn
         )
-        })
+        
         
       }
     )
@@ -605,11 +635,11 @@ entropy.table.hourly <- function(
 
 start <- Sys.time()
 
-test<- entropy.table.hourly('009', 'pm25',
+test<- entropy.table.hourly('011', 'pm25',
                             overlap = FALSE,
                            date_ranges_entire = list(
                              c('2020-09-26', '2020-10-22')),
-                           tested_sample_sequence = c(2, 28),
+                           tested_sample_sequence = c(2,6,10,28),
                            location_type = 'pooled',
                            all_time = TRUE)
 
@@ -1130,6 +1160,14 @@ write_rds(entropy_time_hourly_pdf_df_pooled, file =
 
 
 
+
+
+
+
+
+
+
+# testing---------------------
 
 ```
 
