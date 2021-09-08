@@ -254,7 +254,8 @@ entropy.table.shape <- function(
     # make df of entire monitoring period (approx. a year)
     # recorded from given location
     data_year <- data %>%
-      filter(home == home_num)
+      filter(home == home_num)%>%
+      arrange(datehour)
     
     data_year <-
       if(location_type == 'pooled') {
