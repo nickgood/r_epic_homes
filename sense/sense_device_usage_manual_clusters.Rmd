@@ -41,15 +41,6 @@ threedig <- function(x) {
 home.list <- function(x) sapply(x, threedig)
 ```
 
-```{r data_import, eval = FALSE}
-data <- read_rds("../output_thesis/sense/sense_all.rds")
-
-# test <- data %>%
-#   group_by(job_id) %>%
-#   summarize(end = max(datetime))
-```
-
----
 
 # Manual Clustering  
 
@@ -87,8 +78,23 @@ energy_colors <- c(cbbPalette['light_blue'],
 energy_breaks <- c('ac', 'shoulder', 'heat')
 energy_labels <- c('AC', 'Shoulder', 'Heat')
 
+resolution <- 'minute'
 ```
 
+
+```{r data_import, eval = FALSE}
+
+data <- if(resolution == 'hour'){
+  read_rds("../output_thesis/sense/sense_hourly.rds")} else if(resolution == 'minute'){
+  read_rds("../output_thesis/sense/sense_all.rds")}
+}
+
+# test <- data %>%
+#   group_by(job_id) %>%
+#   summarize(end = max(datetime))
+```
+
+---
 
 heating threshold set at `r heat_percentile_thresh` percentile for daily % time on
 
@@ -109,6 +115,16 @@ cluster.manual <- function(home_id, devices,
                            measure = 'pct', # pct (fraction on) or consumption
                            return_data = FALSE) {
   
+  if(resolution == 'hour'){
+unit_per_day <-  24 # amoutn of units in each day
+unit_check <- 0.9
+units <- 'hours'
+}else if(resolution == 'minute'){
+unit_per_day <-  60*24 # amoutn of units in each day
+unit_check <- 50
+units <- 'mins'
+}
+  
   a <- data %>%
     filter(job_id == home_id) %>%
     mutate(dateday = floor_date(datetime, unit = 'day'),
@@ -116,14 +132,15 @@ cluster.manual <- function(home_id, devices,
                                        device_id, sense_device_name)) %>%
     group_by(sense_device_name, dateday) %>%
     summarise(
-      mins = n(), # amount of minutes device was on during specified day
+      on_per_day = n(), # amount of hours device was on during specified day
       consumption = sum(consumption_kwh, na.rm = TRUE),
       .groups = "drop") %>%
-    mutate(d_min =  60 * 24, # amoutn of minutes in each day
-           pct = mins * 100 / d_min,
-           pct = if_else(pct == Inf, 0, pct),
-           pct = if_else(d_min < 50, 0, pct)) %>% # make cluster of time periods
-    select(-c(mins,d_min))%>%
+    mutate(
+         pct = on_per_day * 100 / unit_per_day,
+         pct = if_else(pct == Inf, 0, pct),
+         pct = case_when(unit_per_day < unit_check ~ 0,
+                         TRUE ~ pct)) %>% # make cluster of time periods
+    select(-c(on_per_day,unit_per_day))%>%
     pivot_wider(names_from = sense_device_name, values_from = c(pct, consumption),
                 values_fill = 0 # make device usage minutes zero if not registered
                 # in a certain day
@@ -144,7 +161,7 @@ cluster.manual <- function(home_id, devices,
   #   }
     a %>%
     #find month with max avg daily heat pct on
-    # and make threshold 10% of that value
+    # and make threshold 15% of that value
     group_by(month = month(dateday, label = TRUE, abbr = TRUE)) %>%
     summarise(avg_heat = mean(heat, na.rm = TRUE)) %>%
     pull(avg_heat) %>%

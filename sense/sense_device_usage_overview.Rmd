@@ -23,8 +23,17 @@ library('factoextra')
 
 ```
 
+```{r define_variables}
+resolution <- 'minute'
+
+```
+
+
+
 ```{r data_import, eval = TRUE}
-data <- read_rds("../output_thesis/sense/sense_all.rds")
+data <- if(resolution == 'hour'){
+  read_rds("../output_thesis/sense/sense_hourly.rds")} else if(resolution == 'minute'){
+  read_rds("../output_thesis/sense/sense_all.rds")}
 
 # # find how many homes have data after given date
 # test <- data %>% filter(datetime > ymd('2021-04-14')) %>% select(job_id) %>%
@@ -41,6 +50,16 @@ data <- read_rds("../output_thesis/sense/sense_all.rds")
 
 daily.fraction <- function(home_id # home id, in form: '003'
                        ) {
+  if(resolution == 'hour'){
+unit_per_day <-  24 # amoutn of units in each day
+unit_check <- 0.9
+units <- 'hours'
+}else if(resolution == 'minute'){
+unit_per_day <-  60*24 # amoutn of units in each day
+unit_check <- 50
+units <- 'mins'
+}
+  
 a <- data %>%
   filter(job_id == home_id) %>%
   mutate(dateday = floor_date(datetime, unit = 'day'),
@@ -48,12 +67,13 @@ a <- data %>%
                                      device_id, sense_device_name)) %>%
   group_by(sense_device_name, dateday) %>%
   summarise(
-    mins = n(), # amount of minutes device was on during specified day
+    on_per_day = n(), # amount of units device was on during specified day
     .groups = "drop") %>%
-  mutate(d_min =  60 * 24, # amoutn of minutes in each day
-         pct = mins * 100 / d_min,
+  mutate(
+         pct = on_per_day * 100 / unit_per_day,
          pct = if_else(pct == Inf, 0, pct),
-         pct = if_else(d_min < 50, 0, pct))
+         pct = case_when(unit_per_day < unit_check ~ 0,
+                         TRUE ~ pct))
 
 # plot for specified home
 ggplot(a, aes(x = dateday, y = pct) ) +
@@ -76,7 +96,7 @@ coord_cartesian(ylim = c(0,100))+
 ```{r plot_daily_frac_overview}
 
 # # for one home
-# daily.fraction('013')
+daily.fraction('004')
 
 
 # apply above function to all homes
@@ -120,7 +140,7 @@ geom_segment(aes(xend = dateday, y = 0, yend = consumption)) +
 
 ```
 
-```{r plot_daily_consum_overview, eval = FALSE}
+```{r plot_daily_consum_overview, eval = TRUE}
 # homes 3 and 16 do not have data available
 
 # apply above function to all homes
