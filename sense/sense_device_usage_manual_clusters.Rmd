@@ -56,7 +56,9 @@ homes_tier2<-home.list(c(4,10,11,13,15)) # shoulder-heat (sometimes second shoul
 homes_tier1<-home.list(c(6,8,14))
 
 # just compare methods for daily fraction of time-on (pct)
-heat_percentile_thresh <- 0.25
+# heat_percentile_thresh <- 0.25
+
+max_heat_fraction <- 0.15
 ac_usage_thresh <- 0
 
 # color blind pallette
@@ -78,16 +80,19 @@ energy_colors <- c(cbbPalette['light_blue'],
 energy_breaks <- c('ac', 'shoulder', 'heat')
 energy_labels <- c('AC', 'Shoulder', 'Heat')
 
-resolution <- 'minute'
+resolution <- 'hour'
 ```
 
 
 ```{r data_import, eval = FALSE}
 
-data <- if(resolution == 'hour'){
-  read_rds("../output_thesis/sense/sense_hourly.rds")} else if(resolution == 'minute'){
-  read_rds("../output_thesis/sense/sense_all.rds")}
-}
+data <- (
+  if(resolution == 'hour'){
+  read_rds("../output_thesis/sense/sense_hourly_thesis.rds")} else if(resolution == 'minute'){
+  read_rds("../output_thesis/sense/sense_all_thesis.rds")}
+  )%>%
+  filter(datetime < ymd('2021-05-01'))
+
 
 # test <- data %>%
 #   group_by(job_id) %>%
@@ -96,7 +101,7 @@ data <- if(resolution == 'hour'){
 
 ---
 
-heating threshold set at `r heat_percentile_thresh` percentile for daily % time on
+heating threshold set at `r max_heat_fraction` of max month daily fraction on
 
 ac threshold set at `r ac_usage_thresh`% for daily % time on
 
@@ -117,11 +122,9 @@ cluster.manual <- function(home_id, devices,
   
   if(resolution == 'hour'){
 unit_per_day <-  24 # amoutn of units in each day
-unit_check <- 0.9
 units <- 'hours'
 }else if(resolution == 'minute'){
 unit_per_day <-  60*24 # amoutn of units in each day
-unit_check <- 50
 units <- 'mins'
 }
   
@@ -137,10 +140,8 @@ units <- 'mins'
       .groups = "drop") %>%
     mutate(
          pct = on_per_day * 100 / unit_per_day,
-         pct = if_else(pct == Inf, 0, pct),
-         pct = case_when(unit_per_day < unit_check ~ 0,
-                         TRUE ~ pct)) %>% # make cluster of time periods
-    select(-c(on_per_day,unit_per_day))%>%
+         pct = if_else(pct == Inf, 0, pct)) %>% # make cluster of time periods
+    select(-c(on_per_day))%>%
     pivot_wider(names_from = sense_device_name, values_from = c(pct, consumption),
                 values_fill = 0 # make device usage minutes zero if not registered
                 # in a certain day
@@ -151,7 +152,7 @@ units <- 'mins'
     rename_at(vars(contains(c('heat', 'furnace'))), list(~sub('.*','heat',.))) %>%
     rename_at(vars(contains('ac')), list(~sub('.*','ac',.)))
   
-  # find heat threshold value based on percentile
+  # find heat threshold value based on percent of max month
   heat_thresh_value <-
   #   if(include_zero == TRUE) {
   #   a %>% pull(heat) %>% quantile(heat_percentile_thresh)
@@ -165,7 +166,7 @@ units <- 'mins'
     group_by(month = month(dateday, label = TRUE, abbr = TRUE)) %>%
     summarise(avg_heat = mean(heat, na.rm = TRUE)) %>%
     pull(avg_heat) %>%
-    max()*0.15
+    max()*max_heat_fraction
   
   # make a df with clusters
   a_cl <- a %>%
@@ -243,6 +244,14 @@ cluster.manual.heat <- function(home_id, devices,
                                 include_zero,
                                 return_data = FALSE) {
   
+    if(resolution == 'hour'){
+unit_per_day <-  24 # amoutn of units in each day
+units <- 'hours'
+}else if(resolution == 'minute'){
+unit_per_day <-  60*24 # amoutn of units in each day
+units <- 'mins'
+}
+  
   a <- data %>%
     filter(job_id == home_id) %>%
     mutate(dateday = floor_date(datetime, unit = 'day'),
@@ -250,15 +259,13 @@ cluster.manual.heat <- function(home_id, devices,
                                        device_id, sense_device_name)) %>%
     group_by(sense_device_name, dateday) %>%
     summarise(
-      mins = n(), # amount of minutes device was on during specified day
+      on_per_day = n(), # amount of hours device was on during specified day
       consumption = sum(consumption_kwh, na.rm = TRUE),
       .groups = "drop") %>%
-    mutate(d_min =  60 * 24, # amoutn of minutes in each day
-           pct = mins * 100 / d_min,
-           pct = if_else(pct == Inf, 0, pct),
-           pct = if_else(d_min < 50, 0, pct)) %>% # make cluster of time periods
-    
-    select(-c(mins,d_min))%>%
+    mutate(
+         pct = on_per_day * 100 / unit_per_day,
+         pct = if_else(pct == Inf, 0, pct)) %>% # make cluster of time periods
+    select(-c(on_per_day))%>%
     pivot_wider(names_from = sense_device_name, values_from = c(pct, consumption),
                 values_fill = 0 # make device usage minutes zero if not registered
                 # in a certain day
@@ -283,7 +290,7 @@ cluster.manual.heat <- function(home_id, devices,
     group_by(month = month(dateday, label = TRUE, abbr = TRUE)) %>%
     summarise(avg_heat = mean(heat, na.rm = TRUE)) %>%
     pull(avg_heat) %>%
-    max()*0.15
+    max()*max_heat_fraction
   
   # make a df with clusters
   a_cl <- a %>%
@@ -503,6 +510,7 @@ hm <- '015'
 cluster_df_015 <- cluster.manual.heat(hm, c('furnace'), return_data = TRUE, include_zero = zero_choice)
 
 
+# tier 1 homes
 
 hm <- '006'
 #
@@ -513,7 +521,7 @@ cluster_df_006 <- cluster.manual(hm, c('heat 1','ac'), return_data = TRUE, inclu
 hm <- '008'
 # many heats that could be feasible...
 # heat 1 and 2 on approx same fraction, but 2 consumes more energy
-cluster_df_008 <- cluster.manual(hm, c('heat 2','ac'), return_data = TRUE, include_zero = zero_choice)
+cluster_df_008 <- cluster.manual(hm, c('heat 1','ac'), return_data = TRUE, include_zero = zero_choice)
 
 
 
@@ -582,13 +590,14 @@ y <- rle(a$energy_cluster)
 # look for shoulder dates in tier 3
 if(x_home %in% c(homes_tier3,
                  # special case Tier 2 homes
-                 '010', '015', '013'
+                 '010'
                  )) {
   # define sets of days based on their consecutive energy_cluster value
   # (and the lengths of each set)
-#label a set TRUE if it contains 6 or more consecutive shoulder days
+#label a set TRUE if it contains 8 or more consecutive shoulder days
     z <- y$values == 'shoulder' &
-      y$lengths >= ifelse(x_home == '012', 5, 8) # home 12 special case 
+      # y$lengths >= 8
+      y$lengths >= ifelse(x_home == '012', 5, 8) # home 12 special case
     # find first set of clustered shoulder days that is 8 or more days long
     i_shoulder <- which(z)[1] 
     # return NA if there is never a 8-day stretch of shoulder days
@@ -598,12 +607,14 @@ if(x_home %in% c(homes_tier3,
     # return position of start of 8-day stretch
     a$dateday[sum(y$lengths[1:(i_shoulder-1)])+1]
 } else shoulder_start <- NA
+
 # look for heat dates in tier 2 and 3
 
 if(x_home %in% c(homes_tier3, homes_tier2)) {
 
     #same for heat days
-    z <- y$values == 'heat' & y$lengths >= 8 
+    z <- y$values == 'heat' & 
+      y$lengths >= ifelse(x_home == '012', 6, 8) # home 12 special case
     # find first set of clustered heat days that is 8 or more days long
     if(x_home == '010') i_heat <- which(z)[2]  else# home 010 is special case
     i_heat <- which(z)[1]
@@ -625,10 +636,10 @@ if(x_home %in% c(homes_tier3, homes_tier2)) {
 } else heat_start <- NA
 
 
-# look for end dates of heat seasons
+# look for end dates of heat seasons (special cases)
 if(x_home %in% c(
-                 # special case Tier 2 homes
-                  '015', '013' 
+                 # # special case Tier 2 homes
+                 #  '015', '013' 
                  )) {
   # define sets of days based on their consecutive energy_cluster value
   # (and the lengths of each set)
@@ -753,7 +764,7 @@ should_start <- season_end_points %>%
   filter(home == x_home) %>%
   pull(shoulder_start) %>% as.character()
 
-should_start <- if(x_home %in% c('010', '015')) should_start else
+should_start <- if(x_home %in% c('010')) should_start else
   if (x_home %in% homes_tier2) first_date else
     ifelse(is_empty(should_start), NA, should_start)
 
@@ -792,37 +803,6 @@ tibble(home = rep(x_home, 3),
 }) %>%
   bind_rows()
 
-
-# energy_cluster_df<- tribble(~home, ~cluster_type,
-#                             ~start_date, ~end_date,
-#                      '001', 'ac', '2020-07-20', '2020-10-01',
-#                      '001', 'shoulder', '2020-10-02', '2020-12-02',
-#                      '001', 'heat', '2020-12-03', '2021-04-10',
-#                      '002', 'ac', '2020-07-21', '2020-08-27',
-#                      '002', 'shoulder', '2020-08-28', '2020-10-07',
-#                      '002', 'heat', '2020-10-08', '2021-04-18',
-#                      '004', 'shoulder', '2020-08-10', '2020-10-12',
-#                      '004', 'heat', '2020-10-13', '2021-04-22',
-#                      '007', 'ac', '2020-08-18', '2020-09-04',
-#                      '007', 'shoulder', '2020-09-05', '2020-10-12',
-#                      '007', 'heat', '2020-10-13', '2021-03-27',
-#                      '009', 'ac', '2020-08-25', '2020-09-23',
-#                      '009', 'shoulder', '2020-09-24', '2020-10-31',
-#                      '009', 'heat', '2020-11-01', '2021-04-22',                     
-#                      '010', 'heat', '2020-12-02', '2021-04-23',
-#                      '011', 'shoulder', '2020-08-26', '2020-12-01',
-#                      '011', 'heat', '2020-12-02', '2021-04-22',
-#                      '012', 'ac', '2020-09-20', '2020-09-26',
-#                      '012', 'shoulder', '2020-09-27', '2020-11-07',
-#                      '012', 'heat', '2020-11-08', '2021-04-22',
-#                      '013', 'shoulder', '2020-10-13', '2020-11-07',
-#                      '013', 'heat', '2020-11-08', '2021-03-31',
-#                      '013', 'shoulder_2', '2021-04-01', '2021-05-23',
-#                      '015', 'shoulder', '2020-11-26', '2020-11-23',
-#                      '015', 'heat', '2020-11-24', '2021-03-28',
-#                      '015', 'shoulder_2', '2021-03-29', '2021-05-23',
-# ) %>%
-#   mutate(across(start_date, ymd), across(end_date, ymd))
 
 # create csv
 write_csv(energy_cluster_df, './csv_created_sense/energy_cluster_df.csv')
