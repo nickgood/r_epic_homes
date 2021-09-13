@@ -8,7 +8,7 @@ knitr::opts_chunk$set(fig.path = 'figures/',
   warning = FALSE,
   message = FALSE,
   echo = FALSE,
-  fig.width = 10, fig.height = 16,
+  fig.width = 10, fig.height = 8,
   cache = FALSE)
 
 ```
@@ -24,10 +24,9 @@ library('factoextra')
 ```
 
 ```{r define_variables}
-resolution <- 'minute'
+resolution <- 'hour'
 
 ```
-
 
 
 ```{r data_import, eval = TRUE}
@@ -35,10 +34,47 @@ data <- if(resolution == 'hour'){
   read_rds("../output_thesis/sense/sense_hourly.rds")} else if(resolution == 'minute'){
   read_rds("../output_thesis/sense/sense_all.rds")}
 
+data_old <- if(resolution == 'hour'){
+  read_rds("../output_thesis/sense/sense_hourly_old.rds")} else if(resolution == 'minute'){
+  read_rds("../output_thesis/sense/sense_all_old.rds")}
+
+dates <- data_old %>%
+              group_by(job_id) %>%
+              summarise(end_date_old = max(datetime),
+                        start_date_old = min(datetime)) %>%
+                          full_join(data %>%
+              group_by(job_id) %>%
+              summarise(end_date = max(datetime),
+                         start_date = min(datetime)),
+            by = 'job_id')
+
 # # find how many homes have data after given date
 # test <- data %>% filter(datetime > ymd('2021-04-14')) %>% select(job_id) %>%
 #   as.factor() %>% levels()
 ```
+
+
+```{r merge_data_files}
+
+
+data <- data %>%
+  left_join(dates, by = 'job_id')%>%
+  filter(datetime>end_date_old) %>%
+  bind_rows(data_old)
+
+# make sure no duplictes
+# sum(duplicated(test3))
+
+```
+
+
+```{r write_combined_data, eval = FALSE}
+write_rds(data, "../output_thesis/sense/sense_hourly_thesis.rds")
+write_rds(data, paste0('../output_thesis/sense/sense_hourly_thesis_',
+                       Sys.Date(),'.rds'))
+
+```
+
 
 # Daily Device Overviews  
 
@@ -52,11 +88,9 @@ daily.fraction <- function(home_id # home id, in form: '003'
                        ) {
   if(resolution == 'hour'){
 unit_per_day <-  24 # amoutn of units in each day
-unit_check <- 0.9
 units <- 'hours'
 }else if(resolution == 'minute'){
 unit_per_day <-  60*24 # amoutn of units in each day
-unit_check <- 50
 units <- 'mins'
 }
   
@@ -71,9 +105,7 @@ a <- data %>%
     .groups = "drop") %>%
   mutate(
          pct = on_per_day * 100 / unit_per_day,
-         pct = if_else(pct == Inf, 0, pct),
-         pct = case_when(unit_per_day < unit_check ~ 0,
-                         TRUE ~ pct))
+         pct = if_else(pct == Inf, 0, pct))
 
 # plot for specified home
 ggplot(a, aes(x = dateday, y = pct) ) +
@@ -93,10 +125,10 @@ coord_cartesian(ylim = c(0,100))+
 
 ```
 
-```{r plot_daily_frac_overview}
+```{r plot_daily_frac_overview, eval = FALSE}
 
 # # for one home
-daily.fraction('004')
+# daily.fraction('004')
 
 
 # apply above function to all homes
@@ -110,8 +142,8 @@ lapply(levels(as.factor(data$job_id)), daily.fraction)
 
 # function to test daily usage per device by home
 
-daily.consumption <- function(home_id # home id, in form: '003'
-                       ) {
+daily.consumption <- function(home_id, # home id, in form: '003'
+                       y_max = NA) {
 a <- data %>%
   filter(job_id == home_id) %>%
   mutate(dateday = floor_date(datetime, unit = 'day'),
@@ -134,15 +166,36 @@ geom_segment(aes(xend = dateday, y = 0, yend = consumption)) +
     ylab("Consumption (kwh)") +
     #scale_x_log10() +
   facet_wrap(~sense_device_name, ncol = 4, scales = "fixed")+
-  ggtitle(paste('Home', home_id, 'Consumption'))
+  ggtitle(paste('Home', home_id, 'Consumption'))+
+  coord_cartesian(ylim = c(0,y_max))
 }
 
 
 ```
 
-```{r plot_daily_consum_overview, eval = TRUE}
+```{r plot_daily_consum_overview, eval = FALSE}
 # homes 3 and 16 do not have data available
 
 # apply above function to all homes
 lapply(levels(as.factor(data$job_id)), daily.consumption)
 ```
+
+```{r plot_zoom_daily_consum_overview}
+
+daily.consumption('001', y_max = 2.5)
+
+daily.consumption('006', y_max = 5)
+
+daily.consumption('011', y_max = 1.5)
+
+daily.consumption('014', y_max = 0.5)
+
+daily.consumption('010', y_max = 1)
+
+daily.consumption('008', y_max = 1.5)
+
+
+
+
+```
+
