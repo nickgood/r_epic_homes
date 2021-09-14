@@ -26,6 +26,7 @@ library(googlesheets4)
 library(lubridate)
 library(gridExtra) #for making ggplot autocorrelation plot grids
 library(ggpubr) # for making time series plot grids (with common legends)
+library(tseries) # for tests of stationarity
 
 ```
 
@@ -81,6 +82,8 @@ locations_indoor <- c('living', 'bedroom', 'kitchen')
 
 # define metrics for acf testing
 metrics_all <- c('pm25', 'voc', 'co2', 'temp', 'humid')
+
+clusters_all <- c('heat', 'shoulder', )
 
 #define sizes for plot text
 xsmall <- 2
@@ -325,7 +328,7 @@ ts.grid <- function(plots, title,
 
 # Will stationarity be an issue?
 
-```{r stationarity, fig.width=10.5, fig.height=8}
+```{r stationarity, fig.width=10.5, fig.height=8, eval = FALSE}
 # check stationarity before doing acf calcs and plots
 
 # make time series plot for all available sensors
@@ -432,6 +435,144 @@ map(
 
 ```
 
+```{r stationarity_tests}
+
+
+
+# variables for testing -------------
+
+
+# x_home <- '001'
+# x_location <- 'living'
+# x_metric <- 'pm25'
+# x_cluster <- 11
+# rm(x_home, x_location, x_cluster, x_metric)
+
+
+# stationarity tests------------
+
+cluster_method <- 'month'
+
+
+data <- omni_daily_data_complete %>%
+  mutate(month = month(date))
+
+stat_test <- lapply(metrics_all, function(x_metric) {
+    
+    lapply(locations_indoor, function(x_location) {
+      
+      lapply(homes_all, function(x_home) {
+        
+         lapply(if(cluster_method == 'month') c(1:12) else clusters_all,
+               function(x_cluster) {
+                 
+a <- data %>%
+  filter(home == x_home & location == x_location &
+           if(cluster_method == 'month') {
+             month == x_cluster
+             } else energy_cluster == x_cluster)
+
+# return NULL if condition does not exist
+if(length(a %>% pull(x_metric)) == 0) return() 
+
+# count fraction of missing readings
+missing <- sum(is.na(pull(a, all_of(x_metric))))/length(pull(a, all_of(x_metric)))
+if(missing==1) return() # return NULL if all values are missing
+
+a <-  a %>% fill(all_of(x_metric)) # fill in NA's with previous value
+
+# trim NA values off of beginning of sample
+a <- (a[min(which(!is.na(a %>% pull(x_metric)))):length(a %>% pull(x_metric)),]) %>%
+  pull(x_metric)
+
+if(length(a)<3) return()
+                 adf <- adf.test(a)
+                 kpss <- kpss.test(a)
+                 
+                 list( 'home' = x_home, 'energy_cluster' = x_cluster,
+                       'location' = x_location, 'adf_p' = adf$p.value,
+                       'kpss_p' = kpss$p.value, 'missing_frac' = missing)
+               }
+        ) %>%
+        bind_rows()
+      }
+      ) %>%
+        bind_rows()
+    }
+    ) %>%
+      bind_rows()
+  }
+  ) %>%
+  bind_rows()
+
+stat_test_summary<- stat_test %>%
+  group_by(energy_cluster) %>%
+  summarise(frac_pass_adf = sum(adf_p<0.05)/n(),
+            frac_pass_kpss = sum(kpss_p>0.05)/n(),
+            n_samples = n())
+
+# calculate summary if omissions of data with missing values occur
+stat_test_summary_omit<- stat_test %>%
+  filter(missing_frac < 0.11) %>%
+  group_by(energy_cluster) %>%
+  summarise(frac_pass_adf = sum(adf_p<0.05)/n(),
+            frac_pass_kpss = sum(kpss_p>0.05)/n(),
+            n_samples = n())
+
+
+
+
+# testing-----------------------
+
+# a <- omni_daily_data_complete %>%
+#   mutate(month = month(date))%>%
+#   filter(home == '004', month == 1, location == 'kitchen')
+# 
+# missing <- sum(is.na(pull(a, all_of('pm25'))))/length(pull(a, all_of('pm25')))
+# if(missing>0.11) return()
+# 
+# a <-  a %>% fill(all_of('pm25')) # fill in NA's with previous value
+# 
+# # trim NA values off of beginning of sample
+# a <- (a[min(which(!is.na(a %>% pull('pm25')))):length(a %>% pull('pm25')),]) %>%
+#   pull('pm25')
+# 
+# 
+# adf.test(a)
+# kpss.test(a)
+
+
+# # fill in NA's with previous value
+# a <- omni_daily_data_complete %>%
+#   filter(home == '001', energy_cluster == 'heat', location == 'living') %>%
+#   fill(all_of('pm25'))
+# # trim NA values off of beginning of sample
+# a <- (a[min(which(!is.na(a %>% pull('pm25')))):length(a %>% pull('pm25')),]) %>%
+#   pull('pm25')
+# 
+# if(length(a)<3) return()
+#                  test <- adf.test(a)
+#                  test$p.value
+#                  
+#  kpss.test(a)
+#  kpss.test(b)
+#           b <- a[!is.na(a)] 
+#           
+#    test <-  data.frame(x = c(NA,3,5,5,NA,NA,NA,6, NA,7,NA))
+#    test2 <- test %>% fill(x)
+
+   # test if input to lapply/map is blank
+#    x <- data.frame(z = c('a','a','c','d'), y = c('j','u','k','l'))
+# x %>%
+#                  filter(x == 'e') %>%
+#                  pull(y) %>%
+#                  as.factor() %>% levels()
+# map(x %>%
+#                  filter(x == 'e') %>%
+#                  pull(y) %>%
+#                  as.factor() %>% levels(), function(x) x) %>% bind_rows()
+```
+
 # Autocorrelation plots  
 
 ```{r ggacf_omission_criteria}
@@ -439,20 +580,23 @@ map(
 days_avail_min <- 25
 pairs_min <- 20
 missing_pct_min <- 1/9*100
+
 ```
 
 
 
 ```{r ggacf_function, include= FALSE}
 
-# # variables for testing
+# # variables for testing-----------------
 # data <- omni_daily_data_complete
-# hm <- '003'
+# hm <- '015'
 # loc <- 'living'
 # metric <- 'pm25'
 # lag.max <- 14
+# cluster <- 'shoulder'
+# type <- 'correlation'
 
-##Define an autocorrelation plot function in ggplot
+##Define an autocorrelation plot function in ggplot------------------
 
 ###Make acf function in ggplot
 ##from: https://stackoverflow.com/questions/28857241/r-combine-plots-that-use-parmfrow-internally
@@ -478,7 +622,7 @@ ggacf <- function(data,  hm, loc, metric,
       pull(all_of(metric))
     }
 
-  if(length(x) == 0) return()
+  if(length(x) < 3) return() # don't calculate anything if there are less than 
   
   # count days in monitoring period with available data
   days_avail <- sum(!is.na(x))
@@ -595,11 +739,14 @@ ach50 <- if(is_empty(ach50)) 'not measured' else if (is.na(ach50)) {
   
   return(list('lag_signif' = lag_signif, 'plot' = plot))
 }
-# test for one home, loc, metric
-lapply('009', ggacf,
+
+# testing-------------
+# # test for one home, loc, metric
+lapply('015', ggacf,
        data = omni_daily_data_complete,
        loc = 'living', lag_max_plot = 10,
-       metric = 'pm25', simple= TRUE)
+       metric = 'pm25', simple= TRUE,
+       cluster = 'shoulder')
 ```
 
 
@@ -975,7 +1122,8 @@ b <- a %>% filter(missing_pct > missing_pct_min)
 ### omitted `r b %>% nrow()/n_metrics_lags` additional monitoring periods for each metric
 ### because missing more than `r missing_pct_min`% of days within period
 
-```{r lag_plots, eval = FALSE}
+
+```{r lag_plots, eval = TRUE}
 
 ######## one metric
 met <- 'pm25'
@@ -1003,9 +1151,8 @@ filter(lag_signif %>%is.finite()) %>%
   group_by(location, energy_cluster) %>%
   summarise(
     label_position=median(lag_signif, na.rm= TRUE)+5,
-    label_value=n()
+    label_value=n(), .groups = 'drop'
   ) %>%
-  ungroup() %>%
   mutate(label_value = paste0('n=',label_value))
 
 # boxplots by location
@@ -1040,9 +1187,8 @@ n_labels <- a %>%
   group_by(location) %>%
   summarise(
   label_position=median(lag_signif, na.rm= TRUE)+5,
-  label_value=n()
+  label_value=n(), .groups = 'drop'
 ) %>%
-  ungroup() %>%
   mutate(label_value = paste0('n=',label_value))
 
 
@@ -1086,9 +1232,8 @@ n_labels <- a %>%
   group_by(location, metric) %>%
   summarise(
     label_position=median(lag_signif, na.rm= TRUE)+5,
-    label_value=n()
+    label_value=n(), .groups = 'drop'
   ) %>%
-  ungroup() %>%
   mutate(label_value = paste0('n=',label_value))
 
 # boxplots by location, pooled clusters
@@ -1128,9 +1273,8 @@ n_labels <- a %>%
   group_by(energy_cluster, metric) %>%
   summarise(
     label_position=median(lag_signif, na.rm= TRUE)+5,
-    label_value=n()
+    label_value=n(), .groups = 'drop'
   ) %>%
-  ungroup() %>%
   mutate(label_value = paste0('n=',label_value))
 
 # boxplots by cluster, pooled rooms
@@ -1159,13 +1303,15 @@ ggplot(data = a ,
                        labels = c("Yes", "No"),
                        guide = "legend")
 
+
+
 ```
 
 ## seems to be not much difference in significant lag by room,
 ## but may be difference between clusters
 ## however, this could be due to heating periods beings longer, and less stationary
 
-```{r lag_table_csv, eval = FALSE}
+```{r lag_table_csv, eval = TRUE}
 # don't include Inf values in calculations
 acf_lags_finite <- acf_lags_filter %>%
     filter(!is.infinite(lag_signif))
