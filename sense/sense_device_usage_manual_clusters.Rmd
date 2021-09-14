@@ -91,7 +91,7 @@ data <- (
   read_rds("../output_thesis/sense/sense_hourly_thesis.rds")} else if(resolution == 'minute'){
   read_rds("../output_thesis/sense/sense_all_thesis.rds")}
   )%>%
-  filter(datetime < ymd('2021-05-01'))
+  filter(datetime < ymd('2021-06-01'))
 
 
 # test <- data %>%
@@ -577,6 +577,23 @@ daily_energy_data_clustered <- read_csv('./csv_created_sense/daily_energy_data_c
 #   group_by(home) %>%
 #   summarise(shoulder_start = dateday[which(energy_cluster == 'heat')[1]])
 
+a <- daily_energy_data_clustered %>%
+  filter(home == '009') %>%
+  arrange(dateday)  
+
+y <- rle(a$energy_cluster) 
+
+heat_indeces <- which(y$values == 'heat' & y$lengths>=8)
+
+final_heat_index <- heat_indeces[length(heat_indeces)]
+final_heat_length <- y$lengths[final_heat_index]
+a$dateday[sum(y$lengths[1:final_heat_index])+1]
+# need to add condition if NA (if the last heat period is the end,
+# so nothing occurs after the last index)
+
+
+# return position of end of 8-day stretch
+    a$dateday[sum(y$lengths[1:(i_heat-1)])+1]
 
 # test with function
 season_end_points <- map(homes_all, function(x_home) {
@@ -585,6 +602,8 @@ a <- daily_energy_data_clustered %>%
   filter(home == x_home) %>%
   arrange(dateday)  
 
+  # define sets of days based on their consecutive energy_cluster value
+  # (and the lengths of each set)
 y <- rle(a$energy_cluster) 
 
 # look for shoulder dates in tier 3
@@ -592,8 +611,7 @@ if(x_home %in% c(homes_tier3,
                  # special case Tier 2 homes
                  '010'
                  )) {
-  # define sets of days based on their consecutive energy_cluster value
-  # (and the lengths of each set)
+
 #label a set TRUE if it contains 8 or more consecutive shoulder days
     z <- y$values == 'shoulder' &
       # y$lengths >= 8
@@ -636,24 +654,18 @@ if(x_home %in% c(homes_tier3, homes_tier2)) {
 } else heat_start <- NA
 
 
-# look for end dates of heat seasons (special cases)
+# look for end dates of heat seasons 
 if(x_home %in% c(
-                 # # special case Tier 2 homes
-                 #  '015', '013' 
+                 homes_tier2, homes_tier3
                  )) {
-  # define sets of days based on their consecutive energy_cluster value
-  # (and the lengths of each set)
-#label a set TRUE if it contains 6 or more consecutive shoulder days
-    z <- y$values == 'shoulder' &
-      y$lengths >= 8 
-    # find second set of clustered shoulder days that is 8 or more days long
-    i_heat <- which(z)[2] 
-    # return NA if there is never a 8-day stretch of shoulder days
-    heat_end <- if (is.na(i_heat)) NA else 
-    # return first day if that is when 8-day stretch starts
-    if (i_heat == 1) a$dateday[1] else
-    # return position of start of 8-day stretch
-    a$dateday[sum(y$lengths[1:(i_heat-1)])+1]
+
+# determine index of heating day spans with lengths of 8 days or greater
+heat_indeces <- which(y$values == 'heat' & y$lengths>=8)
+
+final_heat_index <- heat_indeces[length(heat_indeces)]
+final_heat_length <- y$lengths[final_heat_index]
+heat_end <- a$dateday[sum(y$lengths[1:final_heat_index])+1]
+
 } else heat_end <- NA
 
     return(tibble('home' = x_home, 'shoulder_start' = shoulder_start,
