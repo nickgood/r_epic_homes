@@ -35,7 +35,8 @@ library(gridExtra)
 ```
 
 ```{r data_import}
-rtdata <- read_rds('./csv_created/omni_calibrated.rds')
+omni_hourly <- read_rds('./csv_created/omni_hourly_calibrated.rds') %>%
+  rename(datetime = datehour)
 ```
 
 
@@ -234,11 +235,11 @@ time.table <- function(data, period,
   #month
  if (period == 'month'){
     a <- a %>% 
-      mutate(month = month(datetime, label = TRUE)) %>%
+      mutate(month = floor_date(datetime, unit = 'month')) %>%
       count(month, home) %>% # count amount of observations used for each average
       full_join(
         a %>%
-          mutate(month = month(datetime, label = TRUE)) %>%
+          mutate(month = floor_date(datetime, unit = 'month')) %>%
           
       group_by(month, .dots = groupers) %>% 
       summarize_if(is.numeric, list(mean.val = mean.val,
@@ -566,11 +567,11 @@ locations_indoor <- c('living', 'bedroom', 'kitchen')
 
 periods_all <- c('hour', 'day', 'month')
 
-living_data <- rtdata %>% filter(location == 'living')
-kitchen_data <- rtdata %>% filter(location == 'kitchen')
-bedroom_data <- rtdata %>% filter(location == 'bedroom')
-outdoor_data <- rtdata %>% filter(location == 'outdoor')
-garage_data <- rtdata %>% filter(location == 'garage')
+living_data <- omni_hourly %>% filter(location == 'living')
+kitchen_data <- omni_hourly %>% filter(location == 'kitchen')
+bedroom_data <- omni_hourly %>% filter(location == 'bedroom')
+outdoor_data <- omni_hourly %>% filter(location == 'outdoor')
+garage_data <- omni_hourly %>% filter(location == 'garage')
 
 
 # color blind pallette
@@ -680,7 +681,7 @@ hour.day.month.grid(rm, err_ribbon_plot1 = FALSE, note = version,
 
 
 {
-  a <- time.table(rtdata, 'hour', groupers = 'location')
+  a <- time.table(omni_hourly, 'hour', groupers = 'location')
   
 ##PM2.5
 
@@ -810,7 +811,7 @@ plotvoc
           strip.background =element_blank())
       }
 
-a <- time.table(rtdata, 'hour', groupers = c('home','location'))%>%
+a <- time.table(omni_hourly, 'hour', groupers = c('home','location'))%>%
   filter(home %in% homes_no5)
 
 plot.hourly('pm25', data = a)
@@ -832,7 +833,7 @@ plot.hourly('temp', data = a)
 
 
 
-{A <- time.table(rtdata, 'date.day', groupers = 'location')
+{A <- time.table(omni_hourly, 'date.day', groupers = 'location')
   
 ##PM2.5
 
@@ -929,7 +930,8 @@ plotvoc
          x = "Weekday",
          title = 'Weekday')+
     scale_x_discrete(
-                       labels = c('M', 'T', 'W', 'Th', 'F', 'Sa', 'Su')
+                       labels = c('M', 'T', 'W', 'Th', 'F', 'Sa', 'Su'),
+                       breaks = c('Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun')
                        )+
        scale_color_discrete(name = 'Home')+
     theme_bw()+
@@ -951,7 +953,7 @@ plotvoc
           strip.background =element_blank())
       }
 
-a <- time.table(rtdata, 'day', groupers = c('home','location'))%>%
+a <- time.table(omni_hourly, 'day', groupers = c('home','location'))%>%
   filter(home %in% homes_no5)
 
 plot.weekday('pm25', data = a)
@@ -983,7 +985,7 @@ rms <- c('living', 'outdoor')
 metric <- 'pm25'
 
 
-a <- rtdata %>%
+a <- omni_hourly %>%
   filter(location %in% rms) %>%
   mutate(month = lubridate::month(datetime, label = TRUE)) %>%
   group_by(month, location) %>%
@@ -1094,7 +1096,8 @@ plotvoc
          title = 'Monthly')+
     scale_x_discrete(
                        labels = sapply(month.abb[c(1:12)],
-                                       substr, start = 1, stop = 1) %>% unname()
+                                       substr, start = 1, stop = 1) %>% unname(),
+                       breaks = month.abb[c(1:12)]
                        )+
        scale_color_discrete(name = 'Home')+
     theme_bw()+
@@ -1116,7 +1119,7 @@ plotvoc
           strip.background =element_blank())
       }
 
-a <- time.table(rtdata, 'month', groupers = c('home','location'))%>%
+a <- time.table(omni_hourly, 'month', groupers = c('home','location'))%>%
   filter(home %in% homes_no5)
 
 plot.monthly('pm25', data = a)
@@ -1125,10 +1128,85 @@ plot.monthly('co2', data = a)
 plot.monthly('temp', data = a)
 
 
+
 ```
 
 
 
+```{r monthly_new_method, fig.height=2.5, fig.width = 12}
+
+
+
+      plot.monthly <- function(metric, data, location = NULL) {
+     
+              # define upper y-limit for plot based on metric
+      y_range <- case_when(
+        metric == 'pm25' ~ c(0,40),
+        metric == 'voc' ~ voc_lim,
+        metric == 'co2' ~ c(0,2000),
+        metric == 'temp' ~ temp_lim,
+        metric == 'humid' ~ humid_lim,
+        metric == 'lux' ~ lux_lim,
+        metric == 'spl_a' ~ spl_a_lim)
+      
+        #     y_label <- case_when(
+        # metric == 'pm25' ~ expression('PM'[2.5]*', ppb'),
+        # metric == 'voc' ~ 'TVOC, ppb',
+        # metric == 'co2' ~ expression('CO'[2]*', ppb'),
+        # metric == 'temp' ~ 'Temperature, deg C',
+        # metric == 'humid' ~ 'Relative Humidity, %',
+        # metric == 'lux' ~ 'Light, lx',
+        # metric == 'spl_a' ~ 'Noise, dB')
+      
+     ggplot(data, aes(x = month, y = get(paste0(metric, '_mean.val')), color = home))+
+    geom_line( aes(group = home), size = 1)+
+    {if( is.null(location) | length(location) > 1) 
+      facet_wrap(~factor(location, levels = c('living', 'kitchen', 'bedroom',
+                                              'garage', 'outdoor')),
+                 ncol = 5)}+
+    ##geom_errorbar(aes(ymax = pm25_high.val, ymin = pm25_low.val))+ ##bars instead?
+    # geom_ribbon(aes(ymax = get(paste0(metric, '_high.val')),
+    #                 ymin = get(paste0(metric, '_low.val')), fill = home),
+    #             alpha = 0.2, color = NA)+
+    labs(y = paste('Average', metric),
+         x = "Month",
+         title = 'Monthly')+
+       scale_x_date("Date",
+                    breaks = c(seq(from=as.Date("2020-07-01"),to=as.Date("2021-07-01"),by="month")),
+               labels = c(
+                 sapply(month.abb[c(1:12)],
+                                       substr, start = 1, stop = 1) %>% unname(),
+                 'J'))+ 
+       scale_color_discrete(name = 'Home')+
+    theme_bw()+
+    theme(plot.title = element_blank(),
+          title = element_text(size = medium),
+          axis.text.y = element_text(size = small),
+          axis.text.x = element_text(size = small-3),
+          strip.text = element_text( size = medium),
+          axis.title = element_text(size = medium),
+          legend.title = element_text(size = medium-3),
+          panel.spacing.x = unit(1, 'lines') # add horiz space between facets
+          )+
+               coord_cartesian(ylim = y_range)+
+        # make point size proportional to # of obs, with 0 obs = size 0
+        # geom_point(aes(size = n))+
+        scale_size_area(max_size = max_point_size, guide = 'none')+
+          ##for extra space between facets
+    theme(
+          strip.background =element_blank())
+      }
+      
+      a <- time.table(omni_hourly, 'month', groupers = c('home','location'))%>%
+  filter(home %in% homes_no5) %>% mutate(month = as.Date(month))
+      
+
+plot.monthly('pm25', data = a)
+plot.monthly('voc', data = a)
+plot.monthly('co2', data = a)
+plot.monthly('temp', data = a)     
+      
+```
 
 
 
@@ -1141,7 +1219,7 @@ plot.monthly('temp', data = a)
 
 # function to compare diurnal trends of indoor rooms
 # for specified metric
-room.compare <- function(metric, data = rtdata,
+room.compare <- function(metric, data = omni_hourly,
                          simple = TRUE) {
   
   # make data for plots
@@ -1237,7 +1315,7 @@ compare_df <- full_join(
 ## For one home/metric
 
 ```{r plot_room_comparison_example, fig.height=4, fig.width = 6}
-a <- rtdata %>% filter(home == '010')
+a <- omni_hourly %>% filter(home == '010')
 room.compare(metric = 'pm25', data = a, simple = FALSE)
 ```
 
@@ -1245,7 +1323,7 @@ room.compare(metric = 'pm25', data = a, simple = FALSE)
 
 ```{r plot_room_comparison_all, fig.height=6.5, fig.width = 10.5, results='asis'}
 
-a <- rtdata %>% filter( home %in% homes_no5)
+a <- omni_hourly %>% filter( home %in% homes_no5)
 
 # # test for one metric
 # room.compare('pm25', data = a)
@@ -1257,5 +1335,195 @@ lapply(metrics_all, function(x_metric) {
   # insert page break between plots
   cat("\n\n\\pagebreak\n")
 })
+```
+
+
+```{r old_time_monthly_func}
+
+# old functions before modification of month
+
+
+# ##Function to make table for plots of real time OMNI data
+# ##averaged by hour of day, weekday, month, or a combination
+# time.table <- function(data, period,
+#                        start_date = "1900-01-13 00:00:00",
+#                        end_date = "9999-08-13 00:00:00",
+#                        groupers = NULL, # vector of variables to group by
+#                        # arithmetic mean if FALSE, geometric if TRUE 
+#                        geometric = FALSE 
+#                        ) {
+#   
+#   #use start and end date to define timespan during which to use data
+#   a <- data %>%
+#     filter(datetime > ymd_hms(start_date) &
+#              datetime < ymd_hms(end_date))
+#   
+#   #if geo is FALSE (default), use arithmetic mean and standard deviation
+#   #to plot line and error bars respectively
+#   #if geo is TRUE, use geometric mean and 95% conf interval
+#   #to plot line and error bars respectively
+#   if(geometric == FALSE){
+#     mean.val <- function(x) {mean_NA(x)}
+#     high.val <- function(x) {high.sd(x)}
+#     low.val <- function(x) {low.sd(x)}
+#   } else {
+#     mean.val <- function(x) {gm(x)}
+#     high.val <- function(x) {high.conf(x)}
+#     low.val <- function(x) {low.conf(x)}
+#   }
+#   
+#   #####average and plot values by the specified time period
+#   #hour of day
+#   if (period == 'hour'){
+#     a <- a %>% 
+#       mutate(hour = hour(datetime)) %>%
+#       count(hour, home) %>% # count amount of observations used for each average
+#       full_join(
+#         a %>%
+#           mutate(hour = hour(datetime)) %>%
+#       group_by(hour, .dots = groupers) %>% 
+#       summarize_if(is.numeric, list(mean.val = mean.val,
+#                                     low.val = low.val,
+#                                     high.val = high.val))%>%
+#       ungroup()) %>%
+#       mutate(hour = as.numeric(hour))
+#     
+#       }
+#   
+#   #weekday
+#   if (period == 'day'){
+#     a <- a %>% 
+#       mutate(weekday = wday(datetime, label = TRUE)) %>% 
+#       count(weekday, home) %>% # count amount of observations used for each average
+#       full_join(
+#         a %>%
+#           mutate(weekday = wday(datetime, label = TRUE)) %>% 
+#           
+#       group_by(weekday, .dots = groupers) %>% 
+#       summarize_if(is.numeric, list(mean.val = mean.val,
+#                                     low.val = low.val,
+#                                     high.val = high.val))%>%
+#       ungroup())
+#     
+#   }
+#   
+#   # #weekday and hour of each day
+#   # if (period == 'day.hour'){
+#   #   a <- a %>% 
+#   #     mutate(weekday = wday(datetime, label = TRUE),
+#   #            hour = hour(datetime)) %>%
+#   #     group_by(weekday, hour, .dots = groupers) %>% 
+#   #     summarize_if(is.numeric, list(mean.val = mean.val,
+#   #                                   low.val = low.val,
+#   #                                   high.val = high.val))%>%
+#   #     ungroup() %>%
+#   #     mutate(hour = as.numeric(hour))
+#   #   
+#   # }
+#   
+#   #month
+#  if (period == 'month'){
+#     a <- a %>% 
+#       mutate(month = month(datetime, label = TRUE)) %>%
+#       count(month, home) %>% # count amount of observations used for each average
+#       full_join(
+#         a %>%
+#           mutate(month = month(datetime, label = TRUE)) %>%
+#           
+#       group_by(month, .dots = groupers) %>% 
+#       summarize_if(is.numeric, list(mean.val = mean.val,
+#                                     low.val = low.val,
+#                                     high.val = high.val))%>%
+#       ungroup())
+#   }
+#   
+#   # #month and hour of each day
+#   # if (period == 'month.hour'){
+#   #   a <- a %>% 
+#   #     mutate(month = month(datetime, label = TRUE),
+#   #            hour = hour(datetime)) %>%
+#   #     group_by(month, hour, .dots = groupers) %>% 
+#   #     summarize_if(is.numeric, list(mean.val = mean.val,
+#   #                                   low.val = low.val,
+#   #                                   high.val = high.val))%>%
+#   #     ungroup() %>%
+#   #     mutate(hour = as.numeric(hour))
+#   #   
+#   # }
+#   
+#   #     if (period == 'date.day'){
+#   #   a <- a %>% 
+#   #     mutate(datetime = floor_date(datetime, unit = 'days')) %>%
+#   #     group_by(datetime, .dots = groupers) %>% 
+#   #     summarize_if(is.numeric, list(mean.val = mean.val,
+#   #                                   low.val = low.val,
+#   #                                   high.val = high.val))%>%
+#   #     ungroup() %>%
+#   #     mutate()
+#   # }
+# 
+#   return(a)
+# 
+# }
+
+
+    #   plot.monthly <- function(metric, data, location = NULL) {
+    #  
+    #           # define upper y-limit for plot based on metric
+    #   y_range <- case_when(
+    #     metric == 'pm25' ~ c(0,40),
+    #     metric == 'voc' ~ voc_lim,
+    #     metric == 'co2' ~ c(0,2000),
+    #     metric == 'temp' ~ temp_lim,
+    #     metric == 'humid' ~ humid_lim,
+    #     metric == 'lux' ~ lux_lim,
+    #     metric == 'spl_a' ~ spl_a_lim)
+    #   
+    #     #     y_label <- case_when(
+    #     # metric == 'pm25' ~ expression('PM'[2.5]*', ppb'),
+    #     # metric == 'voc' ~ 'TVOC, ppb',
+    #     # metric == 'co2' ~ expression('CO'[2]*', ppb'),
+    #     # metric == 'temp' ~ 'Temperature, deg C',
+    #     # metric == 'humid' ~ 'Relative Humidity, %',
+    #     # metric == 'lux' ~ 'Light, lx',
+    #     # metric == 'spl_a' ~ 'Noise, dB')
+    #   
+    #  ggplot(data, aes(x = month, y = get(paste0(metric, '_mean.val')), color = home))+
+    # geom_line( aes(group = home), size = 1)+
+    # {if( is.null(location) | length(location) > 1) 
+    #   facet_wrap(~factor(location, levels = c('living', 'kitchen', 'bedroom',
+    #                                           'garage', 'outdoor')),
+    #              ncol = 5)}+
+    # ##geom_errorbar(aes(ymax = pm25_high.val, ymin = pm25_low.val))+ ##bars instead?
+    # # geom_ribbon(aes(ymax = get(paste0(metric, '_high.val')),
+    # #                 ymin = get(paste0(metric, '_low.val')), fill = home),
+    # #             alpha = 0.2, color = NA)+
+    # labs(y = paste('Average', metric),
+    #      x = "Month",
+    #      title = 'Monthly')+
+    # scale_x_discrete(
+    #                    labels = sapply(month.abb[c(1:12)],
+    #                                    substr, start = 1, stop = 1) %>% unname(),
+    #                    breaks = month.abb[c(1:12)]
+    #                    )+
+    #    scale_color_discrete(name = 'Home')+
+    # theme_bw()+
+    # theme(plot.title = element_blank(),
+    #       title = element_text(size = medium),
+    #       axis.text.y = element_text(size = small),
+    #       axis.text.x = element_text(size = small-3),
+    #       strip.text = element_text( size = medium),
+    #       axis.title = element_text(size = medium),
+    #       legend.title = element_text(size = medium-3),
+    #       panel.spacing.x = unit(1, 'lines') # add horiz space between facets
+    #       )+
+    #            coord_cartesian(ylim = y_range)+
+    #     # make point size proportional to # of obs, with 0 obs = size 0
+    #     # geom_point(aes(size = n))+
+    #     scale_size_area(max_size = max_point_size, guide = 'none')+
+    #       ##for extra space between facets
+    # theme(
+    #       strip.background =element_blank())
+    #   }
 ```
 
