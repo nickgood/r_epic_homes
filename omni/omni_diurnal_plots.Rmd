@@ -29,8 +29,17 @@ library(gridExtra)
 ```
 
 ```{r data_import}
-rtdata <- read_rds('./csv_created/omni_calibrated.rds')
+omni_hourly <- read_rds('./csv_created/omni_hourly_calibrated.rds')
+
 ```
+
+# only use data up to June 2021
+```{r censor_date}
+omni_hourly <- omni_hourly %>% filter(datehour<ymd_hms('2021-06-01 00:00:00'))
+
+
+```
+
 
 
 ```{r functions_misc}
@@ -147,8 +156,8 @@ line_size <- 0.5
 max_point_size <- 1.5
 
 # define y-limits for metrics (for time series plots)
-pm25_lim <- c(0,90)
-voc_lim <- c(0,1200)
+pm25_lim <- c(0,30)
+voc_lim <- c(0,600)
 co2_lim <- c(0,2500)
 temp_lim <- c(0,25)
 humid_lim <- c(0,60)
@@ -225,13 +234,14 @@ diurnal.table <- function(data,
                        groupers = NULL, # vector of variables to group by
                        # arithmetic mean if FALSE, geometric if TRUE
                        locations = locations_indoor,
+                       error = 'conf',
                        geometric = FALSE 
                        ) {
   
   #use start and end date to define timespan during which to use data
   a <- data %>%
-    filter(datetime > ymd_hms(start_date) &
-             datetime < ymd_hms(end_date) &
+    filter(datehour > ymd_hms(start_date) &
+             datehour < ymd_hms(end_date) &
              location %in% locations_indoor)
   
   #if geo is FALSE (default), use arithmetic mean and standard deviation
@@ -239,18 +249,28 @@ diurnal.table <- function(data,
   #if geo is TRUE, use geometric mean and 95% conf interval
   #to plot line and error bars respectively
   if(geometric == FALSE){
-    mean.val <- function(x) {mean_NA(x)}
-    high.val <- function(x) {high.sd(x)}
-    low.val <- function(x) {low.sd(x)}
-  } else {
+    mean.val <- function(x) {mean(x, na.rm = TRUE)}
+
+  } else if(geometric == TRUE){
     mean.val <- function(x) {gm(x)}
-    high.val <- function(x) {high.conf(x)}
-    low.val <- function(x) {low.conf(x)}
+
   }
+  
+  if(error == 'conf'){
+    high.val <- function(x) {
+      mean.val(x)+1.96*sd(x, na.rm = TRUE)/sqrt(length(x[!is.na(x)]))
+    }
+    low.val <- function(x) {
+      mean.val(x)-1.96*sd(x, na.rm = TRUE)/sqrt(length(x[!is.na(x)]))
+    }
+} else if(error == 'sd'){
+    high.val <- function(x) mean.val(x)+sd(x, na.rm = TRUE)
+    low.val <- function(x) mean.val(x)-sd(x, na.rm = TRUE)
+ }
   
   # average and plot values by hour of day
     a <- a %>%
-      mutate(hour = hour(datetime))
+      mutate(hour = hour(datehour))
     
     a <- a %>%
       group_by_at(.vars= c('hour', groupers)) %>%
@@ -319,7 +339,7 @@ diurnal.table <- function(data,
 err_ribbon <- TRUE
 
 # make diurnal plots
-    a <- diurnal.table(rtdata)
+    a <- diurnal.table(omni_hourly)
 
 #pm25------------
  met <- 'pm25'
@@ -390,7 +410,7 @@ err_ribbon <- TRUE
 err_ribbon <- TRUE
 
 # make diurnal plots
-    a <- diurnal.table(rtdata, groupers = 'location')
+    a <- diurnal.table(omni_hourly, groupers = 'location')
 
 #pm25------------
  met <- 'pm25'
@@ -464,12 +484,12 @@ err_ribbon <- TRUE
 
 
 # make diurnal plots
-    a <- diurnal.table(rtdata %>%
+    a <- diurnal.table(omni_hourly %>%
                          filter(!is.na(energy_cluster) &
                                   home_type %in% c('tier2', 'tier3')),
                        groupers = 'energy_cluster') %>%
       bind_rows(
-        diurnal.table(rtdata %>%
+        diurnal.table(omni_hourly %>%
                          filter(!is.na(energy_cluster) &
                                   home_type %in% c('tier2', 'tier3')))%>%
                         mutate(energy_cluster = 'overall')
@@ -537,10 +557,10 @@ clust.diurn('voc', a)
 ```{r}
 err_ribbon <- TRUE
 
-a <- rtdata %>%
+a <- omni_hourly %>%
   filter(!is.na(energy_cluster) &
            home_type %in% c('tier2', 'tier3'))%>%
-  mutate(month = months(datetime, abbreviate = TRUE))%>%
+  mutate(month = months(datehour, abbreviate = TRUE))%>%
   mutate(
          energy_cluster = case_when(
            month %in% month.abb[c(12,1,2)] ~ "winter",
