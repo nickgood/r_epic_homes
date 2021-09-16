@@ -551,7 +551,59 @@ clust.diurn('voc', a)
 # clust.diurn('voc', a%>%filter(energy_cluster == 'heat'))
 # clust.diurn('voc', a%>%filter(energy_cluster == 'shoulder'))
 # clust.diurn('voc', a%>%filter(energy_cluster == 'ac'))
+
+clust.diurn('co2', a)
+
 ```
+
+### by season disaggregated by home
+```{r}
+
+# make diurnal plots
+    a <- diurnal.table(omni_hourly %>%
+                         filter(!is.na(energy_cluster) &
+                                  home_type %in% c('tier2', 'tier3')),
+                       groupers = c('energy_cluster', 'home')) %>%
+      bind_rows(
+        diurnal.table(omni_hourly %>%
+                         filter(!is.na(energy_cluster) &
+                                  home_type %in% c('tier2', 'tier3')),
+                      groupers = c( 'home'))%>%
+                        mutate(energy_cluster = 'overall')
+      )
+
+met <- 'co2'
+
+  
+        ggplot(a, aes(x = hour, y = get(paste0(met, '_mean.val')),
+                    fill = home, color = home
+))+
+        geom_line( size = line_size)+
+        ##geom_errorbar(aes(ymax = pm25_high.val, ymin = pm25_low.val))+ ##bars instead?
+        geom_ribbon(aes(ymax = get(paste0(met, '_high.val')),
+                        ymin = get(paste0(met, '_low.val'))
+                        # fill = home
+                        ),
+                    alpha = if_else(err_ribbon == TRUE, 0.2, 0), color = NA)+
+        labs(y = met,
+             x = 'Hour of Day')+
+        scale_x_continuous(limits = c(0,24),
+                           breaks = c(0,6,12,18),
+                           expand = c(0,0))+
+        theme_bw()+
+        # coord_cartesian(ylim = y_range)+
+        theme(plot.title = element_blank(),
+      axis.text.x = element_text(size = xsmall))+
+        # make point size proportional to # of obs, with 0 obs = size 0
+  geom_point(aes(size = n))+
+        scale_size_area(max_size = max_point_size)+
+        annotate('text', x=Inf, y = Inf, hjust = 1, vjust = 1,
+                 label = '*Unclassified Days and\nGroup 1 Homes omitted')+
+          facet_wrap(vars(energy_cluster))    
+
+```
+
+
 
 ### Diurnal plot by seasons define by month
 ```{r}
