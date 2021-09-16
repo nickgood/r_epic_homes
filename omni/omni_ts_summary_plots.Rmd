@@ -37,6 +37,8 @@ library(gridExtra)
 ```{r data_import}
 omni_hourly <- read_rds('./csv_created/omni_hourly_calibrated.rds') %>%
   rename(datetime = datehour)
+
+home_type_df <- read_csv('../sense/csv_created_sense/home_type_df.csv')
 ```
 
 
@@ -562,6 +564,10 @@ spl_a_diff_lim <- c(-9,9)
 
 homes_all <- home.list(c(1:16))
 homes_no5 <- home.list(c(1:4, 6:16))
+homes_tier1 <- home_type_df %>% filter(home_type == 'tier1') %>% pull(home)
+homes_tier2 <- home_type_df %>% filter(home_type == 'tier2') %>% pull(home)
+homes_tier3 <- home_type_df %>% filter(home_type == 'tier3') %>% pull(home)
+
 metrics_all <- c('pm25', 'voc', 'co2', 'temp','humid', 'lux', 'spl_a')
 locations_indoor <- c('living', 'bedroom', 'kitchen')
 
@@ -824,9 +830,47 @@ plot.hourly('temp', data = a)
 
 ```
 
+## By Season
+* NOTE: Group 1 Homes and unclassified days omitted from data set
+### Heating
+```{r, fig.height=2.5, fig.width = 12}
+
+a <- time.table(omni_hourly %>% filter(energy_cluster == 'heat'),
+                'hour', groupers = c('home','location'))%>%
+  filter(home %in% c(homes_tier2, homes_tier3))
+
+plot.hourly('pm25', data = a)
+plot.hourly('voc', data = a)
+plot.hourly('co2', data = a)
+plot.hourly('temp', data = a)
+```
+
+### Shoulder
+```{r, fig.height=2.5, fig.width = 12}
+
+a <- time.table(omni_hourly %>% filter(energy_cluster == 'shoulder'),
+                'hour', groupers = c('home','location'))%>%
+  filter(home %in% c(homes_tier2, homes_tier3))
+
+plot.hourly('pm25', data = a)
+plot.hourly('voc', data = a)
+plot.hourly('co2', data = a)
+plot.hourly('temp', data = a)
+```
 
 
+### AC
+```{r, fig.height=2.5, fig.width = 12}
 
+a <- time.table(omni_hourly %>% filter(energy_cluster == 'ac'),
+                'hour', groupers = c('home','location'))%>%
+  filter(home %in% c(homes_tier2, homes_tier3))
+
+plot.hourly('pm25', data = a)
+plot.hourly('voc', data = a)
+plot.hourly('co2', data = a)
+plot.hourly('temp', data = a)
+```
 # Daily
 
 ```{r date_day, eval = FALSE}
@@ -1056,82 +1100,6 @@ plotvoc
 ```
 
 ## By Home
-
-```{r monthly_homes, eval = FALSE, fig.height=2.5, fig.width = 12}
-
-   # plot with details
-      plot.monthly <- function(metric, data, location = NULL) {
-     
-              # define upper y-limit for plot based on metric
-      y_range <- case_when(
-        metric == 'pm25' ~ c(0,40),
-        metric == 'voc' ~ voc_lim,
-        metric == 'co2' ~ c(0,2000),
-        metric == 'temp' ~ temp_lim,
-        metric == 'humid' ~ humid_lim,
-        metric == 'lux' ~ lux_lim,
-        metric == 'spl_a' ~ spl_a_lim)
-      
-        #     y_label <- case_when(
-        # metric == 'pm25' ~ expression('PM'[2.5]*', ppb'),
-        # metric == 'voc' ~ 'TVOC, ppb',
-        # metric == 'co2' ~ expression('CO'[2]*', ppb'),
-        # metric == 'temp' ~ 'Temperature, deg C',
-        # metric == 'humid' ~ 'Relative Humidity, %',
-        # metric == 'lux' ~ 'Light, lx',
-        # metric == 'spl_a' ~ 'Noise, dB')
-      
-     ggplot(data, aes(x = month, y = get(paste0(metric, '_mean.val')), color = home))+
-    geom_line( aes(group = home), size = 1)+
-    {if( is.null(location) | length(location) > 1) 
-      facet_wrap(~factor(location, levels = c('living', 'kitchen', 'bedroom',
-                                              'garage', 'outdoor')),
-                 ncol = 5)}+
-    ##geom_errorbar(aes(ymax = pm25_high.val, ymin = pm25_low.val))+ ##bars instead?
-    # geom_ribbon(aes(ymax = get(paste0(metric, '_high.val')),
-    #                 ymin = get(paste0(metric, '_low.val')), fill = home),
-    #             alpha = 0.2, color = NA)+
-    labs(y = paste('Average', metric),
-         x = "Month",
-         title = 'Monthly')+
-    scale_x_discrete(
-                       labels = sapply(month.abb[c(1:12)],
-                                       substr, start = 1, stop = 1) %>% unname(),
-                       breaks = month.abb[c(1:12)]
-                       )+
-       scale_color_discrete(name = 'Home')+
-    theme_bw()+
-    theme(plot.title = element_blank(),
-          title = element_text(size = medium),
-          axis.text.y = element_text(size = small),
-          axis.text.x = element_text(size = small-3),
-          strip.text = element_text( size = medium),
-          axis.title = element_text(size = medium),
-          legend.title = element_text(size = medium-3),
-          panel.spacing.x = unit(1, 'lines') # add horiz space between facets
-          )+
-               coord_cartesian(ylim = y_range)+
-        # make point size proportional to # of obs, with 0 obs = size 0
-        # geom_point(aes(size = n))+
-        scale_size_area(max_size = max_point_size, guide = 'none')+
-          ##for extra space between facets
-    theme(
-          strip.background =element_blank())
-      }
-
-a <- time.table(omni_hourly, 'month', groupers = c('home','location'))%>%
-  filter(home %in% homes_no5)
-
-plot.monthly('pm25', data = a)
-plot.monthly('voc', data = a)
-plot.monthly('co2', data = a)
-plot.monthly('temp', data = a)
-
-
-
-```
-
-
 
 ```{r monthly_new_method, fig.height=2.5, fig.width = 12}
 
