@@ -478,12 +478,15 @@ omni_data_precal <-
 
 ```
 
+
+
 ```{r import_filter_data}
 filter_data <- read_rds('../output_thesis/pm25/pm25.rds')
 ```
 
 
 # create correction factor
+
 ```{r find_correction_ratios_for_all_sensors}
 
 # add correciton factor to real-time pm2.5 data
@@ -521,6 +524,15 @@ grav_cf_df <- omni_data_precal %>%
 
 ```
 
+* check between rooms and ensure same calibration value can be used for all indoor rooms
+```{r}
+# a <- grav_cf_df %>% filter(location %in% c('living', 'kitchen', 'bedroom'))
+# ggplot(a, aes(y = twa, x = location))+
+#   geom_boxplot()
+
+```
+
+
 *look at correction factor spread (for median)
 ```{r}
 # check spread of correction factor values
@@ -531,6 +543,11 @@ ggplot(grav_cf_df, aes(y = grav_cf))+
 
 * after omitting negatives...
 ```{r}
+
+grav_omit <- grav_cf_df %>% filter(!is.na(grav_cf) & grav_cf < 0) %>%nrow()
+grav_all <- grav_cf_df %>% filter(!is.na(grav_cf)) %>%nrow()
+
+
 grav_cf_df_clean <- grav_cf_df %>%
   filter(!is.na(grav_cf) & grav_cf >0)
 
