@@ -344,9 +344,10 @@ err_ribbon <- TRUE
 #pm25------------
  met <- 'pm25'
 
-     y_range <- case_when(
+ y_range <- case_when(
         met == 'pm25' ~ pm25_lim,
-        met == 'voc' ~ voc_lim)
+        met == 'voc' ~ voc_lim,
+        met == 'co2' ~ co2_lim)
      
       ggplot(a, aes(x = hour, y = get(paste0(met, '_mean.val'))
                       # color = home
@@ -378,7 +379,8 @@ err_ribbon <- TRUE
       
  y_range <- case_when(
         met == 'pm25' ~ pm25_lim,
-        met == 'voc' ~ voc_lim)
+        met == 'voc' ~ voc_lim,
+        met == 'co2' ~ co2_lim)
  
       ggplot(a, aes(x = hour, y = get(paste0(met, '_mean.val'))
                       # color = home
@@ -402,6 +404,37 @@ err_ribbon <- TRUE
         # make point size proportional to # of obs, with 0 obs = size 0
   geom_point(aes(size = n))+
         scale_size_area(max_size = max_point_size) 
+# co2--------------   
+      met <- 'co2'
+      
+ y_range <- case_when(
+        met == 'pm25' ~ pm25_lim,
+        met == 'voc' ~ voc_lim,
+        met == 'co2' ~ co2_lim)
+ 
+      ggplot(a, aes(x = hour, y = get(paste0(met, '_mean.val'))
+                      # color = home
+                      ))+
+        geom_line( size = line_size)+
+        ##geom_errorbar(aes(ymax = pm25_high.val, ymin = pm25_low.val))+ ##bars instead?
+        geom_ribbon(aes(ymax = get(paste0(met, '_high.val')),
+                        ymin = get(paste0(met, '_low.val'))
+                        # fill = home
+                        ),
+                    alpha = if_else(err_ribbon == TRUE, 0.2, 0), color = NA)+
+        labs(y = met,
+             x = 'Hour of Day')+
+        scale_x_continuous(limits = c(0,24),
+                           breaks = c(0,6,12,18),
+                           expand = c(0,0))+
+        theme_bw()+
+        coord_cartesian(ylim = y_range)+
+        theme(plot.title = element_blank(),
+      axis.text.x = element_text(size = xsmall))+
+        # make point size proportional to # of obs, with 0 obs = size 0
+  geom_point(aes(size = n))+
+        scale_size_area(max_size = max_point_size) 
+      
 ```
 
 
@@ -415,9 +448,10 @@ err_ribbon <- TRUE
 #pm25------------
  met <- 'pm25'
 
-     y_range <- case_when(
+ y_range <- case_when(
         met == 'pm25' ~ pm25_lim,
-        met == 'voc' ~ voc_lim)
+        met == 'voc' ~ voc_lim,
+        met == 'co2' ~ co2_lim)
      
       ggplot(a, aes(x = hour, y = get(paste0(met, '_mean.val'))
                       # color = home
@@ -450,7 +484,8 @@ err_ribbon <- TRUE
       
  y_range <- case_when(
         met == 'pm25' ~ pm25_lim,
-        met == 'voc' ~ voc_lim)
+        met == 'voc' ~ voc_lim,
+        met == 'co2' ~ co2_lim)
  
       ggplot(a, aes(x = hour, y = get(paste0(met, '_mean.val'))
                       # color = home
@@ -475,6 +510,39 @@ err_ribbon <- TRUE
   geom_point(aes(size = n))+
         scale_size_area(max_size = max_point_size) +
         facet_wrap(vars(location))
+# co2--------------   
+      met <- 'co2'
+      
+ y_range <- case_when(
+        met == 'pm25' ~ pm25_lim,
+        met == 'voc' ~ voc_lim,
+        met == 'co2' ~ co2_lim)
+ 
+      ggplot(a, aes(x = hour, y = get(paste0(met, '_mean.val'))
+                      # color = home
+                      ))+
+        geom_line( size = line_size)+
+        ##geom_errorbar(aes(ymax = pm25_high.val, ymin = pm25_low.val))+ ##bars instead?
+        geom_ribbon(aes(ymax = get(paste0(met, '_high.val')),
+                        ymin = get(paste0(met, '_low.val'))
+                        # fill = home
+                        ),
+                    alpha = if_else(err_ribbon == TRUE, 0.2, 0), color = NA)+
+        labs(y = met,
+             x = 'Hour of Day')+
+        scale_x_continuous(limits = c(0,24),
+                           breaks = c(0,6,12,18),
+                           expand = c(0,0))+
+        theme_bw()+
+        coord_cartesian(ylim = y_range)+
+        theme(plot.title = element_blank(),
+      axis.text.x = element_text(size = xsmall))+
+        # make point size proportional to # of obs, with 0 obs = size 0
+  geom_point(aes(size = n))+
+        scale_size_area(max_size = max_point_size) +
+        facet_wrap(vars(location))
+      
+      
 ```
 
 
