@@ -153,7 +153,7 @@ small <- 15
 medium <- 20
 large <- 26
 line_size <- 0.5
-max_point_size <- 1.5
+max_point_size <- 0.75
 
 # define y-limits for metrics (for time series plots)
 pm25_lim <- c(0,30)
@@ -758,5 +758,144 @@ month.diurn('voc', a)
 # month.diurn('voc', a%>%filter(energy_cluster == 'fall'))
 # month.diurn('voc', a%>%filter(energy_cluster == 'spring'))
 # month.diurn('voc', a%>%filter(energy_cluster == 'summer'))
+```
+
+
+### Multiple metrics in one plot
+```{r functions_diurnal_metrics}
+##Function to make table for plots of real time OMNI data
+##averaged by hour of day, weekday, month, or a combination
+diurnal.table <- function(data,
+                          met,
+                       start_date = "1900-01-13 00:00:00",
+                       end_date = "9999-08-13 00:00:00",
+                       groupers = NULL, # vector of variables to group by
+                       # arithmetic mean if FALSE, geometric if TRUE
+                       locations = locations_indoor,
+                       error = 'conf',
+                       geometric = FALSE 
+                       ) {
+  
+  #use start and end date to define timespan during which to use data
+  a <- data %>%
+    filter(datehour > ymd_hms(start_date) &
+             datehour < ymd_hms(end_date)) %>%
+    select(datehour, home, location, all_of(met))
+  
+  #if geo is FALSE (default), use arithmetic mean and standard deviation
+  #to plot line and error bars respectively
+  #if geo is TRUE, use geometric mean and 95% conf interval
+  #to plot line and error bars respectively
+  if(geometric == FALSE){
+    mean.val <- function(x) {mean(x, na.rm = TRUE)}
+
+  } else if(geometric == TRUE){
+    mean.val <- function(x) {gm(x)}
+
+  }
+  
+  if(error == 'conf'){
+    high.val <- function(x) {
+      mean.val(x)+1.96*sd(x, na.rm = TRUE)/sqrt(length(x[!is.na(x)]))
+    }
+    low.val <- function(x) {
+      mean.val(x)-1.96*sd(x, na.rm = TRUE)/sqrt(length(x[!is.na(x)]))
+    }
+} else if(error == 'sd'){
+    high.val <- function(x) mean.val(x)+sd(x, na.rm = TRUE)
+    low.val <- function(x) mean.val(x)-sd(x, na.rm = TRUE)
+ }
+  
+  # average and plot values by hour of day
+    a <- a %>%
+      mutate(hour = hour(datehour))
+    
+    a <- a %>%
+      group_by_at(.vars= c('hour', groupers)) %>%
+      summarize_if(is.numeric, list(mean.val = mean.val,
+                                    low.val = low.val,
+                                    high.val = high.val)) %>%
+      left_join(
+        a %>%
+          group_by_at(.vars= c('hour', groupers)) %>%
+      summarize(n = n(), .groups = 'drop'),
+      by = c('hour', groupers),
+      )%>%
+      mutate(hour = as.numeric(hour)
+             ) %>% 
+      mutate(metric = met)
+             
+    
+  
+
+  return(a)
+
+}
+
+# test <- diurnal.table(omni_hourly, 'pm25', groupers = 'location')
+
+
+    # plot without labels and such
+    plot.diurnal <- function(dat, err_ribbon = TRUE) {
+
+      # make a dummy df in which to define limits for each metric
+limit_df <- dat %>%
+  group_by(metric) %>%
+  summarize(max = max(mean.val))%>%
+  mutate(min = 0) %>%
+        pivot_longer(cols = c(max, min), names_to = 'side', values_to = 'limits')
+
+    
+      ggplot(dat, aes(x = hour, y = mean.val
+                      # color = home
+                      ))+
+        geom_line( size = line_size)+
+        ##geom_errorbar(aes(ymax = pm25_high.val, ymin = pm25_low.val))+ ##bars instead?
+        geom_ribbon(aes(ymax = high.val,
+                        ymin = low.val
+                        # fill = home
+                        ),
+                    alpha = if_else(err_ribbon == TRUE, 0.2, 0), color = NA)+
+        labs(
+          y = 'Average Value',
+             x = 'Hour of Day')+
+        scale_x_continuous(limits = c(0,24),
+                           breaks = c(0,6,12,18),
+                           expand = c(0,0))+
+        theme_bw()+
+        # coord_cartesian(ylim = y_range)+
+        theme(plot.title = element_blank(),
+      axis.text.x = element_text(size = xsmall))+
+        # make point size proportional to # of obs, with 0 obs = size 0
+  geom_point(aes(size = n))+
+        scale_size_area(max_size = max_point_size)+
+        facet_grid(rows = vars(metric), cols = vars(location),
+                   scales = 'free_y')+
+        # use dummy df to define limits for each metric
+        geom_blank(data = limit_df, aes(x = 15, y = limits))
+    }
+
+
+
+```
+
+```{r plots_diurnal_metrics, fig.height=5, fig.width=8}
+
+
+# make dataframe that includes all metrics    
+a <- map(c('pm25', 'voc', 'co2'), function(x_metric){
+  diurnal.table(omni_hourly, x_metric, groupers = 'location')
+}
+) %>% bind_rows()
+
+# change order of metrics for plotting
+a$location <- factor(a$location, levels = c('kitchen', 'living', 'bedroom',
+                                            'garage', 'outdoor'))
+a$metric <- factor(a$metric, levels = c('pm25', 'voc', 'co2'))
+
+# plot
+plot.diurnal(a)
+
+
 ```
 
