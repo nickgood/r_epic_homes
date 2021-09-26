@@ -542,7 +542,7 @@ ggplot(grav_cf_df, aes(y = grav_cf))+
 ```
 
 * after omitting negatives...
-```{r}
+```{r, fig.height=3, fig.width=3}
 
 grav_omit <- grav_cf_df %>% filter(!is.na(grav_cf) & grav_cf < 0) %>%nrow()
 grav_all <- grav_cf_df %>% filter(!is.na(grav_cf)) %>%nrow()
@@ -552,19 +552,29 @@ grav_cf_df_clean <- grav_cf_df %>%
   filter(!is.na(grav_cf) & grav_cf >0)
 
 # check spread of correction factor values
-ggplot(grav_cf_df_clean, aes(y = grav_cf))+
-  geom_boxplot()
+ggplot(grav_cf_df_clean, aes( x = 1, y = grav_cf))+
+  geom_boxplot(outlier.shape = NA)+
+  geom_jitter( width = 0.15, )+
+  theme_classic()+
+  theme(
+    axis.text.x = element_blank(),
+    axis.title.x = element_blank(),
+    axis.ticks.x = element_blank()
+  )+
+  ylab('Gravimetric Correction Factor')
+  
+
 ```
 
 
 *look at regression of TWA to filter values
 
 ```{r}
-model <- lm("twa~conc_correct", data = grav_cf_df_clean)
+model <- lm("twa~conc_correct+0", data = grav_cf_df_clean)
 
 # print model results
 broom::tidy(model, conf.int = TRUE) %>%
-  kable(digits = c(NA, 1, 1, 1, 6 , 1, 1), caption = "OMNI vs. Filter PM2.5") %>%
+  kable(digits = c(NA, 2, 2, 2, 6 , 2, 2), caption = "OMNI vs. Filter PM2.5") %>%
   kable_paper(bootstrap_options = "striped", full_width = F)
 ```
 
@@ -576,15 +586,34 @@ predicted_df <- data.frame(twa_pred = predict(model, grav_cf_df_clean),
                            conc_correct=grav_cf_df_clean$conc_correct)
 
 ggplot(grav_cf_df_clean, aes(x = conc_correct, y = twa)) +
-  geom_point(aes(color = location)) +
+  geom_point(aes(
+    color = location
+    )) +
   #geom_smooth(method = "lm", formula = "y ~ x", se = FALSE) +
   theme_bw() +
-  geom_abline(slope = 1, intercept = 0) +
-  ylim(0,NA) + xlim(0,NA) +
-  ylab("OMNI (ug/m^3)") + xlab("Filter (ug/m^3)")+
-  geom_line(data = predicted_df, aes( y = twa_pred))
+  geom_abline(slope = 1, intercept = 0, linetype = 'dashed') +
+  ylab("Omni (ug/m^3)") + xlab("Filter (ug/m^3)")+
+  geom_line(data = predicted_df, aes( y = twa_pred
+                                      # linetype = 'model'
+                                      ),
+            linetype = 'solid')+
+  scale_y_continuous(expand = c(0,0), limits = c(0,110))+
+  scale_x_continuous(expand = c(0,0), limits = c(0,110))
+# scale_linetype_manual(
+  #   values = c('dashed', 'solid'),
+  #   # breaks = c('dashed', 'solid'),
+  #   labels = c('1 to 1', 'Model')
+  # )
+
+
 
   
+# # without filter "outliers"
+# 
+# a %>% grav_cf_df_clean %>% filter(conc_correct<50)
+# 
+# model <- lm("twa~conc_correct+0", data = a)
+
 ```
 
 
