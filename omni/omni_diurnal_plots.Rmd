@@ -190,7 +190,7 @@ homes_all <- home.list(c(1:16))
 homes_no5 <- home.list(c(1:4, 6:16))
 metrics_all <- c('pm25', 'voc', 'co2', 'temp','humid', 'lux', 'spl_a')
 locations_indoor <- c('living', 'bedroom', 'kitchen')
-
+locations_all <- c(locations_indoor, 'outdoor', 'garage')
 periods_all <- c('hour', 'day', 'month')
 
 
@@ -220,7 +220,7 @@ energy_colors <- c(cbbPalette['light_blue'],
                    cbbPalette['black'])%>% unname()
 
 energy_breaks <- c('ac', 'shoulder', 'heat', 'overall')
-energy_labels <- c('AC', 'Shoulder', 'Heat', 'Entire Period')
+energy_labels <- c('Summer', 'Shoulder', 'Winter', 'Entire Period')
 
 ```
 
@@ -438,7 +438,7 @@ err_ribbon <- TRUE
 ```
 
 
-### Diurnal plot for overall sampling period pooled homes, pooled rooms
+### Diurnal plot for seasons pooled homes, disagg rooms
 ```{r, fig.height=3, fig.width=10.5}
 err_ribbon <- TRUE
 
@@ -551,17 +551,6 @@ err_ribbon <- TRUE
 err_ribbon <- TRUE
 
 
-# make diurnal plots
-    a <- diurnal.table(omni_hourly %>%
-                         filter(!is.na(energy_cluster) &
-                                  home_type %in% c('tier2', 'tier3')),
-                       groupers = 'energy_cluster') %>%
-      bind_rows(
-        diurnal.table(omni_hourly %>%
-                         filter(!is.na(energy_cluster) &
-                                  home_type %in% c('tier2', 'tier3')))%>%
-                        mutate(energy_cluster = 'overall')
-      )
 
 clust.diurn <- function(met, data){
   
@@ -604,24 +593,79 @@ clust.diurn <- function(met, data){
 
 }
       
-      #pm25------------
+
+
+```
+
+
+### Group 2 and 3 Homes
+
+```{r}
+
+# make diurnal plots
+    a <- diurnal.table(omni_hourly %>%
+                         filter(!is.na(energy_cluster) &
+                                  home_type %in% c('tier2', 'tier3')),
+                       groupers = 'energy_cluster') %>%
+      bind_rows(
+        diurnal.table(omni_hourly %>%
+                         filter(!is.na(energy_cluster) &
+                                  home_type %in% c('tier2', 'tier3')))%>%
+                        mutate(energy_cluster = 'overall')
+      )
+
 clust.diurn('pm25', a)
 
-# clust.diurn('pm25', a%>%filter(energy_cluster == 'heat'))
-# clust.diurn('pm25', a%>%filter(energy_cluster == 'shoulder'))
-# clust.diurn('pm25', a%>%filter(energy_cluster == 'ac'))
-
-
-# voc--------------   
-     
 clust.diurn('voc', a)
 
-# clust.diurn('voc', a%>%filter(energy_cluster == 'heat'))
-# clust.diurn('voc', a%>%filter(energy_cluster == 'shoulder'))
-# clust.diurn('voc', a%>%filter(energy_cluster == 'ac'))
+clust.diurn('co2', a)
+```
+
+### Group 2 Homes
+
+```{r}
+
+# make diurnal plots
+    a <- diurnal.table(omni_hourly %>%
+                         filter(!is.na(energy_cluster) &
+                                  home_type %in% c('tier2')),
+                       groupers = 'energy_cluster') %>%
+      bind_rows(
+        diurnal.table(omni_hourly %>%
+                         filter(!is.na(energy_cluster) &
+                                  home_type %in% c('tier2')))%>%
+                        mutate(energy_cluster = 'overall')
+      )
+
+clust.diurn('pm25', a)
+
+clust.diurn('voc', a)
 
 clust.diurn('co2', a)
+```
 
+
+### Group 3 Homes
+
+```{r}
+
+# make diurnal plots
+    a <- diurnal.table(omni_hourly %>%
+                         filter(!is.na(energy_cluster) &
+                                  home_type %in% c('tier3')),
+                       groupers = 'energy_cluster') %>%
+      bind_rows(
+        diurnal.table(omni_hourly %>%
+                         filter(!is.na(energy_cluster) &
+                                  home_type %in% c('tier3')))%>%
+                        mutate(energy_cluster = 'overall')
+      )
+
+clust.diurn('pm25', a)
+
+clust.diurn('voc', a)
+
+clust.diurn('co2', a)
 ```
 
 ### by season disaggregated by home
@@ -761,8 +805,9 @@ month.diurn('voc', a)
 ```
 
 
-### Multiple metrics in one plot
-```{r functions_diurnal_metrics}
+# Multiple metrics in one plot
+##overall monitoring period
+```{r functions_diurnal_rooms}
 ##Function to make table for plots of real time OMNI data
 ##averaged by hour of day, weekday, month, or a combination
 diurnal.table <- function(data,
@@ -771,7 +816,7 @@ diurnal.table <- function(data,
                        end_date = "9999-08-13 00:00:00",
                        groupers = NULL, # vector of variables to group by
                        # arithmetic mean if FALSE, geometric if TRUE
-                       locations = locations_indoor,
+                       locations = locations_all,
                        error = 'conf',
                        geometric = FALSE 
                        ) {
@@ -779,8 +824,9 @@ diurnal.table <- function(data,
   #use start and end date to define timespan during which to use data
   a <- data %>%
     filter(datehour > ymd_hms(start_date) &
-             datehour < ymd_hms(end_date)) %>%
-    select(datehour, home, location, all_of(met))
+             datehour < ymd_hms(end_date) &
+             location %in% locations_all) %>%
+    select(datehour, home, location, all_of(met), energy_cluster)
   
   #if geo is FALSE (default), use arithmetic mean and standard deviation
   #to plot line and error bars respectively
@@ -832,7 +878,7 @@ diurnal.table <- function(data,
 
 }
 
-# test <- diurnal.table(omni_hourly, 'pm25', groupers = 'location')
+# test <- diurnal.table(omni_hourly, 'pm25', groupers = c('location'))
 
 
     # plot without labels and such
@@ -879,7 +925,7 @@ limit_df <- dat %>%
 
 ```
 
-```{r plots_diurnal_metrics, fig.height=5, fig.width=8}
+```{r plots_diurnal_rooms, fig.height=5, fig.width=8}
 
 
 # make dataframe that includes all metrics    
@@ -895,6 +941,309 @@ a$metric <- factor(a$metric, levels = c('pm25', 'voc', 'co2'))
 
 # plot
 plot.diurnal(a)
+
+
+```
+
+##disaggregated by season
+```{r functions_diurnal_seasons}
+
+
+    # plot without labels and such
+    plot.diurnal.season <- function(dat, err_ribbon = TRUE) {
+
+      # make a dummy df in which to define limits for each metric
+limit_df <- dat %>%
+  group_by(metric) %>%
+  summarize(max = max(mean.val))%>%
+  mutate(min = 0) %>%
+        pivot_longer(cols = c(max, min), names_to = 'side', values_to = 'limits')
+
+    
+      ggplot(dat, aes(x = hour, y = mean.val
+                      # color = home
+                      ))+
+        geom_line( size = line_size,
+                      aes(color = energy_cluster, fill = energy_cluster)
+                   )+
+        ##geom_errorbar(aes(ymax = pm25_high.val, ymin = pm25_low.val))+ ##bars instead?
+        geom_ribbon(aes(ymax = high.val,
+                        ymin = low.val,
+                      fill = energy_cluster
+                        ),
+                    alpha = if_else(err_ribbon == TRUE, 0.2, 0), color = NA)+
+        labs(
+          y = 'Average Value',
+             x = 'Hour of Day')+
+        scale_x_continuous(limits = c(0,24),
+                           breaks = c(0,6,12,18),
+                           expand = c(0,0))+
+        theme_bw()+
+        # coord_cartesian(ylim = y_range)+
+        theme(plot.title = element_blank(),
+      axis.text.x = element_text(size = xsmall))+
+        # make point size proportional to # of obs, with 0 obs = size 0
+  geom_point(aes(size = n,
+                      color = energy_cluster, fill = energy_cluster
+                 ))+
+        scale_size_area(max_size = max_point_size)+
+        facet_grid(rows = vars(metric), cols = vars(energy_cluster),
+                   scales = 'free_y')+
+                scale_fill_manual(
+          breaks = energy_breaks,
+          values = energy_colors,
+          labels = energy_labels,
+          aesthetics = c('fill', 'color')
+        )+
+        # use dummy df to define limits for each metric
+        geom_blank(data = limit_df, aes(x = 15, y = limits))
+    }
+
+
+```
+
+### Group 2 and 3
+```{r plots_diurnal_seasons, fig.height=5, fig.width=8}
+
+a <- omni_hourly %>% filter(home_type %in% c('tier2', 'tier3'))
+
+# make dataframe that includes all metrics    
+a <- map(c('pm25', 'voc', 'co2'), function(x_metric){
+  diurnal.table(a, x_metric, groupers = 'energy_cluster')
+}
+) %>%
+  bind_rows()
+# %>%
+#   # bind with data not disagreggated by season
+#   bind_rows(
+#     map(c('pm25', 'voc', 'co2'), function(x_metric){
+#   diurnal.table(a, x_metric)
+# }
+# )  %>% bind_rows() %>% mutate(energy_cluster = 'overall') 
+#   )
+
+# change order of metrics for plotting
+a$energy_cluster <- factor(a$energy_cluster, levels = c('overall', 'ac', 'shoulder',
+                                            'heat'))
+a$metric <- factor(a$metric, levels = c('pm25', 'voc', 'co2'))
+
+# plot
+plot.diurnal.season(a)
+
+
+
+```
+
+
+### Group 2
+```{r plots_diurnal_seasons, fig.height=5, fig.width=5.5}
+
+a <- omni_hourly %>% filter(home_type %in% c('tier2'))
+
+# make dataframe that includes all metrics    
+a <- map(c('pm25', 'voc', 'co2'), function(x_metric){
+  diurnal.table(a, x_metric, groupers = 'energy_cluster')
+}
+) %>%
+  bind_rows()
+# %>%
+#   # bind with data not disagreggated by season
+#   bind_rows(
+#     map(c('pm25', 'voc', 'co2'), function(x_metric){
+#   diurnal.table(a, x_metric)
+# }
+# )  %>% bind_rows() %>% mutate(energy_cluster = 'overall') 
+#   )
+
+# change order of metrics for plotting
+a$energy_cluster <- factor(a$energy_cluster, levels = c('overall', 'ac', 'shoulder',
+                                            'heat'))
+a$metric <- factor(a$metric, levels = c('pm25', 'voc', 'co2'))
+
+# plot
+plot.diurnal.season(a)
+
+
+
+```
+
+
+### Group 3
+```{r plots_diurnal_seasons, fig.height=5, fig.width=6.5}
+
+a <- omni_hourly %>% filter(home_type %in% c('tier3'))
+
+# make dataframe that includes all metrics    
+a <- map(c('pm25', 'voc', 'co2'), function(x_metric){
+  diurnal.table(a, x_metric, groupers = 'energy_cluster')
+}
+)%>%
+bind_rows()
+# %>%
+#   # bind with data not disagreggated by season
+#   bind_rows(
+#     map(c('pm25', 'voc', 'co2'), function(x_metric){
+#   diurnal.table(a, x_metric)
+# }
+# )  %>% bind_rows() %>% mutate(energy_cluster = 'overall') 
+#   )
+
+# change order of metrics for plotting
+a$energy_cluster <- factor(a$energy_cluster, levels = c('overall', 'ac', 'shoulder',
+                                            'heat'))
+a$metric <- factor(a$metric, levels = c('pm25', 'voc', 'co2'))
+
+# plot
+plot.diurnal.season(a)
+
+
+
+```
+
+
+##disaggregated by season and home
+```{r functions_diurnal_seasons_homes}
+
+
+    # plot without labels and such
+    plot.diurnal.season.home <- function(dat, err_ribbon = TRUE) {
+
+      # make a dummy df in which to define limits for each metric
+limit_df <- dat %>%
+  group_by(metric) %>%
+  summarize(max = max(mean.val))%>%
+  mutate(min = 0) %>%
+        pivot_longer(cols = c(max, min), names_to = 'side', values_to = 'limits')
+
+    
+      ggplot(dat, aes(x = hour, y = mean.val
+                      # color = home
+                      ))+
+        geom_line( size = line_size,
+                      aes(color = home)
+                   )+
+        ##geom_errorbar(aes(ymax = pm25_high.val, ymin = pm25_low.val))+ ##bars instead?
+        geom_ribbon(aes(ymax = high.val,
+                        ymin = low.val,
+                      fill = home
+                        ),
+                    alpha = if_else(err_ribbon == TRUE, 0.2, 0), color = NA)+
+        labs(
+          y = 'Average Value',
+             x = 'Hour of Day')+
+        scale_x_continuous(limits = c(0,24),
+                           breaks = c(0,6,12,18),
+                           expand = c(0,0))+
+        theme_bw()+
+        # coord_cartesian(ylim = y_range)+
+        theme(plot.title = element_blank(),
+      axis.text.x = element_text(size = xsmall))+
+        # make point size proportional to # of obs, with 0 obs = size 0
+  geom_point(aes(size = n,
+color = home
+))+
+        scale_size_area(max_size = max_point_size)+
+        facet_grid(rows = vars(metric), cols = vars(energy_cluster),
+                   scales = 'free_y')+
+
+        # use dummy df to define limits for each metric
+        geom_blank(data = limit_df, aes(x = 15, y = limits))
+    }
+
+
+```
+
+### Group 2 and 3
+```{r plots_diurnal_seasons_homes, fig.height=5, fig.width=8}
+
+a <- omni_hourly %>% filter(home_type %in% c('tier2', 'tier3'))
+
+# make dataframe that includes all metrics    
+a <- map(c('pm25', 'voc', 'co2'), function(x_metric){
+  diurnal.table(a, x_metric, groupers = c('energy_cluster', 'home'))
+}
+) %>%
+  bind_rows() %>%
+  # bind with data not disagreggated by season
+  bind_rows(
+    map(c('pm25', 'voc', 'co2'), function(x_metric){
+  diurnal.table(a, x_metric, groupers = 'home')
+}
+)  %>% bind_rows() %>% mutate(energy_cluster = 'overall') 
+  )
+
+# change order of metrics for plotting
+a$energy_cluster <- factor(a$energy_cluster, levels = c('overall', 'ac', 'shoulder',
+                                            'heat'))
+a$metric <- factor(a$metric, levels = c('pm25', 'voc', 'co2'))
+
+# plot
+plot.diurnal.season.home(a)
+
+
+
+```
+
+
+### Group 2
+```{r plots_diurnal_seasons_homes, fig.height=5, fig.width=8}
+
+a <- omni_hourly %>% filter(home_type %in% c('tier2'))
+
+# make dataframe that includes all metrics    
+a <- map(c('pm25', 'voc', 'co2'), function(x_metric){
+  diurnal.table(a, x_metric, groupers = c('energy_cluster', 'home'))
+}
+) %>%
+  bind_rows() %>%
+  # bind with data not disagreggated by season
+  bind_rows(
+    map(c('pm25', 'voc', 'co2'), function(x_metric){
+  diurnal.table(a, x_metric, groupers = 'home')
+}
+)  %>% bind_rows() %>% mutate(energy_cluster = 'overall') 
+  )
+
+# change order of metrics for plotting
+a$energy_cluster <- factor(a$energy_cluster, levels = c('overall', 'ac', 'shoulder',
+                                            'heat'))
+a$metric <- factor(a$metric, levels = c('pm25', 'voc', 'co2'))
+
+# plot
+plot.diurnal.season.home(a)
+
+
+
+```
+
+
+### Group 3
+```{r plots_diurnal_seasons_homes, fig.height=5, fig.width=8}
+
+a <- omni_hourly %>% filter(home_type %in% c('tier3'))
+
+# make dataframe that includes all metrics    
+a <- map(c('pm25', 'voc', 'co2'), function(x_metric){
+  diurnal.table(a, x_metric, groupers = c('energy_cluster', 'home'))
+}
+) %>%
+  bind_rows() %>%
+  # bind with data not disagreggated by season
+  bind_rows(
+    map(c('pm25', 'voc', 'co2'), function(x_metric){
+  diurnal.table(a, x_metric, groupers = 'home')
+}
+)  %>% bind_rows() %>% mutate(energy_cluster = 'overall') 
+  )
+
+# change order of metrics for plotting
+a$energy_cluster <- factor(a$energy_cluster, levels = c('overall', 'ac', 'shoulder',
+                                            'heat'))
+a$metric <- factor(a$metric, levels = c('pm25', 'voc', 'co2'))
+
+# plot
+plot.diurnal.season.home(a)
+
 
 
 ```
