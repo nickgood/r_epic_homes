@@ -956,7 +956,13 @@ plot.diurnal(a)
 limit_df <- dat %>%
   group_by(metric) %>%
   summarize(max = max(mean.val))%>%
-  mutate(min = 0) %>%
+  mutate(min = 0,
+         max = case_when(
+           metric == 'pm25' ~ 30,
+           metric == 'voc' ~ 600,
+           metric == 'co2' ~ 1000
+         )
+         ) %>%
         pivot_longer(cols = c(max, min), names_to = 'side', values_to = 'limits')
 
     
@@ -987,7 +993,7 @@ limit_df <- dat %>%
                       color = energy_cluster, fill = energy_cluster
                  ))+
         scale_size_area(max_size = max_point_size)+
-        facet_grid(rows = vars(metric), cols = vars(energy_cluster),
+        facet_wrap(vars(metric),
                    scales = 'free_y')+
                 scale_fill_manual(
           breaks = energy_breaks,
@@ -1003,7 +1009,7 @@ limit_df <- dat %>%
 ```
 
 ### Group 2 and 3
-```{r plots_diurnal_seasons, fig.height=5, fig.width=8}
+```{r plots_diurnal_seasons, fig.height=2.5, fig.width=8}
 
 a <- omni_hourly %>% filter(home_type %in% c('tier2', 'tier3'))
 
@@ -1036,7 +1042,7 @@ plot.diurnal.season(a)
 
 
 ### Group 2
-```{r plots_diurnal_seasons, fig.height=5, fig.width=5.5}
+```{r plots_diurnal_seasons, fig.height=2.5, fig.width=8}
 
 a <- omni_hourly %>% filter(home_type %in% c('tier2'))
 
@@ -1069,7 +1075,7 @@ plot.diurnal.season(a)
 
 
 ### Group 3
-```{r plots_diurnal_seasons, fig.height=5, fig.width=6.5}
+```{r plots_diurnal_seasons, fig.height=2.5, fig.width=8}
 
 a <- omni_hourly %>% filter(home_type %in% c('tier3'))
 
