@@ -49,8 +49,14 @@ library(ggpubr) # for tesing log-normality
 
 ```
 
-```{r import_omni_hourly_data}
-omni_hourly_data<- read_rds('./csv_created/omni_hourly_calibrated.rds')
+```{r import_omni_hourly}
+omni_hourly<- read_rds('./csv_created/omni_hourly_calibrated.rds')
+
+```
+
+```{r censor_date}
+omni_hourly <- omni_hourly %>% filter(datehour<ymd_hms('2021-06-01 00:00:00'))
+
 
 ```
 
@@ -141,7 +147,7 @@ locations_indoor <- c('living', 'kitchen', 'bedroom')
 # tested_sample_sequence <- seq(1,27)
 # home_num <- '009'
 # location_type <- 'kitchen'
-# data <- omni_hourly_data
+# data <- omni_hourly
 # monitor_season <- date_ranges_entire[1]
 # metric <- 'pm25'
 # days <- 27
@@ -202,7 +208,7 @@ entropy.table.hourly <- function(
   all_time, # if TRUE, compare each short sampling period to entire monitoring year of home
     longterm_avail_limit = 0, # only use data from a long-term period if it has at least this fraction of data available (0 means no periods are omitted if they have any data)
   sample_avail_limit = 0, # only use data from a sample period if it has at least this fraction of data available (0 means no periods are omitted if they have any data)
-  data = omni_hourly_data) {
+  data = omni_hourly) {
   
       warn <<- 'none'# clear warning output in case it was triggered previously
   output <<- na.result(NA) # clear error output in case it was triggered previously
@@ -658,7 +664,7 @@ sample_results
 # energy cluster period based on home
  pick.start <- function(x_home, x_cluster) {
    if(x_cluster == 'all') {
-        omni_hourly_data %>%
+        omni_hourly %>%
    filter(home == x_home) %>%
    pull(datehour) %>% min()%>% date() %>% as.character()
    } else if( x_cluster %in% c('heat', 'shoulder', 'ac')){
@@ -676,7 +682,7 @@ sample_results
 
   pick.end <- function(x_home, x_cluster) {
     if(x_cluster == 'all') {
-        omni_hourly_data %>%
+        omni_hourly %>%
    filter(home == x_home) %>%
    pull(datehour) %>% max()%>% date() %>% as.character()
    } else if( x_cluster %in% c('heat', 'shoulder', 'ac')){

@@ -44,7 +44,7 @@ library(ggpubr) # for tesing log-normality
 ```
 
 ```{r import_omni_minute_data, eval = FALSE}
-omni_data<- read_csv('./csv_created/omni_all_locations.csv')
+# omni_data<- read_csv('./csv_created/omni_all_locations.csv')
 
 # # remove all variables but omni_data
 # rm(list=setdiff(ls(), "omni_data"))
@@ -57,8 +57,8 @@ omni_data<- read_csv('./csv_created/omni_all_locations.csv')
 
 ```
 
-```{r import_omni_hourly_data}
-omni_hourly_data<- read_rds('./csv_created/omni_hourly_calibrated.rds')
+```{r import_omni_hourly}
+omni_hourly<- read_rds('./csv_created/omni_hourly_calibrated.rds')
 # # remove all variables but omni_data
 # rm(list=setdiff(ls(), "omni_data"))
 
@@ -67,6 +67,14 @@ omni_hourly_data<- read_rds('./csv_created/omni_hourly_calibrated.rds')
 #   summarize(pm25_zeros = sum(pm25 == 0), pm25_n = n()) %>%
 #   mutate(pm25_zero_pct = pm25_zeros/pm25_n*100) %>%
 #   ungroup()
+```
+
+
+
+```{r censor_date}
+omni_hourly <- omni_hourly %>% filter(datehour<ymd_hms('2021-06-01 00:00:00'))
+
+
 ```
 
 ```{r import_energy_cluster_homes}
@@ -145,7 +153,7 @@ locations_indoor <- c('living', 'kitchen', 'bedroom')
 # tested_sample_sequence <- seq(7,19,4)
 # home_num <- '004'
 # location_type <- 'living'
-# data <- omni_hourly_data
+# data <- omni_hourly
 # monitor_season <- date_ranges_entire[1]
 # metric <- 'pm25'
 # days <- 23
@@ -198,7 +206,7 @@ entropy.table.shape <- function(
   all_time, # if TRUE, compare each short sampling period to entire monitoring year of home
   longterm_avail_limit = 0, # only use data from a long-term period if it has at least this fraction of data available (0 means no periods are omitted if they have any data)
   sample_avail_limit = 0, # only use data from a sample period if it has at least this fraction of data available (0 means no periods are omitted if they have any data)
-  data = omni_hourly_data) {
+  data = omni_hourly) {
   
     warn <<- 'none'# clear warning output in case it was triggered previously
 
@@ -561,7 +569,7 @@ list(
 
 # test function--------------------------
 
-# test2 <- omni_hourly_data %>% filter(
+# test2 <- omni_hourly %>% filter(
 #   home == '010' & location == 'living' &
 #     datehour %>% between(as.POSIXct(ymd('2020-10-25')),
 #                          as.POSIXct(ymd('2020-11-03')))
@@ -589,7 +597,7 @@ test<- entropy.table.shape('009', 'pm25',
 # energy cluster period based on home
  pick.start <- function(x_home, x_cluster) {
    if(x_cluster == 'all') {
-        omni_hourly_data %>%
+        omni_hourly %>%
    filter(home == x_home) %>%
    pull(datehour) %>% min()%>% date() %>% as.character()
    } else if( x_cluster %in% c('heat', 'shoulder', 'ac')){
@@ -607,7 +615,7 @@ test<- entropy.table.shape('009', 'pm25',
 
   pick.end <- function(x_home, x_cluster) {
     if(x_cluster == 'all') {
-        omni_hourly_data %>%
+        omni_hourly %>%
    filter(home == x_home) %>%
    pull(datehour) %>% max()%>% date() %>% as.character()
    } else if( x_cluster %in% c('heat', 'shoulder', 'ac')){
