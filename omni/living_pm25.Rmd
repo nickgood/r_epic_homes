@@ -1,0 +1,218 @@
+---
+title: "Living PM2.5"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: paper
+---
+
+```{r global_options, echo=FALSE}
+knitr::opts_chunk$set(fig.path = 'figures/',
+  warning = FALSE,
+  message = FALSE,
+  echo = FALSE,
+  fig.width = 10, fig.height = 3,
+  cache = FALSE)
+```
+
+```{r}
+library(dplyr)
+library(purrr)
+library(tidyr)
+library(openair)
+library(ggplot2)
+library(readr)
+library(lubridate)
+library(stringr)
+```
+
+```{r}
+output <- read_rds("../output/living_pm25.rds")
+```
+
+```{r}
+pct <- output %>%
+  ungroup() %>%
+  group_by(id_home, hod) %>%
+  summarise(n = n(),
+            p002 = 100* sum(pm25 < 2) / n(),
+            p005 = 100* sum(pm25 < 5) / n(),
+            p012 = 100* sum(pm25 < 12) / n(),
+            p050 = 100* sum(pm25 < 50) / n(),
+            p100 = 100* sum(pm25 < 100) / n(),
+            p500 = 100* sum(pm25 < 500) / n(),
+            .groups = "drop") %>%
+  group_by(hod) %>%
+  select(-id_home, n) %>%
+  summarise_all(mean, .groups = "drop")
+```
+
+# All homes
+
+```{r all}
+cols <- c("<500" = "red", "<100" = "orange", "<50" = "yellow", "<12" = "green", "<5" = "blue", "<2" = "purple")
+
+ggplot(pct, aes(x=hod*60*60)) + 
+  geom_area(aes(y=p500, fill= "<500")) +
+  geom_area(aes(y=p100, fill= "<100")) + 
+  geom_area(aes(y=p050, fill="<50")) + 
+  geom_area(aes(y=p012, fill="<12")) + 
+  geom_area(aes(y=p005, fill="<5")) +
+  geom_area(aes(y=p002, fill="<2")) +
+  ylab("% of values within concentration range") +
+  theme_minimal() +
+  ggtitle("Indoor fine particle Concentrations - All Homes") +
+  xlab("Hour of day") +
+  scale_x_time(breaks = seq(0,24*60*60,3*60*60), limits = c(0,23*60*60), 
+               minor_breaks = seq(0, 24*60*60, 1*60*60), expand = expansion(mult = 0, add = 0)) +
+  scale_fill_manual(values = cols,
+                    name = expression(mu*g/m^3),
+                    breaks = c("<500", "<100", "<50", "<12", "<5", "<2"),
+                    labels = c("<500", "<100", "<50", "<12", "<5", "<2"),
+                    guide = "legend")
+```
+
+# All homes by month
+
+```{r}
+pct <- output %>%
+  group_by(id_home, month, hod) %>%
+  summarise(n = n(),
+            p002 = 100* sum(pm25 < 2) / n(),
+            p005 = 100* sum(pm25 < 5) / n(),
+            p012 = 100* sum(pm25 < 12) / n(),
+            p050 = 100* sum(pm25 < 50) / n(),
+            p100 = 100* sum(pm25 < 100) / n(),
+            p500 = 100* sum(pm25 < 500) / n(),
+            .groups = "drop") %>%
+  group_by(month, hod) %>%
+  select(-id_home, -n) %>%
+  summarise_all(mean, .groups = "drop")
+```
+
+```{r month, fig.width=10, fig.height=10}
+cols <- c("<500" = "red", "<100" = "orange", "<50" = "yellow", "<12" = "green", "<5" = "blue", "<2" = "purple")
+
+ggplot(pct %>% mutate(month = month(month, label = TRUE)), aes(x=hod*60*60)) + 
+  geom_area(aes(y=p500, fill= "<500")) +
+  geom_area(aes(y=p100, fill= "<100")) + 
+  geom_area(aes(y=p050, fill="<50")) + 
+  geom_area(aes(y=p012, fill="<12")) + 
+  geom_area(aes(y=p005, fill="<5")) +
+  geom_area(aes(y=p002, fill="<2")) +
+  ylab("% of values within concentration range") +
+  theme_minimal() +
+  ggtitle("Indoor fine particle concentrations by month - All Homes") +
+  xlab("Hour of day") +
+  scale_x_time(breaks = seq(0,24*60*60,4*60*60), limits = c(0,23*60*60), 
+               minor_breaks = seq(0, 24*60*60, 1*60*60), expand = expansion(mult = 0, add = 0)) +
+  scale_fill_manual(values = cols,
+                    name = expression(mu*g/m^3),
+                    breaks = c("<500", "<100", "<50", "<12", "<5", "<2"),
+                    labels = c("<500", "<100", "<50", "<12", "<5", "<2"),
+                    guide = "legend") +
+  facet_wrap(~month, ncol = 3) +
+  theme(axis.text = element_text(size = 14),
+        legend.text = element_text(size = 14),
+        axis.title = element_text(size = 14),
+        axis.text.x = element_text(size = 8))
+```
+
+# All homes by season
+
+```{r}
+pct <- output %>%
+  group_by(id_home, month, hod) %>%
+  summarise(n = n(),
+            p002 = 100* sum(pm25 < 2) / n(),
+            p005 = 100* sum(pm25 < 5) / n(),
+            p012 = 100* sum(pm25 < 12) / n(),
+            p050 = 100* sum(pm25 < 50) / n(),
+            p100 = 100* sum(pm25 < 100) / n(),
+            p500 = 100* sum(pm25 < 500) / n(),
+            .groups = "drop") %>%
+  mutate(season = if_else(month ==12 | month < 3, "Winter", ""),
+         season = if_else(month >=3 & month <= 5, "Spring", season),
+         season = if_else(month >=6 & month <= 8, "Summer", season),
+         season = if_else(month >= 9 & month <= 11, "Fall", season)) %>%
+  group_by(season, hod) %>%
+  select(-id_home, -n, - month) %>%
+  summarise_all(mean, .groups = "drop")
+```
+
+```{r season, fig.width=8, fig.height=8}
+cols <- c("<500" = "red", "<100" = "orange", "<50" = "yellow", "<12" = "green", "<5" = "blue", "<2" = "purple")
+
+ggplot(pct, aes(x=hod*60*60)) + 
+  geom_area(aes(y=p500, fill= "<500")) +
+  geom_area(aes(y=p100, fill= "<100")) + 
+  geom_area(aes(y=p050, fill="<50")) + 
+  geom_area(aes(y=p012, fill="<12")) + 
+  geom_area(aes(y=p005, fill="<5")) +
+  geom_area(aes(y=p002, fill="<2")) +
+  ylab("% of values within concentration range") +
+  theme_minimal() +
+  ggtitle("Indoor fine particle concentrations by season - All Homes") +
+  xlab("Hour of day") +
+  scale_x_time(breaks = seq(0,24*60*60,4*60*60), limits = c(0,23*60*60), 
+               minor_breaks = seq(0, 24*60*60, 1*60*60), expand = expansion(mult = 0, add = 0)) +
+  scale_fill_manual(values = cols,
+                    name = expression(mu*g/m^3),
+                    breaks = c("<500", "<100", "<50", "<12", "<5", "<2"),
+                    labels = c("<500", "<100", "<50", "<12", "<5", "<2"),
+                    guide = "legend") +
+  facet_wrap(~season, ncol = 2) +
+  theme(axis.text = element_text(size = 14),
+        legend.text = element_text(size = 14),
+        axis.title = element_text(size = 14),
+        axis.text.x = element_text(size = 8))
+```
+
+# By homes - all seasons
+
+# All Homes by season
+
+```{r}
+pct <- output %>%
+  group_by(id_home, month, hod) %>%
+  summarise(n = n(),
+            p002 = 100* sum(pm25 < 2) / n(),
+            p005 = 100* sum(pm25 < 5) / n(),
+            p012 = 100* sum(pm25 < 12) / n(),
+            p050 = 100* sum(pm25 < 50) / n(),
+            p100 = 100* sum(pm25 < 100) / n(),
+            p500 = 100* sum(pm25 < 500) / n(),
+            .groups = "drop") %>%
+  group_by(id_home, hod) %>%
+  select(-n, -month) %>%
+  summarise_all(mean, .groups = "drop")
+```
+
+```{r by_homes, fig.width=10, fig.height=12}
+cols <- c("<500" = "red", "<100" = "orange", "<50" = "yellow", "<12" = "green", "<5" = "blue", "<2" = "purple")
+
+ggplot(pct, aes(x=hod*60*60)) + 
+  geom_area(aes(y=p500, fill= "<500")) +
+  geom_area(aes(y=p100, fill= "<100")) + 
+  geom_area(aes(y=p050, fill="<50")) + 
+  geom_area(aes(y=p012, fill="<12")) + 
+  geom_area(aes(y=p005, fill="<5")) +
+  geom_area(aes(y=p002, fill="<2")) +
+  ylab("% of values within concentration range") +
+  theme_minimal() +
+  ggtitle("Indoor fine particle concentrations by month - All Homes") +
+  xlab("Hour of day") +
+  scale_x_time(breaks = seq(0,24*60*60,4*60*60), limits = c(0,23*60*60), 
+               minor_breaks = seq(0, 24*60*60, 1*60*60), expand = expansion(mult = 0, add = 0)) +
+  scale_fill_manual(values = cols,
+                    name = expression(mu*g/m^3),
+                    breaks = c("<500", "<100", "<50", "<12", "<5", "<2"),
+                    labels = c("<500", "<100", "<50", "<12", "<5", "<2"),
+                    guide = "legend") +
+  facet_wrap(~id_home, ncol = 3) +
+  theme(axis.text = element_text(size = 14),
+        legend.text = element_text(size = 14),
+        axis.title = element_text(size = 20),
+        axis.text.x = element_text(size = 8))
+```
