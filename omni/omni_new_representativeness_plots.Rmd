@@ -554,7 +554,7 @@ diurn.rep.plot <- function(data, x_home, x_location, x_energy_cluster, x_metric,
       filter(sample_length == x_sample_lengths)
     
   # find sample closest to median (or 25 percentile) representativeness value
-  # for given home in given season
+  # for given home in given location in given season for given sample length
   rep_value <- data_sample_length %>% pull(rep) %>% quantile(0.25)
   
   
