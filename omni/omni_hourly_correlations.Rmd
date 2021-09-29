@@ -35,7 +35,14 @@ library(gridExtra)
 ```
 
 ```{r data_import}
-omni_hourly_data <- read_rds('./csv_created/omni_hourly_calibrated.rds')
+omni_hourly <- read_rds('./csv_created/omni_hourly_calibrated.rds')
+```
+
+# only use data up to June 2021
+```{r censor_date}
+omni_hourly <- omni_hourly %>% filter(datehour<ymd_hms('2021-06-01 00:00:00'))
+
+
 ```
 
 
@@ -170,7 +177,7 @@ corr_fig_width <- 10.5
 ```{r functions_correlation_additional variable, eval = TRUE}
 # define variables for testing----------------------
 
-# data <- omni_hourly_data
+# data <- omni_hourly
 # hm <- '008'
 # rm_pair <- c('living', 'garage')
 # rm_pair2 <- c('living', 'kitchen')
@@ -223,7 +230,7 @@ corr_fig_width <- 10.5
  
 #  # test funct
 # test <- room.coeff.hour('008', c('living', 'garage'),
-#              23, 'pm25', 'spearman', omni_hourly_data)
+#              23, 'pm25', 'spearman', omni_hourly)
  
  
 
@@ -254,7 +261,7 @@ corr_fig_width <- 10.5
  
 #  # test funct
 # test <- room.cor.hourly('008', c('living', 'garage'),
-#                    'pm25', 'spearman', omni_hourly_data)
+#                    'pm25', 'spearman', omni_hourly)
  
  ##function to create a plot of correlation between
  ##multiple room pairs by hour
@@ -264,7 +271,7 @@ corr_fig_width <- 10.5
                                     met_2 = NULL, loc_2 = NULL,
                                simple = FALSE,
                                     method = 'spearman',
-                                    data = omni_hourly_data) {
+                                    data = omni_hourly) {
    
    ##find correlations and pvalues for each room pair
    a <- map(rms_list, room.cor.hourly,
@@ -280,7 +287,7 @@ bind_rows()
    a <-a %>%
      ##join with average hourly outdoor temp
      full_join(
-       omni_hourly_data %>%
+       omni_hourly %>%
          filter(home == hm, location == loc_2) %>%
          select(datehour, all_of(met_2)) %>%
          group_by(hour = hour(datehour)) %>%
@@ -376,7 +383,7 @@ bind_rows()
                                     method = 'spearman',
                                     func, ncolumn = 5,
                                     met_2 = NULL, loc_2 = NULL,
-                                    data = omni_hourly_data
+                                    data = omni_hourly
                                        ) {
    plots <- map(hms, room.hourly.plot,
                    data = data, rms_list = rms_list,
@@ -482,7 +489,7 @@ bind_rows()
  
 #  # test funct
 # test <- metric.coeff.hour('008', c('pm25', 'co2'),
-#              23, 'living', 'spearman', omni_hourly_data)
+#              23, 'living', 'spearman', omni_hourly)
  
  
 
@@ -513,7 +520,7 @@ bind_rows()
  
 #  # test funct
 # test <- metric.cor.hourly('008', c('pm25', 'co2'),
-#              'living', 'spearman', omni_hourly_data)
+#              'living', 'spearman', omni_hourly)
  
  ##function to create a plot of correlation between
  ##multiple room pairs by hour
@@ -523,7 +530,7 @@ bind_rows()
                                     met_2 = NULL, loc_2 = NULL,
                                  simple = FALSE,
                                     method = 'spearman',
-                                    data = omni_hourly_data) {
+                                    data = omni_hourly) {
    
    ##find correlations and pvalues for each room pair
    a <- map(mets_list, metric.cor.hourly,
@@ -539,7 +546,7 @@ bind_rows()
    a <-a %>%
      ##join with average hourly outdoor temp
      full_join(
-       omni_hourly_data %>%
+       omni_hourly %>%
          filter(home == hm, location == loc_2) %>%
          select(datehour, all_of(met_2)) %>%
          group_by(hour = hour(datehour)) %>%
@@ -636,7 +643,7 @@ bind_rows()
                                     method = 'spearman',
                                     func, ncolumn = 5,
                                     met_2 = NULL, loc_2 = NULL,
-                                    data = omni_hourly_data
+                                    data = omni_hourly
                                        ) {
    plots <- map(hms, metric.hourly.plot,
                    data = data, mets_list = mets_list,
@@ -904,7 +911,7 @@ lapply(locations_indoor, function(x_location){
 ```{r functions_correlation_homes, eval = TRUE}
 # # define variables for testing----------------------
 # 
-# # data <- omni_hourly_data
+# # data <- omni_hourly
 # # hm <- '008'
 # # rm_pair <- c('living', 'garage')
 # # rm_pair2 <- c('living', 'kitchen')
@@ -960,7 +967,7 @@ lapply(locations_indoor, function(x_location){
 # 
 #  # test funct
 # test <- room.coeff.hour(c('living', 'garage'),
-#              23, 'pm25', 'spearman', omni_hourly_data)
+#              23, 'pm25', 'spearman', omni_hourly)
 #  
 #  
 # 
@@ -991,7 +998,7 @@ lapply(locations_indoor, function(x_location){
 #  
 # #  # test funct
 # # test <- room.cor.hourly('008', c('living', 'garage'),
-# #                    'pm25', 'spearman', omni_hourly_data)
+# #                    'pm25', 'spearman', omni_hourly)
 #  
 #  ##function to create a plot of correlation between
 #  ##multiple room pairs by hour
@@ -1001,7 +1008,7 @@ lapply(locations_indoor, function(x_location){
 #                                     met_2 = NULL, loc_2 = NULL,
 #                                simple = FALSE,
 #                                     method = 'spearman',
-#                                     data = omni_hourly_data) {
+#                                     data = omni_hourly) {
 #    
 #    ##find correlations and pvalues for each room pair
 #    a <- map(rms_list, room.cor.hourly,
@@ -1017,7 +1024,7 @@ lapply(locations_indoor, function(x_location){
 #    a <-a %>%
 #      ##join with average hourly outdoor temp
 #      full_join(
-#        omni_hourly_data %>%
+#        omni_hourly %>%
 #          filter(home == hm, location == loc_2) %>%
 #          select(datehour, all_of(met_2)) %>%
 #          group_by(hour = hour(datehour)) %>%
@@ -1113,7 +1120,7 @@ lapply(locations_indoor, function(x_location){
 #                                     method = 'spearman',
 #                                     func, ncolumn = 5,
 #                                     met_2 = NULL, loc_2 = NULL,
-#                                     data = omni_hourly_data
+#                                     data = omni_hourly
 #                                        ) {
 #    plots <- map(hms, room.hourly.plot,
 #                    data = data, rms_list = rms_list,
@@ -1219,7 +1226,7 @@ lapply(locations_indoor, function(x_location){
 #  
 # #  # test funct
 # # test <- metric.coeff.hour('008', c('pm25', 'co2'),
-# #              23, 'living', 'spearman', omni_hourly_data)
+# #              23, 'living', 'spearman', omni_hourly)
 #  
 #  
 # 
@@ -1250,7 +1257,7 @@ lapply(locations_indoor, function(x_location){
 #  
 # #  # test funct
 # # test <- metric.cor.hourly('008', c('pm25', 'co2'),
-# #              'living', 'spearman', omni_hourly_data)
+# #              'living', 'spearman', omni_hourly)
 #  
 #  ##function to create a plot of correlation between
 #  ##multiple room pairs by hour
@@ -1260,7 +1267,7 @@ lapply(locations_indoor, function(x_location){
 #                                     met_2 = NULL, loc_2 = NULL,
 #                                  simple = FALSE,
 #                                     method = 'spearman',
-#                                     data = omni_hourly_data) {
+#                                     data = omni_hourly) {
 #    
 #    ##find correlations and pvalues for each room pair
 #    a <- map(mets_list, metric.cor.hourly,
@@ -1276,7 +1283,7 @@ lapply(locations_indoor, function(x_location){
 #    a <-a %>%
 #      ##join with average hourly outdoor temp
 #      full_join(
-#        omni_hourly_data %>%
+#        omni_hourly %>%
 #          filter(home == hm, location == loc_2) %>%
 #          select(datehour, all_of(met_2)) %>%
 #          group_by(hour = hour(datehour)) %>%
@@ -1373,7 +1380,7 @@ lapply(locations_indoor, function(x_location){
 #                                     method = 'spearman',
 #                                     func, ncolumn = 5,
 #                                     met_2 = NULL, loc_2 = NULL,
-#                                     data = omni_hourly_data
+#                                     data = omni_hourly
 #                                        ) {
 #    plots <- map(hms, metric.hourly.plot,
 #                    data = data, mets_list = mets_list,

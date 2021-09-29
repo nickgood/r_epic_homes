@@ -41,6 +41,13 @@ omni_hourly <- read_rds('./csv_created/omni_hourly_calibrated.rds') %>%
 home_type_df <- read_csv('../sense/csv_created_sense/home_type_df.csv')
 ```
 
+# only use data up to June 2021
+```{r censor_date}
+omni_hourly <- omni_hourly %>% filter(datehour<ymd_hms('2021-06-01 00:00:00'))
+
+
+```
+
 
 ```{r define_functions}
 
