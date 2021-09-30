@@ -145,10 +145,10 @@ locations_indoor <- c('living', 'kitchen', 'bedroom')
 
 # define variables for testing-----------------------
 
-# date_ranges_entire <- list(c('2020-09-26','2020-10-22'))
-# tested_sample_sequence <- seq(1,27)
-# home_num <- '009'
-# location_type <- 'kitchen'
+# date_ranges_entire <- list(c('2020-08-18','2020-09-13'))
+# tested_sample_sequence <- seq(1,28)
+# home_num <- '007'
+# location_type <- 'living'
 # data <- omni_hourly
 # monitor_season <- date_ranges_entire[1]
 # metric <- 'pm25'
@@ -410,21 +410,21 @@ entropy.table.hourly <- function(
       if(length(all_dates_season) <= days*24) {
         warn <<- 'short_season'
         
-              a <- list(
-                'sample_means' = NA %>% as.integer(),
-                'sample_hourly_n' = NA %>% as.integer(),
-                'sample_hourly_sd' = NA %>% as.integer(),
-                'sample_period' = NA%>% as.integer()
+              # a <- list(
+              #   'sample_means' = NA %>% as.integer(),
+              #   'sample_hourly_n' = NA %>% as.integer(),
+              #   'sample_hourly_sd' = NA %>% as.integer(),
+              #   'sample_period' = NA%>% as.integer()
+              # 
+              # ) 
 
-              ) 
-
-              # a <- tibble(
-              #   max_entire = max_entire,
-              #  max_hour_entire = max_hour_entire,
-              #  entire_hourly_n = list(entire_hourly_n),
-              #  entire_hourly_sd = list(entire_hourly_sd),
-              #  entire_data = list(entire)
-              # )
+              a <- tibble(
+                max_entire = max_entire,
+               max_hour_entire = max_hour_entire,
+               entire_hourly_n = list(entire_hourly_n),
+               entire_hourly_sd = list(entire_hourly_sd),
+               entire_data = list(entire)
+              )
   
                       
       } else {
@@ -587,7 +587,7 @@ sample_results
     a  
     }
     # # test kld.period function
-    # test <- kld.period(27)
+    # test <- kld.period(28)
 
             # apply function to find scaled_entropy dataframe for
     # sampling period of length "days2" to range of days in tested_sample_sequence
@@ -646,19 +646,19 @@ sample_results
 # test function--------------------------
 
 # start <- Sys.time()
-# 
-# test<- entropy.table.hourly('011', 'pm25',
+# # 
+# test<- entropy.table.hourly('007', 'pm25',
 #                             overlap = FALSE,
 #                            date_ranges_entire = list(
-#                              c('2020-09-26', '2020-10-22')),
-#                            tested_sample_sequence = c(2,6),
-#                            location_type = 'pooled',
+#                              c('2020-08-18', '2020-09-13')),
+#                            tested_sample_sequence = c(1,28),
+#                            location_type = 'living',
 #                            all_time = TRUE)
 # 
 # 
 # end <- Sys.time()
 # run2 <- end- start
-
+# pick.end('007', 'ac')
 ```
 
 

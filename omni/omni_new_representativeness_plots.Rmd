@@ -163,6 +163,7 @@ large <- 24
 
 ```{r import_pdf_data}
 
+
 # read in csv files
 entropy_df <- 
   
