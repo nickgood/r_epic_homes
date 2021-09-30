@@ -129,7 +129,9 @@ na.result <- function(error, season = NA, sample_days = NA, samp_avail = NA) {
 
 # list of all home numbers
 homes_all <- home.list(1:16)
-clusters_all <- c('heat','shoulder', 'ac', 'all')
+clusters_all <- c('heat','shoulder', 'ac'
+                  # 'all'
+                  )
 locations_indoor <- c('living', 'kitchen', 'bedroom')
 
 ```
@@ -416,12 +418,13 @@ entropy.table.hourly <- function(
 
               ) 
 
-              a <- tibble(
-                max_entire = max_entire,
-               max_hour_entire = max_hour_entire,
-               entire_hourly_n = list(entire_hourly_n),
-               entire_hourly_sd = list(entire_hourly_sd)
-              )
+              # a <- tibble(
+              #   max_entire = max_entire,
+              #  max_hour_entire = max_hour_entire,
+              #  entire_hourly_n = list(entire_hourly_n),
+              #  entire_hourly_sd = list(entire_hourly_sd),
+              #  entire_data = list(entire)
+              # )
   
                       
       } else {
@@ -574,7 +577,8 @@ sample_results
                max_entire = max_entire,
                max_hour_entire = max_hour_entire,
                entire_hourly_n = list(entire_hourly_n),
-               entire_hourly_sd = list(entire_hourly_sd)) %>%
+               entire_hourly_sd = list(entire_hourly_sd),
+               entire_data = list(entire)) %>%
         rename(sample_data = sample_means)
       
 
@@ -647,7 +651,7 @@ sample_results
 #                             overlap = FALSE,
 #                            date_ranges_entire = list(
 #                              c('2020-09-26', '2020-10-22')),
-#                            tested_sample_sequence = c(2,6,10,28),
+#                            tested_sample_sequence = c(2,6),
 #                            location_type = 'pooled',
 #                            all_time = TRUE)
 # 
@@ -801,7 +805,7 @@ lapply(clust, function(cluster_type) {
       date_ranges_entire = list(c(start_date,
                                   end_date)),
       tested_sample_sequence =
-        c(c(1:7), 9, seq(11,27,4)),
+        c(c(1:7), 10, 12, 14,17,21,24,28),
       location_type = loc,
         overlap = overlap_choice,
       all_time = all_time_choice) %>%
@@ -838,7 +842,7 @@ lapply(clust, function(cluster_type) {
       date_ranges_entire = list(c(start_date,
                                   end_date)),
       tested_sample_sequence =
-        c(c(1:7), 9, seq(11,27,4)),
+        c(c(1:7), 10, 12, 14,17,21,24,28),
       location_type = loc,
         overlap = overlap_choice,
       all_time = all_time_choice) %>%
@@ -876,7 +880,7 @@ lapply(clust, function(cluster_type) {
       date_ranges_entire = list(c(start_date,
                                   end_date)),
       tested_sample_sequence =
-        c(c(1:7), 9, seq(11,27,4)),
+        c(c(1:7), 10, 12, 14,17,21,24,28),
       location_type = loc,
         overlap = overlap_choice,
       all_time = all_time_choice) %>%
@@ -895,42 +899,42 @@ lapply(clust, function(cluster_type) {
 )
 
 
-loc <- 'pooled'
-lapply(clust, function(cluster_type) {
-  
-  rep_data <-  lapply(homes_all, function(x_home) {
-    
-    start_date <- pick.start(x_home, cluster_type)
-    end_date <- pick.end(x_home, cluster_type)
-    sample_min <- pick.sample.min(met)
-    sample_max <- if_else(
-      as.numeric(as.Date(end_date) - as.Date(start_date))>=28,
-      28,
-      as.numeric(as.Date(end_date) - as.Date(start_date))
-    )
-    
-    entropy.table.hourly(
-      x_home, metric = met,
-      date_ranges_entire = list(c(start_date,
-                                  end_date)),
-      tested_sample_sequence =
-        c(c(1:7), 9, seq(11,27,4)),
-      location_type = loc,
-        overlap = overlap_choice,
-      all_time = all_time_choice) %>%
-      
-      # add in column for energy_cluster
-      mutate(energy_cluster = cluster_type) 
-  }
-  ) %>%
-    bind_rows()
-  
-  # give a variable name to the created data
-  assign(paste(met, loc, cluster_type, 'rep_data_time_hourly_pdf', sep = '_'),
-         rep_data,
-         envir = .GlobalEnv)
-}
-)
+# loc <- 'pooled'
+# lapply(clust, function(cluster_type) {
+#   
+#   rep_data <-  lapply(homes_all, function(x_home) {
+#     
+#     start_date <- pick.start(x_home, cluster_type)
+#     end_date <- pick.end(x_home, cluster_type)
+#     sample_min <- pick.sample.min(met)
+#     sample_max <- if_else(
+#       as.numeric(as.Date(end_date) - as.Date(start_date))>=28,
+#       28,
+#       as.numeric(as.Date(end_date) - as.Date(start_date))
+#     )
+#     
+#     entropy.table.hourly(
+#       x_home, metric = met,
+#       date_ranges_entire = list(c(start_date,
+#                                   end_date)),
+#       tested_sample_sequence =
+#         c(c(1:7), 9, seq(11,27,4)),
+#       location_type = loc,
+#         overlap = overlap_choice,
+#       all_time = all_time_choice) %>%
+#       
+#       # add in column for energy_cluster
+#       mutate(energy_cluster = cluster_type) 
+#   }
+#   ) %>%
+#     bind_rows()
+#   
+#   # give a variable name to the created data
+#   assign(paste(met, loc, cluster_type, 'rep_data_time_hourly_pdf', sep = '_'),
+#          rep_data,
+#          envir = .GlobalEnv)
+# }
+# )
 
 met <- 'voc'
  
@@ -953,7 +957,7 @@ lapply(clust, function(cluster_type) {
       date_ranges_entire = list(c(start_date,
                                   end_date)),
       tested_sample_sequence =
-        c(c(1:7), 9, seq(11,27,4)),
+        c(c(1:7), 10, 12, 14,17,21,24,28),
       location_type = loc,
         overlap = overlap_choice,
       all_time = all_time_choice) %>%
@@ -990,7 +994,7 @@ lapply(clust, function(cluster_type) {
       date_ranges_entire = list(c(start_date,
                                   end_date)),
       tested_sample_sequence =
-        c(c(1:7), 9, seq(11,27,4)),
+        c(c(1:7), 10, 12, 14,17,21,24,28),
       location_type = loc,
         overlap = overlap_choice,
       all_time = all_time_choice) %>%
@@ -1027,7 +1031,7 @@ lapply(clust, function(cluster_type) {
       date_ranges_entire = list(c(start_date,
                                   end_date)),
       tested_sample_sequence =
-        c(c(1:7), 9, seq(11,27,4)),
+        c(c(1:7), 10, 12, 14,17,21,24,28),
       location_type = loc,
         overlap = overlap_choice,
       all_time = all_time_choice) %>%
@@ -1055,9 +1059,9 @@ entropy_time_hourly_pdf_df <- bind_rows(
   pm25_bedroom_ac_rep_data_time_hourly_pdf,
   pm25_living_ac_rep_data_time_hourly_pdf,
   pm25_kitchen_ac_rep_data_time_hourly_pdf,
-pm25_bedroom_all_rep_data_time_hourly_pdf,
-  pm25_living_all_rep_data_time_hourly_pdf,
-  pm25_kitchen_all_rep_data_time_hourly_pdf,
+# pm25_bedroom_all_rep_data_time_hourly_pdf,
+#   pm25_living_all_rep_data_time_hourly_pdf,
+#   pm25_kitchen_all_rep_data_time_hourly_pdf,
 voc_bedroom_heat_rep_data_time_hourly_pdf,
   voc_living_heat_rep_data_time_hourly_pdf,
   voc_kitchen_heat_rep_data_time_hourly_pdf,
@@ -1066,10 +1070,10 @@ voc_bedroom_heat_rep_data_time_hourly_pdf,
   voc_kitchen_shoulder_rep_data_time_hourly_pdf,
   voc_bedroom_ac_rep_data_time_hourly_pdf,
   voc_living_ac_rep_data_time_hourly_pdf,
-  voc_kitchen_ac_rep_data_time_hourly_pdf,
-  voc_bedroom_all_rep_data_time_hourly_pdf,
-  voc_living_all_rep_data_time_hourly_pdf,
-  voc_kitchen_all_rep_data_time_hourly_pdf
+  voc_kitchen_ac_rep_data_time_hourly_pdf
+  # voc_bedroom_all_rep_data_time_hourly_pdf,
+  # voc_living_all_rep_data_time_hourly_pdf,
+  # voc_kitchen_all_rep_data_time_hourly_pdf
 )
 
 # # if did months
