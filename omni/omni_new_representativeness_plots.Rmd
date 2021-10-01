@@ -268,8 +268,6 @@ entropy_df_clean <- entropy_df%>%
     energy_cluster %in% clusters_all,
     !is.na(kld), # with insufficient data in cluster/year/no cluster
   n_samp_avail >= frac_samp_required) %>% # with less than certain percentage of available samples
-# omit home 011 in shoulder season for severe lack of data
-  filter(!(home =='011' & location == 'bedroom' & energy_cluster == 'shoulder')) %>%
     mutate(
       median_diff_pct = (median_sample - median_entire)/median_entire*100,
       # mean_diff_pct = (mean_sample - mean_entire)/mean_entire*100,
@@ -416,60 +414,6 @@ ggplot(entropy_time, aes(x = sample_length, group = sample_length,
 ```
 
 
-
-```{r, fig.height=3, fig.width = 8}
-
-
-met <- 'pm25'
-
-map(c('pm25', 'voc'), function(x_metric){
-a <- entropy_time %>% filter(sample_length %in% c(3,7,15) &
-                               !is.na(rep) &
-                               metric == x_metric)
-
-  lvls <- levels(as.factor(a$sample_length))
-  n <- by(a, a$sample_length, function(x) sum(x$rep))
-  
-  above1 <- by(a, a$sample_length, function(x) {
-    (sum(x$rep >thresh_vector[1])/length(x$rep)*100) %>%
-      signif(2)
-  }
-  )
-  
-  above2 <- by(a, a$sample_length, function(x) {
-    (sum(x$rep >thresh_vector[2])/length(x$rep)*100) %>%
-      signif(2)
-  }
-  )
-  
-  labels <- paste0(lvls,", n=",as.integer(n),", ", above1, "%>",
-                   thresh_vector[1], ',  ',above2, "%>",thresh_vector[2])
-  
-  
-ggplot(a)+
-  geom_density(aes(x = rep, fill = as.factor(sample_length)), alpha = 0.3)+
-  # geom_text(aes(label = (ext_outlier_n*100) %>% signif(2)),
-  #           y = 0.75, size = xsmall)+
-  facet_wrap(vars(metric))+
-  geom_vline(xintercept = thresh_vector, linetype = 'dashed')+
-  xlab('Time-Structured Representativeness')+
-  ggtitle('Samples from all homes, rooms, and seasons pooled')+
-      labs(fill = 'Length of Sample, days')+
-    theme_classic()+
-    theme(
-      axis.text.y = element_blank(),
-      axis.ticks.y = element_blank()
-    )+
-    scale_fill_manual( values = length_colors,
-                       labels=labels)+
-  ylab('Amount of Samples')+
-  coord_cartesian(xlim = c(0,1))
-}
-)
-```
-
-
-
 ### One Home
 
 * find home with most data
@@ -572,6 +516,59 @@ ggplot(a, aes(x = sample_length, group = sample_length,
 ```
 
 
+
+## Rep Density Plots
+```{r, fig.height=3, fig.width = 8}
+
+
+map(c('pm25', 'voc'), function(x_metric){
+a <- entropy_time %>% filter(sample_length %in% c(1,3,7,14) &
+                               !is.na(rep) &
+                               metric == x_metric)
+
+  lvls <- levels(as.factor(a$sample_length))
+  n <- by(a, a$sample_length, function(x) sum(x$rep))
+  
+  above1 <- by(a, a$sample_length, function(x) {
+    (sum(x$rep >thresh_vector[1])/length(x$rep)*100) %>%
+      signif(2)
+  }
+  )
+  
+  above2 <- by(a, a$sample_length, function(x) {
+    (sum(x$rep >thresh_vector[2])/length(x$rep)*100) %>%
+      signif(2)
+  }
+  )
+  
+  labels <- paste0(lvls,", n=",as.integer(n),", ", above1, "%>",
+                   thresh_vector[1], ',  ',above2, "%>",thresh_vector[2])
+  
+  
+ggplot(a)+
+  geom_density(aes(x = rep, fill = as.factor(sample_length)), alpha = 0.3)+
+  # geom_text(aes(label = (ext_outlier_n*100) %>% signif(2)),
+  #           y = 0.75, size = xsmall)+
+  facet_wrap(vars(metric))+
+  geom_vline(xintercept = thresh_vector, linetype = 'dashed')+
+  xlab('Time-Structured Representativeness')+
+  ggtitle('Samples from all homes, rooms, and seasons pooled')+
+      labs(fill = 'Length of Sample, days')+
+    theme_classic()+
+    theme(
+      axis.text.y = element_blank(),
+      axis.ticks.y = element_blank()
+    )+
+    scale_fill_manual( values = length_colors,
+                       labels=labels)+
+  ylab('Amount of Samples')+
+  coord_cartesian(xlim = c(0,1))
+}
+)
+```
+
+
+
 ## Comparison of Diurnal Trends of Samples to those of Long-Term Period
 ```{r}
 # variables for testing---------------
@@ -588,7 +585,7 @@ ggplot(a, aes(x = sample_length, group = sample_length,
 
 # function-----------------
 diurn.rep.plot <- function(data, x_home, x_location, x_energy_cluster, x_metric,
-         sample_lengths = c(3,7,15)){
+         sample_lengths = c(3,7,14)){
   
   data_condition <- data %>%
     filter(home == x_home, location == x_location,
@@ -633,12 +630,13 @@ diurn.rep.plot <- function(data, x_home, x_location, x_energy_cluster, x_metric,
   }
   )
   
+
   # combine data from samples and entire data set
   all_data <-
   map(samples, function(x_samples){
     tibble(
       hour = c(0:23),
-    mean = x_samples[['data']][['sample_data']][['sample_data']],
+    mean = x_samples[['data']][['sample_data']][['sample_means']],
     sample_length = rep(x_samples[['sample_length']], 24) %>% as.character()
     )
     
@@ -709,7 +707,7 @@ diurn.rep.plot <- function(data, x_home, x_location, x_energy_cluster, x_metric,
 
 
 * pick homes, seasons, (and rooms if not pooled)
-```{r}
+```{r, fig.height=3, fig.width = 7}
 
 if(pooled_rooms == TRUE) {
   map(c('pm25', 'voc'), function(y_metric){
@@ -756,8 +754,13 @@ if(pooled_rooms == TRUE) {
 # diurn.rep.plot(entropy_time, '012', 'pooled', 'heat', 'pm25')
 # 
 # 
-# # not pooled rooms
-# diurn.rep.plot(entropy_time, '009', 'bedroom', 'heat', 'pm25')
+# not pooled rooms
+diurn.rep.plot(entropy_time, '009', 'living', 'heat', 'pm25')
+diurn.rep.plot(entropy_time, '009', 'living', 'heat', 'voc')
+
+diurn.rep.plot(entropy_time, '009', 'living', 'heat', 'pm25', c(1,3,7))
+diurn.rep.plot(entropy_time, '009', 'living', 'heat', 'voc', c(1,3,7))
+
 # diurn.rep.plot(entropy_time, '009', 'kitchen', 'heat', 'pm25')
 # diurn.rep.plot(entropy_time, '009', 'bedroom', 'heat', 'pm25')
 # 
