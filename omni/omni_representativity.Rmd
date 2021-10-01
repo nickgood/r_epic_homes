@@ -47,8 +47,15 @@ library(ggpubr) # for tesing log-normality
 
 ```
 
-```{r import_omni_hourly_data, eval = TRUE}
-omni_hourly_data<- read_rds('./csv_created/omni_hourly_calibrated.rds')
+```{r import_omni_hourly, eval = TRUE}
+omni_hourly<- read_rds('./csv_created/omni_hourly_calibrated.rds')
+
+```
+
+
+```{r censor_date}
+omni_hourly <- omni_hourly %>% filter(datehour<ymd_hms('2021-06-01 00:00:00'))
+
 
 ```
 
@@ -106,7 +113,7 @@ labeller.metrics <- as_labeller(c('pm25'='PM[2.5]', 'voc'="TVOC"),
                            default = label_parsed)
 
 # make function to label season names
-labeller.clusters <- as_labeller(c('ac'='AC', 'heat'="Heat",
+labeller.clusters <- as_labeller(c('ac'='Summer', 'heat'="Winter",
                                   'shoulder' ='Shoulder'),
                            default = label_parsed)
 
@@ -147,7 +154,7 @@ energy_colors <- c(cbbPalette['light_blue'],
                    cbbPalette['dark_orange'])%>% unname()
 energy_shapes <- c(15, 16, 17)
 energy_breaks <- c('ac', 'shoulder', 'heat')
-energy_labels <- c('AC', 'Shoulder', 'Heat')
+energy_labels <- c('Summer', 'Shoulder', 'Winter')
 
 ```
 
@@ -159,7 +166,7 @@ energy_labels <- c('AC', 'Shoulder', 'Heat')
 
 # date_ranges_entire <- list(c('2020-08-26', '2020-12-01'))
 # home_num <- '011'
-# data <- omni_hourly_data
+# data <- omni_hourly
 # monitor_season <- date_ranges_entire[1]
 # metric <- 'voc'
 # all_time <- TRUE
@@ -208,7 +215,7 @@ info.gain.table <- function(
   sample_length, # sampling period lengths (days)
 season_avail_limit = 0, # only use data from a sensor if it has at least this fraction of data available (0 means no periods are omitted if they have any data)
 all_time = TRUE, # if TRUE, compare each short sampling period to entire monitoring year of home
-data = omni_hourly_data) {
+data = omni_hourly) {
   
   output <<- na.result(NA) # clear error output in case it was triggered previously
   warn <<- 'none'# clear warning output in case it was triggered previously
@@ -679,6 +686,55 @@ rank.table('voc')
 
 ```
 
+
+# rank line plot
+```{r , fig.height = 3.5, fig.width = 8}
+
+rank.line <- function (x_metric){
+  
+a <- represent_df %>%
+  filter(metric == x_metric) %>%
+  group_by(home, energy_cluster, metric) %>%
+  mutate(rank = rank(represent) %>% as.factor()) %>%
+  ungroup() 
+
+ggplot(a, (aes(x = home, y = rank, group = location)))+
+  geom_line(aes(color = location), size = 1.5)+
+  facet_wrap(vars(energy_cluster), labeller = labeller.clusters,
+             scales = 'free_x')+
+  theme_minimal()+
+  theme(panel.grid = element_blank())+
+  scale_y_discrete(breaks = c('1','2','3'),
+                   labels = c('Lowest', '', 'Highest'))+
+  ylab('Representativeness Rank')+
+  xlab('Home')+
+  geom_vline(
+    xintercept = seq(1.5,length(a %>% pull(home)%>%as.factor%>% levels)-0.5, 1),
+    color = 'grey')+
+  ggtitle(x_metric)+
+  theme(plot.title = element_text(hjust = 0.5))
+}
+
+rank.line('pm25')
+rank.line('voc')
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ```{r original_osses_method}
 
 # # calculate kld for continuous probability distributions
@@ -687,7 +743,7 @@ rank.table('voc')
 # 
 # # date_ranges_entire <- list(c('2020-08-26', '2020-12-01'))
 # # home_num <- '011'
-# # data <- omni_hourly_data
+# # data <- omni_hourly
 # # monitor_season <- date_ranges_entire[1]
 # # metric <- 'voc'
 # # all_time <- TRUE
@@ -736,7 +792,7 @@ rank.table('voc')
 #   sample_length, # sampling period lengths (days)
 # season_avail_limit = 0, # only use data from a sensor if it has at least this fraction of data available (0 means no periods are omitted if they have any data)
 # all_time = TRUE, # if TRUE, compare each short sampling period to entire monitoring year of home
-# data = omni_hourly_data) {
+# data = omni_hourly) {
 #   
 #   output <<- na.result(NA) # clear error output in case it was triggered previously
 #   warn <<- 'none'# clear warning output in case it was triggered previously
