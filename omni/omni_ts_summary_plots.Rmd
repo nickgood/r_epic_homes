@@ -43,7 +43,7 @@ home_type_df <- read_csv('../sense/csv_created_sense/home_type_df.csv')
 
 # only use data up to June 2021
 ```{r censor_date}
-omni_hourly <- omni_hourly %>% filter(datehour<ymd_hms('2021-06-01 00:00:00'))
+omni_hourly <- omni_hourly %>% filter(datetime<ymd_hms('2021-06-01 00:00:00'))
 
 
 ```
@@ -1017,89 +1017,89 @@ plot.weekday('temp', data = a)
 
 
 
-# Monthly
+# Monthly 
 
-## one room
+## one room (old method)
 
 ```{r monthly, eval = FALSE}
 
 
 
-rms <- c('living', 'outdoor')
-
-
-##### Boxplots
-
-# PM2.5
-
-  
-metric <- 'pm25'
-
-
-a <- omni_hourly %>%
-  filter(location %in% rms) %>%
-  mutate(month = lubridate::month(datetime, label = TRUE)) %>%
-  group_by(month, location) %>%
-  mutate(outlier = get(metric) > median(get(metric), na.rm = TRUE) +
-           IQR(get(metric), na.rm = TRUE) * 1.5) %>%
-  ungroup()
-
-
- plotpm <- ggplot(a, aes(x = month, y = get(metric)))+
-    geom_boxplot(outlier.shape = NA)+ # don't plot outliers at first
-    labs(y = expression('PM'["2.5"]*'(ug/m'^3*')'),
-         x = "Month",
-         title = paste("PM in Homes"))+
-   facet_wrap(~location)+
-    theme_bw()+
-    coord_cartesian(ylim = c(0, 60))+
-    theme(plot.title = element_text(hjust = 0.5),
-          title = element_text(size = medium),
-          axis.text = element_text(size = small),
-          strip.text = element_text( size = medium),
-          axis.title = element_text(size = medium))+
-   geom_point(data = function(x) filter_(x, ~ outlier),
-              position = 'jitter', size = 1) # Outliers
-
- 
- plotpm
- 
- 
- 
-##VOC
-
-   
- metric <- 'voc'
-  
-a <- hourly %>%
-  filter(location %in% rms) %>%
-  mutate(month = lubridate::month(datetime, label = TRUE)) %>%
-  group_by(month, location) %>%
-  mutate(outlier = get(metric) > median(get(metric), na.rm = TRUE) +
-           IQR(get(metric), na.rm = TRUE) * 1.5) %>%
-  ungroup()
- 
-   
-   plotvoc <- ggplot(a, aes(x = month, y = get(metric)))+
-    geom_boxplot(outlier.shape = NA)+ # don't plot outliers at first
-    labs(y = 'TVOC (ppb)',
-         x = "Month",
-         title = paste("TVOCs in Homes"))+
-    coord_cartesian(ylim = c(0, 1200))+
-        facet_wrap(~location)+
-    theme_bw()+
-    theme(plot.title = element_text(hjust = 0.5),
-          title = element_text(size = medium),
-          axis.text = element_text(size = small),
-          strip.text = element_text( size = medium),
-          axis.title = element_text(size = medium))+
-   geom_point(data = function(x) filter_(x, ~ outlier),
-              position = 'jitter', size = 1) # Outliers  
-
-   
-   
-
-plotvoc
+# rms <- c('living', 'outdoor')
+# 
+# 
+# ##### Boxplots
+# 
+# # PM2.5
+# 
+#   
+# metric <- 'pm25'
+# 
+# 
+# a <- omni_hourly %>%
+#   filter(location %in% rms) %>%
+#   mutate(month = lubridate::month(datetime, label = TRUE)) %>%
+#   group_by(month, location) %>%
+#   mutate(outlier = get(metric) > median(get(metric), na.rm = TRUE) +
+#            IQR(get(metric), na.rm = TRUE) * 1.5) %>%
+#   ungroup()
+# 
+# 
+#  plotpm <- ggplot(a, aes(x = month, y = get(metric)))+
+#     geom_boxplot(outlier.shape = NA)+ # don't plot outliers at first
+#     labs(y = expression('PM'["2.5"]*'(ug/m'^3*')'),
+#          x = "Month",
+#          title = paste("PM in Homes"))+
+#    facet_wrap(~location)+
+#     theme_bw()+
+#     coord_cartesian(ylim = c(0, 60))+
+#     theme(plot.title = element_text(hjust = 0.5),
+#           title = element_text(size = medium),
+#           axis.text = element_text(size = small),
+#           strip.text = element_text( size = medium),
+#           axis.title = element_text(size = medium))+
+#    geom_point(data = function(x) filter_(x, ~ outlier),
+#               position = 'jitter', size = 1) # Outliers
+# 
+#  
+#  plotpm
+#  
+#  
+#  
+# ##VOC
+# 
+#    
+#  metric <- 'voc'
+#   
+# a <- hourly %>%
+#   filter(location %in% rms) %>%
+#   mutate(month = lubridate::month(datetime, label = TRUE)) %>%
+#   group_by(month, location) %>%
+#   mutate(outlier = get(metric) > median(get(metric), na.rm = TRUE) +
+#            IQR(get(metric), na.rm = TRUE) * 1.5) %>%
+#   ungroup()
+#  
+#    
+#    plotvoc <- ggplot(a, aes(x = month, y = get(metric)))+
+#     geom_boxplot(outlier.shape = NA)+ # don't plot outliers at first
+#     labs(y = 'TVOC (ppb)',
+#          x = "Month",
+#          title = paste("TVOCs in Homes"))+
+#     coord_cartesian(ylim = c(0, 1200))+
+#         facet_wrap(~location)+
+#     theme_bw()+
+#     theme(plot.title = element_text(hjust = 0.5),
+#           title = element_text(size = medium),
+#           axis.text = element_text(size = small),
+#           strip.text = element_text( size = medium),
+#           axis.title = element_text(size = medium))+
+#    geom_point(data = function(x) filter_(x, ~ outlier),
+#               position = 'jitter', size = 1) # Outliers  
+# 
+#    
+#    
+# 
+# plotvoc
 
 
 
@@ -1108,7 +1108,7 @@ plotvoc
 
 ## By Home
 
-```{r monthly_new_method, fig.height=2.5, fig.width = 12}
+```{r function_monthly_new_method}
 
 
 
@@ -1144,14 +1144,12 @@ plotvoc
     #                 ymin = get(paste0(metric, '_low.val')), fill = home),
     #             alpha = 0.2, color = NA)+
     labs(y = paste('Average', metric),
-         x = "Month",
-         title = 'Monthly')+
-       scale_x_date("Date",
-                    breaks = c(seq(from=as.Date("2020-07-01"),to=as.Date("2021-07-01"),by="month")),
+         x = "Month")+
+       scale_x_date(
+                    breaks = c(seq(from=as.Date("2020-07-01"),to=as.Date("2021-06-01"),by="month")),
                labels = c(
-                 sapply(month.abb[c(1:12)],
-                                       substr, start = 1, stop = 1) %>% unname(),
-                 'J'))+ 
+                 sapply(month.abb[c(7:12,1:6)],
+                                       substr, start = 1, stop = 1) %>% unname()))+ 
        scale_color_discrete(name = 'Home')+
     theme_bw()+
     theme(plot.title = element_blank(),
@@ -1172,18 +1170,20 @@ plotvoc
           strip.background =element_blank())
       }
       
-      a <- time.table(omni_hourly, 'month', groupers = c('home','location'))%>%
-  filter(home %in% homes_no5) %>% mutate(month = as.Date(month))
-      
-
-plot.monthly('pm25', data = a)
-plot.monthly('voc', data = a)
-plot.monthly('co2', data = a)
-plot.monthly('temp', data = a)     
       
 ```
 
 
+```{r plot_monthly_new_method, fig.height=2.5, fig.width = 12 }
+
+      a <- time.table(omni_hourly, 'month', groupers = c('home','location'))%>%
+  filter(home %in% homes_no5) %>% mutate(month = as.Date(month))
+
+plot.monthly('pm25', data = a)
+plot.monthly('voc', data = a)
+plot.monthly('co2', data = a)
+plot.monthly('temp', data = a) 
+```
 
 
 
