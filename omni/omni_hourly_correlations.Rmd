@@ -806,7 +806,10 @@ lapply(metrics_all, function(x_metric){
     rm_pairs <- rms_garage
     
     # make plot grid and save for all metrics
-lapply(c('pm25', 'voc'), function(x_metric){
+lapply(c(
+  'pm25',
+  'voc'
+  ), function(x_metric){
    
        room.plot.grid(
     hms = homes_no5,
