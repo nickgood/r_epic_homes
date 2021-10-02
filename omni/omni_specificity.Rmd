@@ -157,7 +157,13 @@ energy_shapes <- c(15, 16, 17)
 energy_breaks <- c('ac', 'shoulder', 'heat')
 energy_labels <- c('Summer', 'Shoulder', 'Winter')
 
+# define colors for room-comparisons
+room_colors <- c(cbbPalette['green'],
+                   cbbPalette['purple'],
+                   cbbPalette['light_orange']
+                   )%>% unname()
 
+room_breaks <- locations_indoor
 ```
 
 ```{r function_mutual_info_master}
@@ -695,7 +701,11 @@ ggplot(a, (aes(x = home, y = rank, group = location)))+
     xintercept = seq(1.5,length(a %>% pull(home)%>%as.factor%>% levels)-0.5, 1),
     color = 'grey')+
   ggtitle(x_metric)+
-  theme(plot.title = element_text(hjust = 0.5))
+  theme(plot.title = element_text(hjust = 0.5))+
+  scale_color_manual(
+    values = room_colors,
+    breaks = room_breaks
+  )
 }
 
 rank.line('pm25')
