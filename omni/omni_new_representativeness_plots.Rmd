@@ -110,7 +110,7 @@ homes_no5 <- home.list(c(1:4,6:16))
 locations_indoor <- c('living', 'kitchen', 'bedroom')
 metrics_all <- c('pm25', 'voc')
 # sequence of representative thresholds to test
-thresh_vector <- c(0.75, 0.9)
+thresh_vector <- c(0.8, 0.9)
 
 # sequence of days to test thresholds for entropy values
 sample_days <- c(1,3,5,7,14)
@@ -572,6 +572,7 @@ ggplot(a)+
 
 ### faceted by season
 
+*Group 3 homes only
 ```{r, fig.height=11, fig.width = 8}
 
 # see post on methodology 
@@ -582,7 +583,8 @@ map(c('pm25', 'voc'), function(x_metric){
   
 a <- entropy_time %>% filter(sample_length %in% c(1,3,7,14) &
                                !is.na(rep) &
-                               metric == x_metric)
+                               metric == x_metric & 
+                               home %in% homes_tier3)
 
 # make a column with the label, so this can be used for the legend
 a <- a %>%
@@ -624,7 +626,7 @@ p1 <- ggplot(a[['ac']])+
   facet_wrap(vars(energy_cluster))+
   geom_vline(xintercept = thresh_vector, linetype = 'dashed')+
   xlab('Time-Structured Representativeness')+
-  ggtitle(paste0(x_metric, ': Samples from all homes and rooms pooled'))+
+  ggtitle(paste0(x_metric, ': Samples from GROUP 3 homes and rooms pooled'))+
       labs(fill = 'Length of Sample, days')+
     theme_classic()+
     theme(
@@ -647,6 +649,7 @@ grid.arrange(p1,p2,p3)
 })
  
 ```
+
 
 
 ## Comparison of Diurnal Trends of Samples to those of Long-Term Period
