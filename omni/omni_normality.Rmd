@@ -1,0 +1,464 @@
+---
+title: "Representativity"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: paper
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.path = 'figures/',
+  warning = FALSE,
+  message = FALSE,
+  echo = FALSE,
+  fig.width = 10, fig.height = 3,
+  cache = FALSE)
+```
+
+```{r libraries, include=FALSE}
+library(dplyr)
+library(purrr)
+library(tidyr)
+library(openair)
+library(ggplot2)
+library(readr)
+library(googlesheets4)
+library(lubridate)
+library(gridExtra)
+library(runner) # for moving window functions
+library(ggpubr) # for tesing log-normality
+# library(cubature) # for alternative method of integrating kld function
+# library(entropy) # for KLD function
+# library(fitdistrplus) # for fitting distribution to data NOTE, MASS::select CONFLICTS WITH dplyr::select
+
+```
+
+
+```{r import_omni_hourly, eval = TRUE}
+omni_hourly<- read_rds('./csv_created/omni_hourly_calibrated.rds')
+
+```
+
+
+```{r censor_date}
+omni_hourly <- omni_hourly %>% filter(datehour<ymd_hms('2021-06-01 00:00:00'))
+
+
+```
+
+```{r import_energy_cluster_homes}
+# import energy cluster dataframe for all homes
+energy_cluster_df <- read_csv('../sense/csv_created_sense/energy_cluster_df.csv')
+```
+
+```{r functions_misc}
+
+#Function to only display 3 significant figures (for tables)
+signif3 <- function(x){
+  signif(x, digits = 3)
+}
+
+##Define a char vector of home numbers using a number vector,
+##ex: x <- home.list(c(1:15)) for homes 1-15
+threedig <- function(x) {
+  if (nchar(x) == 1) {a <- paste0('00', x)
+  return(a)
+  }
+  
+  if (nchar(x) == 2) {a<- paste0('0', x)
+  return(a)
+  }
+  else return(a)
+}
+
+home.list <- function(x) sapply(x, threedig)
+
+
+# give a row of NA values with identifers to help with identifying
+# causes of errors in function
+na.result <- function(error, location = NA, season = NA, n_data_avail = NA) {
+  tibble(
+  'info_gain' = NA,
+  'location' = location, # sample_length,
+  'monitor_season' = season, # period_label,
+  'n_data_avail' = n_data_avail,
+  'error' = error,
+  'warn' = warn # return warning if triggered
+)
+}
+
+# make function to label metric names with subscripts
+labeller.metrics <- as_labeller(c('pm25'='PM[2.5]', 'voc'="TVOC"),
+                           default = label_parsed)
+
+# make function to label season names
+labeller.clusters <- as_labeller(c('ac'='Summer', 'heat'="Winter",
+                                  'shoulder' ='Shoulder'),
+                           default = label_parsed)
+
+
+
+```
+
+
+```{r define_variables}
+
+# list of all home numbers
+homes_no5 <- home.list(c(1:4, 6:16))
+
+clusters_all <- c('heat','shoulder', 'ac')
+locations_indoor <- c('living', 'kitchen', 'bedroom')
+metrics_all <- c('pm25', 'voc', 'co2')
+
+# sequence of representative thresholds to test
+threshold_seq <- c(0.1, 0.2, 0.3)
+
+# sequence of days to test thresholds for shape entropy values
+
+pdf_days <- c(3,7,10,14,21)
+
+warn <- 'none'
+
+# color blind pallette
+# check http://www.cookbook-r.com/Graphs/Colors_(ggplot2)/#a-colorblind-friendly-palette
+cbbPalette <- c('black' = "#000000",
+                'light_orange' = "#E69F00",
+                'light_blue' = "#56B4E9",
+                'green' = "#009E73",
+                'yellow' = "#F0E442",
+                'dark_blue' = "#0072B2",
+                'dark_orange' = "#D55E00",
+                'purple' = "#CC79A7"
+                )
+# define colors for energy clusters
+energy_colors <- c(cbbPalette['light_blue'],
+                   cbbPalette['green'],
+                   cbbPalette['dark_orange'])%>% unname()
+energy_shapes <- c(15, 16, 17)
+energy_breaks <- c('ac', 'shoulder', 'heat')
+energy_labels <- c('Summer', 'Shoulder', 'Winter')
+
+# define colors for room-comparisons
+room_colors <- c(cbbPalette['green'],
+                   cbbPalette['purple'],
+                   cbbPalette['light_orange']
+                   )%>% unname()
+
+room_breaks <- locations_indoor
+
+```
+
+
+
+```{r add_season_column}
+
+# Add continuous season date column to data
+
+
+# make functions to look up starting and ending date of
+# energy cluster period based on home
+ pick.start <- function(x_home, x_cluster) {
+   energy_cluster_df %>%
+   filter(home == x_home & cluster_type == x_cluster) %>%
+   pull(start_date) %>% as.character()
+ }
+ 
+  pick.end <- function(x_home, x_cluster) {
+   energy_cluster_df %>%
+   filter(home == x_home & cluster_type == x_cluster) %>%
+   pull(end_date) %>% as.character()
+  }
+  
+
+# x_home <- '009'
+# x_location <- 'living'
+# x_cluster <- 'shoulder'
+#   
+# rm(x_home, x_location, x_cluster)
+
+hourly_season <-
+  map(homes_no5, function(x_home){
+    map(locations_indoor, function(x_location){
+      map(clusters_all, function(x_cluster){
+        omni_hourly %>%
+          filter(
+            home == x_home& location == x_location&
+              datehour >= ymd(pick.start(x_home, x_cluster)) &
+              datehour <= ymd(pick.end(x_home, x_cluster))) %>%
+          mutate(season = x_cluster)
+      }) %>% bind_rows()
+    }) %>% bind_rows()
+  }) %>% bind_rows()
+
+```
+
+
+```{r}
+# test for normality for each location in one home for one metric
+qqplotter <- function(hm, met,  seas, log.trans = TRUE, resolution = 'hour', 
+                      censored = FALSE){
+  
+  data <- if(censored == FALSE) {
+    if(resolution == '5min') omni_data else
+      if(resolution == 'hour') hourly_season else
+        if(resolution == 'day') omni_daily_data
+    
+  } else if(censored == TRUE) {
+    if(resolution == '5min') omni_censor_high else
+      if(resolution == 'hour') omni_hourly_censor_high else
+        if(resolution == 'day') omni_daily_censor_high
+  }
+  
+  if(met %in% c('pm25', 'voc')) {
+    # define LOD of metric to be 1/2 minimum detected (non-zero) value
+    LOD <- data %>%
+      filter(!!sym(met)!=0) %>%
+      pull(all_of(met))%>%
+      min()
+    
+    # change all zero values to LOD/2
+    data <- data %>%
+        mutate_at(all_of(met), function(x) ifelse(x==0, LOD/2, x))
+  }
+  
+
+  
+  # create df of one metric for indoor rooms
+  data <- data %>%
+      select(home, location, all_of(met), season) %>%
+  filter(home == hm & location %in% locations_indoor) %>%
+    filter(!is.na(met)) %>%
+    mutate(value = if(log.trans == TRUE) {log(get(met))} else get(met))
+
+# filter only data from given season
+  data <- data %>%
+    filter(season == seas)
+  
+  if(nrow(data)==0) NULL else{
+  
+# Create a QQ plot of values by location
+ggqqplot(data, 'value', facet.by = 'location',
+                   title = paste('Home', hm, met, seas,
+                                 if(log.trans == TRUE) {
+                     'log-transformed'} else 'raw data')
+)}
+}
+
+# # test for one home, location, season
+# qqplotter('009', 'pm25', 'ac')
+```
+
+## test normaility for all homes
+
+```{r}
+    map(metrics_all, function(x_metric){
+       map(homes_no5, function(x_home){
+ map(clusters_all, function(x_season){
+        qqplotter(x_home, x_metric, x_season)
+      })
+    }) 
+  })
+    
+```
+
+
+## test other distributions
+
+```{r}
+
+# test for normality for each location in one home for one metric
+distribution.compare <- function(hm, met, seas, resolution = 'hour'){
+  
+  data <- if(resolution == '5min') omni_data else
+    if(resolution == 'hour') hourly_season else
+    if(resolution == 'day') omni_daily_data
+  
+  if(met %in% c('pm25', 'voc')) {
+    # define LOD of metric to be 1/2 minimum detected (non-zero) value
+    LOD <- data %>%
+      filter(!!sym(met)!=0) %>%
+      pull(all_of(met))%>%
+      min()
+    
+    # change all zero values to LOD/2
+    data <- data %>%
+        mutate_at(all_of(met), function(x) ifelse(x==0, LOD/2, x))
+  }
+
+  
+  # create df of one metric for indoor rooms
+  data_metric <- data %>%
+      select(home, location, all_of(met)) %>%
+  filter(home == hm & location %in% locations_indoor) %>%
+    filter(!is.na(met))
+
+  # filter only data from given season
+  data <- data %>%
+    filter(season == seas)
+  
+  rooms_avail <- levels(data_metric %>% pull(location) %>% as.factor())
+
+  
+  map(rooms_avail, function(room) {
+    
+  a <- data_metric %>% filter(location ==room)
+    
+   fit_log_aic <- (fitdistrplus::fitdist(pull(a, met),
+                                        "lnorm", method = 'mle') %>%
+                     suppressWarnings()%>%
+                     tryCatch(error = function(e) list('aic' = NA)))$aic
+
+    
+        fit_weib_aic <- (fitdistrplus::fitdist(pull(a, met),
+                                        "weibull", method = 'mle')%>%
+                     suppressWarnings()%>%
+                     tryCatch(error = function(e) list('aic' = NA)))$aic
+        
+    fit_gam_aic <- (fitdistrplus::fitdist(pull(a, met),
+                                        "gamma", method = 'mle')%>%
+                     suppressWarnings()%>%
+                     tryCatch(error = function(e) list('aic' = NA)))$aic
+    
+    
+
+   list(
+     'log' = fit_log_aic,
+     'weib' = fit_weib_aic,
+     'gam' = fit_gam_aic,
+     'home' = hm,
+     'location' = room,
+     'season' = seas)
+   
+                }# end of map function
+) %>%
+  bind_rows()
+}
+
+# test 
+# test <- distribution.compare('009', 'pm25', 'ac')
+
+```
+
+
+```{r}
+res <- 'hour'
+# pm25------------
+
+met <- 'pm25'
+
+
+ dist_compare_df <- map(clusters_all, function(x_season){
+ 
+   map(homes_no5, function (x_home){
+     distribution.compare(x_home, met, x_season)
+  }) %>% bind_rows()
+     }) %>% bind_rows() %>%
+  mutate( condition = paste(location, home, sep = '_')) %>%
+  pivot_longer(cols = c(log, weib, gam), names_to = 'dist_type',
+               values_to = 'aic') %>%
+  group_by(condition) %>%
+  mutate(min = min(aic)) %>%
+  mutate(min = ifelse(min ==aic, TRUE, FALSE)) %>%
+  ungroup()
+
+# plot the aic of different distribution fits for each sensor
+ ggplot(dist_compare_df, aes(x = condition, y = aic, fill = dist_type, alpha = min))+
+  geom_col(position = 'dodge')+
+  scale_alpha_manual(values = c(1, 0.2),
+                     breaks = c(TRUE, FALSE))+
+  ggtitle(paste('AIC Value, Resolution =', met, res))
+
+# calculate precentages
+
+pm_df <- dist_compare_df %>%
+  filter(min == TRUE) %>%
+  group_by(dist_type) %>%
+  summarise(n_min = n()) %>%
+  mutate(
+    metric = met,
+    pct_min = n_min/sum(n_min),
+         resolution = res)
+
+# voc------------
+
+met <- 'voc'
+
+
+ dist_compare_df <- map(clusters_all, function(x_season){
+ 
+   map(homes_no5, function (x_home){
+     distribution.compare(x_home, met, x_season)
+  }) %>% bind_rows()
+     }) %>% bind_rows() %>%
+  mutate( condition = paste(location, home, sep = '_')) %>%
+  pivot_longer(cols = c(log, weib, gam), names_to = 'dist_type',
+               values_to = 'aic') %>%
+  group_by(condition) %>%
+  mutate(min = min(aic)) %>%
+  mutate(min = ifelse(min ==aic, TRUE, FALSE)) %>%
+  ungroup()
+
+# plot the aic of different distribution fits for each sensor
+ ggplot(dist_compare_df, aes(x = condition, y = aic, fill = dist_type, alpha = min))+
+  geom_col(position = 'dodge')+
+  scale_alpha_manual(values = c(1, 0.2),
+                     breaks = c(TRUE, FALSE))+
+  ggtitle(paste('AIC Value, Resolution =', met, res))
+
+# calculate precentages
+
+voc_df <- dist_compare_df %>%
+  filter(min == TRUE) %>%
+  group_by(dist_type) %>%
+  summarise(n_min = n()) %>%
+  mutate(
+    metric = met,
+    pct_min = n_min/sum(n_min),
+         resolution = res)
+
+
+
+
+
+# co2------------
+
+met <- 'co2'
+
+
+ dist_compare_df <- map(clusters_all, function(x_season){
+ 
+   map(homes_no5, function (x_home){
+     distribution.compare(x_home, met, x_season)
+  }) %>% bind_rows()
+     }) %>% bind_rows() %>%
+  mutate( condition = paste(location, home, sep = '_')) %>%
+  pivot_longer(cols = c(log, weib, gam), names_to = 'dist_type',
+               values_to = 'aic') %>%
+  group_by(condition) %>%
+  mutate(min = min(aic)) %>%
+  mutate(min = ifelse(min ==aic, TRUE, FALSE)) %>%
+  ungroup()
+
+# plot the aic of different distribution fits for each sensor
+ ggplot(dist_compare_df, aes(x = condition, y = aic, fill = dist_type, alpha = min))+
+  geom_col(position = 'dodge')+
+  scale_alpha_manual(values = c(1, 0.2),
+                     breaks = c(TRUE, FALSE))+
+  ggtitle(paste('AIC Value, Resolution =', met, res))
+
+# calculate precentages
+
+co2_df <- dist_compare_df %>%
+  filter(min == TRUE) %>%
+  group_by(dist_type) %>%
+  summarise(n_min = n()) %>%
+  mutate(
+    metric = met,
+    pct_min = n_min/sum(n_min),
+         resolution = res)
+
+bind_rows(pm_df, voc_df, co2_df)
+
+```
+
