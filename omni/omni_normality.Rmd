@@ -194,7 +194,7 @@ hourly_season <-
 ```
 
 
-```{r}
+```{r function_qqplot}
 # test for normality for each location in one home for one metric
 qqplotter <- function(hm, met,  seas, log.trans = TRUE, resolution = 'hour', 
                       censored = FALSE){
@@ -251,7 +251,119 @@ ggqqplot(data, 'value', facet.by = 'location',
 
 ## test normaility for all homes
 
-```{r}
+
+```{r function_grid_plotting}
+
+#function to put plots in a grid
+plot.grid <- function(plots, title,
+                     y_val = NULL, ncol = 4, nrow = 4) {
+  ##omit NULL values (from homes or rooms without valid data)
+  plots <- plots[!sapply(plots, is.null)]
+  
+  do.call('grid.arrange', c(plots, top = title, left = y_val,
+                            ncol = ncol, nrow = nrow))  
+  
+}
+```
+
+
+### PM 2.5
+
+```{r, fig.height=8, fig.width=10.5}
+x_metric <- 'pm25'
+
+x_season <- 'ac'
+
+plots <- map(homes_no5, function(x_home){
+        qqplotter(x_home, x_metric, x_season)
+      })
+plot.grid(plots, paste(x_metric, x_season), ncol = 3)
+  
+
+x_season <- 'shoulder'
+
+plots <- map(homes_no5, function(x_home){
+        qqplotter(x_home, x_metric, x_season)
+      })
+plot.grid(plots, paste(x_metric, x_season), ncol = 3)
+
+
+x_season <- 'heat'
+
+plots <- map(homes_no5, function(x_home){
+        qqplotter(x_home, x_metric, x_season)
+      })
+plot.grid(plots, paste(x_metric, x_season), ncol = 3)
+
+
+```
+
+### VOC
+
+```{r, fig.height=8, fig.width=10.5}
+x_metric <- 'voc'
+
+x_season <- 'ac'
+
+plots <- map(homes_no5, function(x_home){
+        qqplotter(x_home, x_metric, x_season)
+      })
+plot.grid(plots, paste(x_metric, x_season), ncol = 3)
+  
+
+x_season <- 'shoulder'
+
+plots <- map(homes_no5, function(x_home){
+        qqplotter(x_home, x_metric, x_season)
+      })
+plot.grid(plots, paste(x_metric, x_season), ncol = 3)
+
+
+x_season <- 'heat'
+
+plots <- map(homes_no5, function(x_home){
+        qqplotter(x_home, x_metric, x_season)
+      })
+plot.grid(plots, paste(x_metric, x_season), ncol = 3)
+
+
+```
+
+
+### co2
+
+```{r, fig.height=8, fig.width=10.5}
+x_metric <- 'co2'
+
+x_season <- 'ac'
+
+plots <- map(homes_no5, function(x_home){
+        qqplotter(x_home, x_metric, x_season)
+      })
+plot.grid(plots, paste(x_metric, x_season), ncol = 3)
+  
+
+x_season <- 'shoulder'
+
+plots <- map(homes_no5, function(x_home){
+        qqplotter(x_home, x_metric, x_season)
+      })
+plot.grid(plots, paste(x_metric, x_season), ncol = 3)
+
+
+x_season <- 'heat'
+
+plots <- map(homes_no5, function(x_home){
+        qqplotter(x_home, x_metric, x_season)
+      })
+plot.grid(plots, paste(x_metric, x_season), ncol = 3)
+
+
+```
+
+
+### All conditions
+```{r, eval = FALSE}
     map(metrics_all, function(x_metric){
        map(homes_no5, function(x_home){
  map(clusters_all, function(x_season){
@@ -260,12 +372,14 @@ ggqqplot(data, 'value', facet.by = 'location',
     }) 
   })
     
+
+
 ```
 
 
 ## test other distributions
 
-```{r}
+```{r function_dist_test}
 
 # test for normality for each location in one home for one metric
 distribution.compare <- function(hm, met, seas, resolution = 'hour'){
@@ -341,7 +455,7 @@ distribution.compare <- function(hm, met, seas, resolution = 'hour'){
 ```
 
 
-```{r}
+```{r, eval=FALSE}
 res <- 'hour'
 # pm25------------
 
