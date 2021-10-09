@@ -701,6 +701,8 @@ a <- daily_energy_data_clustered %>%
          heat_end = as.Date(heat_end)
          )
 
+
+  
   # line_data <- a %>%
 #   group_by(home_type) %>%
 #   summarise(n_homes = length(unique(home))) %>%
@@ -756,6 +758,26 @@ ggplot(a) +
 
 
 
+```
+
+## make cluster percent csv
+```{r}
+
+##  count percentage of days in each season (not including group1)
+
+season_pcts <- daily_energy_data_clustered %>%
+  group_by(home_type) %>%
+  mutate(n_home_days = n()) %>%
+  ungroup() %>%
+  group_by(energy_cluster, home_type) %>%
+  summarize(
+    n_home_days_cluster = unique(n_home_days),
+    pct_season = n()/n_home_days_cluster*100,
+    pct_season = pct_season %>% signif(2),
+    .groups = 'drop'
+  )
+
+write_csv(season_pcts, './csv_created_sense/season_pcts.csv')
 ```
 
 
