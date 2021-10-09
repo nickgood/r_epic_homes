@@ -74,12 +74,14 @@ threedig <- function(x) {
 home.list <- function(x) sapply(x, threedig)
 
 # make function to label metric names with subscripts
-labeller.metrics <- as_labeller(c('pm25'='PM[2.5]', 'voc'="TVOC"),
+labeller.metrics <- as_labeller(c('pm25'='PM[2.5]', 'voc'="TVOC",
+                                  'co2' = 'CO[2]', 'temp' = 'Temperature'),
                            default = label_parsed)
 
 # make function to label metric names with subscripts and seasons
 labeller.metrics.seasons <- as_labeller(c(
   'pm25'='PM[2.5]', 'voc'="TVOC",
+  'co2' = 'CO[2]', 'temp' = 'Temperature',
   'ac' = 'AC', 'shoulder' = 'Shoulder', 'heat' = 'Heat'
   ), default = label_parsed)
 
