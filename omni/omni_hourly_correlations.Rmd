@@ -105,6 +105,11 @@ rms_driver <- lapply(c(1,4,7), function(x) get(paste0('rms_', x)))
 rms_garage <- lapply(c(2,5), function(x) get(paste0('rms_', x)))
 
 
+#### make lists of metric pairs to correlate
+    met_pairs_proxy <- list(c('co2', 'voc'), c('co2', 'lux'))
+    
+    met_pairs_pollutants <- list(c('pm25', 'co2'), c('pm25', 'voc'))
+
 ##For labeling pruposes
 xsmall <- 6
 small <- 15
@@ -174,6 +179,9 @@ corr_fig_width <- 10.5
 
 ```
 
+
+
+# room-correaltions
 ```{r functions_correlation_additional variable, eval = TRUE}
 # define variables for testing----------------------
 
@@ -189,6 +197,7 @@ corr_fig_width <- 10.5
 # loc_2 <- 'outdoor'
 
 # between room correlation plots--------------------------
+  # data making functions--------------
 
 ##in a home at a given hour 
  room.coeff.hour <- function(hm, rm_pair,
@@ -263,11 +272,14 @@ corr_fig_width <- 10.5
 # test <- room.cor.hourly('008', c('living', 'garage'),
 #                    'pm25', 'spearman', omni_hourly)
  
+
+
+
  ##function to create a plot of correlation between
  ##multiple room pairs by hour
  ##with additional variable also plotted by hour
  
- room.hourly.plot <- function (hm, rms_list, met,
+ room.hourly.home <- function (hm, rms_list, met,
                                     met_2 = NULL, loc_2 = NULL,
                                simple = FALSE,
                                     method = 'spearman',
@@ -280,44 +292,80 @@ corr_fig_width <- 10.5
                method = method,
                data = data
 ) %>%
-bind_rows()
+bind_rows() %>%
+     mutate(home = hm, metric = met)
 
-   if(!is.null(met_2)){
-   ## add second variable if specified
-   a <-a %>%
-     ##join with average hourly outdoor temp
-     full_join(
-       omni_hourly %>%
-         filter(home == hm, location == loc_2) %>%
-         select(datehour, all_of(met_2)) %>%
-         group_by(hour = hour(datehour)) %>%
-         summarize(var_2 = mean(!!sym(met_2), na.rm = TRUE),
-                   var_2_sd = sd(!!sym(met_2), na.rm = TRUE),
-                   var_2_high = var_2+var_2_sd,
-                   var_2_low = var_2-var_2_sd,
-                   .groups = 'drop'),
-       by = 'hour'
-     )
-     ##add scale and units for 2nd y axis
-         if(met_2 == 'co2') {
-                  scale_ratio <- 2000 
-                  unit <- 'ppb'
-         }else if (met_2 == 'temp'){
-                  scale_ratio <- 50 
-                  unit <- 'deg C'
-                  } else if (met_2 == 'humid') {
-                     scale_ratio <- 100
-                     unit <- '%'
-            }
-   }
+   # if(!is.null(met_2)){
+   # ## add second variable if specified
+   # a <-a %>%
+   #   ##join with average hourly outdoor temp
+   #   full_join(
+   #     omni_hourly %>%
+   #       filter(home == hm, location == loc_2) %>%
+   #       select(datehour, all_of(met_2)) %>%
+   #       group_by(hour = hour(datehour)) %>%
+   #       summarize(var_2 = mean(!!sym(met_2), na.rm = TRUE),
+   #                 var_2_sd = sd(!!sym(met_2), na.rm = TRUE),
+   #                 var_2_high = var_2+var_2_sd,
+   #                 var_2_low = var_2-var_2_sd,
+   #                 .groups = 'drop'),
+   #     by = 'hour'
+   #   )
+   # 
+   # 
+   # }
+
+ }
+
+ 
    
-# plot
+     
+ # # test function
+ # test <- room.hourly.home(
+ #    hm = '008',
+ #    rms_list = list(c('living', 'garage')),
+ #    met = 'pm25',
+ #    # met_2 = 'co2', loc_2 = 'living'
+ #    )
+ 
+ 
+ room.hourly.all <- function (rms_list, met,
+                                    method = 'spearman',
+                                    data = omni_hourly){
+      ##find correlations and pvalues for each room pair
+   a <- map(homes_no5, room.hourly.home,
+            rms_list = rms_list,
+               met = met,
+               method = method,
+               data = data
+) %>%
+bind_rows()
+   
+ }
+ 
+ # # test function
+ # test <- room.hourly.all(
+ #   rms_indoor[1], 'pm25'
+ # )
+ 
+ # plotting fucntion------------
+ 
+ room.hourly.plot <- function (data, met) {
+  
+   if(met == 'pm25') metric_title <- expression(paste('PM'[2.5], ' Correlations'))
+   if(met == 'co2') metric_title <- expression(paste('CO'[2], ' Correlations'))
+   if(met == 'voc') metric_title <- 'TVOC Correlations'
+   if(met == 'temp') metric_title <- 'Temperature Correlations'
+
+   a <- data %>% filter(metric == met)
+
+   
+   # plot
    ggplot(a, aes(x = hour)) + 
-     ggtitle(paste('Home', hm))+
      geom_point(aes(y = as.numeric(coeff),
                     shape = ifelse(p_val < 0.05, 'p < 0.05', 'p > 0.05'),
                     color = loc_pair),
-                size = ifelse(simple ==FALSE, 4, 2)
+                size = 1.5
                 )+
      scale_shape_manual(
        breaks = c('p < 0.05', 'p > 0.05'),
@@ -331,126 +379,55 @@ bind_rows()
        values = inter_room_colors,
               breaks = inter_room_breaks,
        name = 'Location Correlation')+
-      {if(!is.null(met_2)) list(
-              ##add points for CO2 levels in kitchen
-     geom_point(aes(y = var_2/scale_ratio, size = paste(loc_2, met_2)),
-                color = 'dimgray', size = 2),
-        scale_y_continuous(
-       # Add a second axis and specify its features
-       sec.axis = sec_axis( trans=~.*scale_ratio,
-                            name = unit)
-       ),
-     #remove label for second legend
-      geom_errorbar(aes(ymin = var_2_low/scale_ratio,
-                        ymax= var_2_high/scale_ratio),
-                    color = 'dimgray')
-     )}+
      coord_cartesian(ylim = c(0,1))+
-     {if(simple == TRUE)
-       theme(
-         legend.box = 'horizontal'
-       )
-       }+
-     theme(
-       axis.text.x = element_text(size = medium),
-       axis.title.x = element_text(size = medium),
-       axis.title.y = element_text(size = medium),
-       axis.text.y = element_text(size = medium),
-       plot.title = element_text(size = medium, hjust = 0.5),
-       legend.title = element_text(size = small),
-       legend.text = element_text(size = small)
-     )+
      scale_x_continuous(limits = c(0,24),
                         breaks = c(0,6,12,18),
-                        labels = c('midnight', '6am','noon', '6pm'),
-                        expand = c(0,0))
-
- }
-
- # # test function
- # room.hourly.plot(
- #    hm = '005',
- #    rms_list = rms_indoor,
- #    met = 'pm25',
- #    # met_2 = 'co2', loc_2 = 'living'
- #    )
- 
-  ##functions that omit legends and lables to plot in a grid
-
-
-  ##function to plot in a grid
- room.plot.grid <- function (hms, rms_list, met,
-                                    method = 'spearman',
-                                    func, ncolumn = 5,
-                                    met_2 = NULL, loc_2 = NULL,
-                                    data = omni_hourly
-                                       ) {
-   plots <- map(hms, room.hourly.plot,
-                   data = data, rms_list = rms_list,
-                   met = met, method = method,
-                met_2 = met_2, loc_2 = loc_2,
-                simple = TRUE)
-   
-   ##omit NULL values (from homes or rooms without valid data)
-    plots <- plots[!sapply(plots, is.null)]
-    
-    legend <- g_legend(plots[[1]]) # extract legend from first plot
-    
-    # omit labels and such from plots
-    plots <- lapply(plots,
-                    function(myplot) {
-                       
-#   # change existing title
-# # https://stackoverflow.com/questions/41940000/modifying-ggplot-objects-after-creation
-# myplot<- ggplot_build(myplot)
-# 
-# myplot$plot$labels$title <-
-#    sub('.*Home ', '',myplot$plot$labels$title) %>% # extract characters after 'Home'
-#    substr(1,3) # extract first three remaining characters (home number)
-# 
-# # convert back to a ggplot object
-# myplot <- ggplot_gtable(myplot)
-# myplot <- as_ggplot(myplot)
-
-# change all other labels
-                       myplot+
-      theme(
-         axis.text.x = element_text(size = xsmall),
-            axis.text.y = element_text(size = xsmall),
-           axis.title.x = element_blank(),
-           axis.title.y = element_blank(),
-           plot.title = element_text(size = xsmall+1, hjust = 0.5),
-           legend.title = element_text(size = xsmall),
-           legend.text = element_text(size = xsmall),
-         # plot.margin=unit(c(-0.25,0,0,0), "cm"), # to omit space between
-           legend.position = 'none')
-         
-                       
-                    }
-    )
-      
-    # arrange all plots
-    # reference: https://stackoverflow.com/questions/10706753/how-do-i-arrange-a-variable-list-of-plots-using-grid-arrange
-    grid.arrange(arrangeGrob(grobs = plots, ncol = ncolumn),
-                 legend, # add in legend
-                 nrow=2, # one row for all plots, one row for legend
-                 heights=c(corr_fig_height-1, 1), # second height is for legend
-                 top = paste(met, ifelse(!is.null(met_2),
-                                         paste('with', loc_2, met_2),
-                                         ''))
-    )
+                        labels = c('12am', '6am','12pm', '6pm'),
+                        expand = c(0,0)) +
+     facet_wrap(vars(home))+
+     theme(
+       strip.background = element_blank(),
+       plot.title = element_text(hjust = 0.5 )
+     )+
+     ggtitle(metric_title)+
+     #ensure order of legends
+        guides(
+        color = guide_legend(order = 1),
+    shape = guide_legend(order = 2)
+  )
  }
  
- # # test funciton
- # room.plot.grid(
- #    hms = home.list(c(1,7,8,9)),
- #    rms_list = list(c('living', 'garage'), c('living', 'kitchen')),
- #    met = 'pm25',
- #    # met_2 = 'temp', loc_2 = 'outdoor'
- #    )
  
+
+
+
+ 
+```
+
+## make data
+```{r}
+
+```
+
+
+## plot all homes
+```{r, fig.height = 5, fig.width = 11}
+
+ # test function
+ test <- room.hourly.all(
+   rms_indoor[1], 'temp'
+ )
+
+ # test function
+ room.hourly.plot(
+   test, 'temp'
+    )
+```
+
+# metric-correlations
+```{r}
 # between metric correlation plots---------------
- 
+ # data-making functions-----------
  ##in a home/room at a given hour 
  metric.coeff.hour <- function(hm, met_pair,
                           hr, loc,
@@ -526,57 +503,68 @@ bind_rows()
  ##multiple room pairs by hour
  ##with additional variable also plotted by hour
  
- metric.hourly.plot <- function (hm, mets_list, loc,
+  metric.hourly.home <- function (hm, loc, mets_list, met,
                                     met_2 = NULL, loc_2 = NULL,
-                                 simple = FALSE,
+                               simple = FALSE,
                                     method = 'spearman',
                                     data = omni_hourly) {
-   
-   ##find correlations and pvalues for each room pair
+ ##find correlations and pvalues for each room pair
    a <- map(mets_list, metric.cor.hourly,
                hm = hm,
                loc = loc,
                method = method,
                data = data
 ) %>%
-bind_rows()
+bind_rows()  %>%
+     mutate(home = hm, location = loc)
 
-   if(!is.null(met_2)){
-   ## add second variable if specified
-   a <-a %>%
-     ##join with average hourly outdoor temp
-     full_join(
-       omni_hourly %>%
-         filter(home == hm, location == loc_2) %>%
-         select(datehour, all_of(met_2)) %>%
-         group_by(hour = hour(datehour)) %>%
-         summarize(var_2 = mean(!!sym(met_2), na.rm = TRUE),
-                   var_2_sd = sd(!!sym(met_2), na.rm = TRUE),
-                   var_2_high = var_2+var_2_sd,
-                   var_2_low = var_2-var_2_sd,
-                   .groups = 'drop'),
-       by = 'hour'
-     )
-     ##add scale and units for 2nd y axis
-         if(met_2 == 'co2') {
-                  scale_ratio <- 2000 
-                  unit <- 'ppb'
-         }else if (met_2 == 'temp'){
-                  scale_ratio <- 50 
-                  unit <- 'deg C'
-                  } else if (met_2 == 'humid') {
-                     scale_ratio <- 100
-                     unit <- '%'
-            }
-   }
+ }
+ 
+  
+ # # test function
+ # test <- metric.hourly.home(
+ #    hm = '009',
+ #    mets_list = list(c('pm25', 'co2'), c('pm25', 'voc')),
+ #    loc = 'living',
+ # # met_2 = 'co2', loc_2 = 'living'
+ # )
+  
+ 
+ metric.hourly.all <- function (mets_list, loc,
+                                    method = 'spearman',
+                                    data = omni_hourly){
+      ##find correlations and pvalues for each room pair
+   a <- map(homes_no5, metric.hourly.home,
+            mets_list = mets_list,
+               loc = loc,
+               method = method,
+               data = data
+) %>%
+bind_rows()
    
+ }
+ 
+ 
+ # test function
+ # test <- metric.hourly.all(list(c('co2', 'lux')), 'living')
+ 
+ 
+  # plotting functions---------------
+ metric.hourly.plot <- function (data, loc) {
+   
+      if(loc == 'living') room_title <- 'Living Room Indicator Correlations'
+      if(loc == 'kitchen') room_title <- 'Kitchen Indicator Correlations'
+      if(loc == 'bedroom') room_title <- 'Bedroom Indicator Correlations'
+      if(loc == 'garage') room_title <- 'Garage Indicator Correlations'
+      if(loc == 'outdoor') room_title <- 'Outdoor Indicator Correlations'
+
+         a <- data %>% filter(location == loc)
 # plot
    ggplot(a, aes(x = hour)) + 
-     ggtitle(paste('Home', hm))+
      geom_point(aes(y = as.numeric(coeff),
                     shape = ifelse(p_val < 0.05, 'p < 0.05', 'p > 0.05'),
                     color = met_pair),
-                size = ifelse(simple == FALSE, 4, 2))+
+                size = 1.5)+
      scale_shape_manual(
        breaks = c('p < 0.05', 'p > 0.05'),
        values = c(16,4),
@@ -590,863 +578,47 @@ bind_rows()
               breaks = inter_metric_breaks,
        labels = inter_metric_labels,
        name = 'Metric Correlation')+
-      {if(!is.null(met_2)) list(
-              ##add points for CO2 levels in kitchen
-     geom_point(aes(y = var_2/scale_ratio, size = paste(loc_2, met_2)),
-                color = 'dimgray'),
-        scale_y_continuous(
-       # Add a second axis and specify its features
-       sec.axis = sec_axis( trans=~.*scale_ratio,
-                            name = unit)
-       ),
-     #remove label for second legend
-     scale_size_manual(NULL, values = 2),
-      geom_errorbar(aes(ymin = var_2_low/scale_ratio,
-                        ymax= var_2_high/scale_ratio),
-                    color = 'dimgray')
-     )}+
      coord_cartesian(ylim = c(-0.5,1))+
       geom_hline(yintercept = 0, linetype = 'dashed')+
-     {if(simple == TRUE)
-       theme(
-         legend.box = 'horizontal'
-       )
-       }+
+     scale_x_continuous(limits = c(0,24),
+                        breaks = c(0,6,12,18),
+                        labels = c('12am', '6am','12pm', '6pm'),
+                        expand = c(0,0)) +
+     facet_wrap(vars(home))+
      theme(
-                                  axis.text.x = element_text(size = medium),
-           axis.title.x = element_text(size = medium),
-           axis.title.y = element_text(size = medium),
-           axis.text.y = element_text(size = medium),
-           plot.title = element_text(size = medium, hjust = 0.5),
-           legend.title = element_text(size = small),
-           legend.text = element_text(size = small)
-           )+
-         scale_x_continuous(limits = c(0,24),
-                       breaks = c(0,6,12,18),
-                       labels = c('midnight', '6am','noon', '6pm'),
-                       expand = c(0,0))
+       strip.background = element_blank(),
+       plot.title = element_text(hjust = 0.5)
+     )+
+     ggtitle(room_title)+
+     #ensure order of legends
+        guides(
+        color = guide_legend(order = 1),
+    shape = guide_legend(order = 2)
+  )
  }
- 
- # # test function
- # metric.hourly.plot(
- #    hm = '005',
- #    mets_list = list(c('pm25', 'co2'), c('pm25', 'voc')),
- #    loc = 'living',
- # # met_2 = 'co2', loc_2 = 'living'
- # )
- 
-  ##functions that omit legends and lables to plot in a grid
 
 
-  ##function to plot in a grid
- metric.plot.grid <- function (hms, mets_list, loc,
-                                    method = 'spearman',
-                                    func, ncolumn = 5,
-                                    met_2 = NULL, loc_2 = NULL,
-                                    data = omni_hourly
-                                       ) {
-   plots <- map(hms, metric.hourly.plot,
-                   data = data, mets_list = mets_list,
-                   loc = loc, method = method,
-                simple = TRUE,
-                met_2 = met_2, loc_2 = loc_2)
-   
-   ##omit NULL values (from homes or rooms without valid data)
-    plots <- plots[!sapply(plots, is.null)]
-    
-    legend <- g_legend(plots[[1]]) # extract legend from first plot
-    
-    # omit labels and such from plots
-    plots <- lapply(plots,
-                    function(myplot) {
-                       
-#   # change existing title
-# # https://stackoverflow.com/questions/41940000/modifying-ggplot-objects-after-creation
-# myplot<- ggplot_build(myplot)
-# 
-# myplot$plot$labels$title <-
-#    sub('.*Home ', '',myplot$plot$labels$title) %>% # extract characters after 'Home'
-#    substr(1,3) # extract first three remaining characters (home number)
-# 
-# # convert back to a ggplot object
-# myplot <- ggplot_gtable(myplot)
-# myplot <- as_ggplot(myplot)
-
-# change all other labels
-                       myplot+
-      theme(
-         axis.text.x = element_text(size = xsmall),
-            axis.text.y = element_text(size = xsmall),
-           axis.title.x = element_blank(),
-           axis.title.y = element_blank(),
-           plot.title = element_text(size = xsmall, hjust = 0.5),
-           legend.title = element_text(size = xsmall),
-           legend.text = element_text(size = xsmall),
-         # plot.margin=unit(c(-0.25,0,0,0), "cm"), # to omit space between
-         
-           legend.position = 'none')
-                    }
-    )
-      
-    # arrange all plots
-    # reference: https://stackoverflow.com/questions/10706753/how-do-i-arrange-a-variable-list-of-plots-using-grid-arrange
-    grid.arrange(arrangeGrob(grobs = plots, ncol = ncolumn),
-                 legend, # add in legend
-                 nrow=2, # one row for all plots, one row for legend
-                 heights=c(corr_fig_height-1, 1), # second height is for legend
-                 top = paste(loc, ifelse(!is.null(met_2),
-                                         paste('with', loc_2, met_2),
-                                         ''))
-    )
- }
- 
- # # test funciton
- # metric.plot.grid(
- #    hms = home.list(c(1:17)),
- #    mets_list = list(c('pm25', 'co2'), c('pm25', 'voc')),
- #    loc = 'living',
- #    # met_2 = 'temp', loc_2 = 'outdoor',
- #    )
- 
 ```
 
+## make data
 
-# Hourly Between-Room Correlation Plots  
+```{r}
 
-* plots are based on **hourly** average values
-* separate plot for each house
-* only a selection of houses
+# metric.hourly.all(met_pairs_proxy)
+```
 
-## Example for one home
+## plot all homes
+```{r, fig.height = 5, fig.width = 11}
 
-```{r fig.height=4, fig.width = 6}
- # plot one home
- room.hourly.plot(
-    hm = '012',
-    rms_list = rms_indoor,
-    met = 'pm25',
-    # met_2 = 'co2', loc_2 = 'living'
+ # test function
+ test <- metric.hourly.all(
+   rms_indoor[1], 'temp'
+ )
+
+ metric.hourly.plot(
+   test, 'living'
     )
 ```
 
 
-
-
-## All Homes
-
-### living interactions
-```{r between_room_hour_correlations_grid, warning=FALSE, fig.height=corr_fig_height, fig.width=corr_fig_width, eval = FALSE, results='asis'}
-
- # # test for one metric
- # room.plot.grid(
- #    hms = '009',
- #    rms_list = list(c('kitchen', 'garage')),
- #    met = 'pm25',
- #    # met_2 = 'temp', loc_2 = 'outdoor'
- #    )
-
-
-    rm_pairs <- rms_indoor
-    
-    # make plot grid and save for all metrics
-lapply(metrics_all, function(x_metric){
-   
-       room.plot.grid(
-    hms = homes_no5,
-    rms_list = rm_pairs,
-    met = x_metric,
-    # met_2 = 'temp', loc_2 = 'outdoor'
-        )
-   # insert page break between plots
-   cat("\n\n\\pagebreak\n")
-       
-   # ggsave(paste0('hourly_corr_',metric,'_', Sys.Date(),'.pdf'), grid,
-    #       height = 8, width = 10)
-}
-   )
-
- 
-
-    rm_pairs <- rms_driver
-    
-    # make plot grid and save for all metrics
-lapply(metrics_all, function(x_metric){
-   
-       room.plot.grid(
-    hms = homes_no5,
-    rms_list = rm_pairs,
-    met = x_metric,
-    # met_2 = 'temp', loc_2 = 'outdoor'
-        )
-   # insert page break between plots
-   cat("\n\n\\pagebreak\n")
-       
-   # ggsave(paste0('hourly_corr_',metric,'_', Sys.Date(),'.pdf'), grid,
-    #       height = 8, width = 10)
-}
-   )
-       
- 
-
-```
-
-### garage interactions
-```{r between_garage_hour_correlations_grid, warning=FALSE, fig.height=corr_fig_height, fig.width=corr_fig_width, eval = TRUE, results='asis'}
-
- # # test for one metric
- # room.plot.grid(
- #    hms = homes_no5,
- #    rms_list = rms_indoor[1],
- #    met = 'pm25',
- #    # met_2 = 'temp', loc_2 = 'outdoor'
- #    )
- # ggsave(paste0('hourly_corr_test', Sys.Date(),'.pdf'), grid,
- #          height = 8, width = 10)
-
-    rm_pairs <- rms_garage
-    
-    # make plot grid and save for all metrics
-lapply(c(
-  'pm25',
-  'voc'
-  ), function(x_metric){
-   
-       room.plot.grid(
-    hms = homes_no5,
-    rms_list = rm_pairs,
-    met = x_metric,
-    # met_2 = 'temp', loc_2 = 'outdoor'
-        )
-   # insert page break between plots
-   cat("\n\n\\pagebreak\n")
-       
-   # ggsave(paste0('hourly_corr_',metric,'_', Sys.Date(),'.pdf'), grid,
-    #       height = 8, width = 10)
-}
-   )
-
- 
-```
-
-### Possible Takeaways  
-
-* no obvious trends in PM2.5 indoor-indoor strength of directional correlations
-* VOC directional indoor-indoor correlation gets weaker in some homes late evening (8pm)
-* **in many homes, PM2.5 directional correlation for garage and outdoor to livingroom peaks near 6am, trends downward until mid-night, then starts to increase again** 
-
-# Hourly Between-Metrics Correlation Plots  
-
-## Example for one home
-
-```{r fig.height=4, fig.width = 6}
- # plot one home
-metric.hourly.plot(
-    hm = '012',
-    mets_list = list(c('co2', 'voc'), c('co2', 'lux')),
-    loc = 'living'
-    # met_2 = 'co2', loc_2 = 'living'
-    )
-
-
-```
-
-
-```{r between_metric_hour_correlations_grid, warning=FALSE, fig.height=corr_fig_height, fig.width=corr_fig_width, eval = FALSE, results='asis'}
- 
-#  # test for one metric
-# grid <- room.plot.grid(
-#     hms = homes_no5,
-#     rms_list = list(c('living', 'garage'), c('living', 'kitchen')),
-#     met = 'pm25',
-#     # met_2 = 'temp', loc_2 = 'outdoor'
-#     )
-#  # ggsave(paste0('hourly_corr_test', Sys.Date(),'.pdf'), grid,
-#  #          height = 8, width = 10)
-
-    met_pairs <- list(c('co2', 'voc'), c('co2', 'lux'))
-    
-    # make plot grid and save for all metrics
-lapply(locations_indoor, function(x_location){
-   
-       metric.plot.grid(
-    hms = homes_no5,
-    mets_list = met_pairs,
-    loc = x_location,
-    # met_2 = 'temp', loc_2 = 'outdoor'
-        )
-   # insert page break between plots
-   cat("\n\n\\pagebreak\n")
-       
-   # ggsave(paste0('hourly_corr_',metric,'_', Sys.Date(),'.pdf'), grid,
-    #       height = 8, width = 10)
-}
-   )
-
- 
-
-    met_pairs <- list(c('pm25', 'co2'), c('pm25', 'voc'))
-    
-    # make plot grid and save for all metrics
-lapply(locations_indoor, function(x_location){
-   
-       metric.plot.grid(
-    hms = homes_no5,
-    mets_list = met_pairs,
-    loc = x_location,
-    # met_2 = 'temp', loc_2 = 'outdoor'
-        )
-   # insert page break between plots
-   cat("\n\n\\pagebreak\n")
-       
-   # ggsave(paste0('hourly_corr_',metric,'_', Sys.Date(),'.pdf'), grid,
-    #       height = 8, width = 10)
-}
-   )
- 
-
-
-```
-
-
-
-## Averaged homes
-
-```{r functions_correlation_homes, eval = TRUE}
-# # define variables for testing----------------------
-# 
-# # data <- omni_hourly
-# # hm <- '008'
-# # rm_pair <- c('living', 'garage')
-# # rm_pair2 <- c('living', 'kitchen')
-# # rms_list <- list(rm_pair, rm_pair2)
-# # met <- 'pm25'
-# # method <- 'spearman'
-# # hr <- 23
-# # met_2 <- 'temp'
-# # loc_2 <- 'outdoor'
-# 
-# # between room correlation plots--------------------------
-# 
-# ##in a home at a given hour 
-#  room.coeff.hour <- function(rm_pair,
-#                           hr, met,
-#                           method,
-#                           data) {
-#    hour_data <-
-#      data %>%
-#            ##make an hour column and filter data by hour of day
-#      mutate(hour = hour(datehour)) %>%
-#      filter(hour == hr) %>%
-#      select(datehour, home, location, all_of(met)) %>%
-#           group_by(location, datehour) %>%
-#      summarize(mean(all_of(met), na.rm = TRUE)) %>%
-#      pivot_wider(names_from = location, values_from = mean)
-#    
-# 
-# 
-#    
-#       ##calculate R coefficient of choice for room at the filtered hour
-#    cor_results <- tryCatch(
-#      {
-#      a <- cor.test(hour_data %>% pull(rm_pair[1]),
-#                           hour_data %>% pull(rm_pair[2]),
-#                           method = method,
-#                    exact = FALSE # to avoid warning message
-#                    )
-#      # return results
-#      tibble('coeff' = a[['estimate']],
-#             'p_val' = a[['p.value']],
-#             'method' = method)
-#      },
-#                  error = function(e) {
-#                    # return empty values if error
-#                    tibble('coeff' = NA,
-#             'p_val' = NA,
-#             'method' = method)
-#                  })
-#     return(cor_results)
-# 
-#     }
-# 
-#  # test funct
-# test <- room.coeff.hour(c('living', 'garage'),
-#              23, 'pm25', 'spearman', omni_hourly)
-#  
-#  
-# 
-# 
-#  ##find correlation between room pair by hour
-#  room.cor.hourly <- function (hm, rm_pair,
-#                            met, method,
-#                            data) {
-#     
-#     cor_results <- sapply(c(0:23), room.coeff.hour,
-#                           hm = hm,
-#                           met = met,
-#                           method = method,
-#                           rm_pair = rm_pair,
-#                           data = data
-# )
-#     
-#    tibble('hour' = c(0:23),
-#           
-#           ##make a column for correlation coefficient values
-#           'coeff' = cor_results[1,],
-#           
-#           ##make a column for correlation p-values
-#           'p_val' = cor_results[2,],
-#           'loc_pair' = paste0(rm_pair[1],'-', rm_pair[2]))
-#  }
-# 
-#  
-# #  # test funct
-# # test <- room.cor.hourly('008', c('living', 'garage'),
-# #                    'pm25', 'spearman', omni_hourly)
-#  
-#  ##function to create a plot of correlation between
-#  ##multiple room pairs by hour
-#  ##with additional variable also plotted by hour
-#  
-#  room.hourly.plot <- function (hm, rms_list, met,
-#                                     met_2 = NULL, loc_2 = NULL,
-#                                simple = FALSE,
-#                                     method = 'spearman',
-#                                     data = omni_hourly) {
-#    
-#    ##find correlations and pvalues for each room pair
-#    a <- map(rms_list, room.cor.hourly,
-#                hm = hm,
-#                met = met,
-#                method = method,
-#                data = data
-# ) %>%
-# bind_rows()
-# 
-#    if(!is.null(met_2)){
-#    ## add second variable if specified
-#    a <-a %>%
-#      ##join with average hourly outdoor temp
-#      full_join(
-#        omni_hourly %>%
-#          filter(home == hm, location == loc_2) %>%
-#          select(datehour, all_of(met_2)) %>%
-#          group_by(hour = hour(datehour)) %>%
-#          summarize(var_2 = mean(!!sym(met_2), na.rm = TRUE),
-#                    var_2_sd = sd(!!sym(met_2), na.rm = TRUE),
-#                    var_2_high = var_2+var_2_sd,
-#                    var_2_low = var_2-var_2_sd,
-#                    .groups = 'drop'),
-#        by = 'hour'
-#      )
-#      ##add scale and units for 2nd y axis
-#          if(met_2 == 'co2') {
-#                   scale_ratio <- 2000 
-#                   unit <- 'ppb'
-#          }else if (met_2 == 'temp'){
-#                   scale_ratio <- 50 
-#                   unit <- 'deg C'
-#                   } else if (met_2 == 'humid') {
-#                      scale_ratio <- 100
-#                      unit <- '%'
-#             }
-#    }
-#    
-# # plot
-#    ggplot(a, aes(x = hour)) + 
-#      ggtitle(paste('Home', hm))+
-#      geom_point(aes(y = as.numeric(coeff),
-#                     shape = ifelse(p_val < 0.05, 'p < 0.05', 'p > 0.05'),
-#                     color = loc_pair),
-#                 size = ifelse(simple ==FALSE, 4, 2)
-#                 )+
-#      scale_shape_manual(
-#        breaks = c('p < 0.05', 'p > 0.05'),
-#        values = c(16,4),
-#        name = 'Significance'
-#      ) +
-#      ylab(expression("Spearman's"~rho))+
-#      xlab('Hour of Day')+
-#       theme_bw()+
-#      scale_color_manual(
-#        values = inter_room_colors,
-#               breaks = inter_room_breaks,
-#        name = 'Location Correlation')+
-#       {if(!is.null(met_2)) list(
-#               ##add points for CO2 levels in kitchen
-#      geom_point(aes(y = var_2/scale_ratio, size = paste(loc_2, met_2)),
-#                 color = 'dimgray', size = 2),
-#         scale_y_continuous(
-#        # Add a second axis and specify its features
-#        sec.axis = sec_axis( trans=~.*scale_ratio,
-#                             name = unit)
-#        ),
-#      #remove label for second legend
-#       geom_errorbar(aes(ymin = var_2_low/scale_ratio,
-#                         ymax= var_2_high/scale_ratio),
-#                     color = 'dimgray')
-#      )}+
-#      coord_cartesian(ylim = c(0,1))+
-#      {if(simple == TRUE)
-#        theme(
-#          legend.box = 'horizontal'
-#        )
-#        }+
-#      theme(
-#        axis.text.x = element_text(size = medium),
-#        axis.title.x = element_text(size = medium),
-#        axis.title.y = element_text(size = medium),
-#        axis.text.y = element_text(size = medium),
-#        plot.title = element_text(size = medium, hjust = 0.5),
-#        legend.title = element_text(size = small),
-#        legend.text = element_text(size = small)
-#      )+
-#      scale_x_continuous(limits = c(0,24),
-#                         breaks = c(0,6,12,18),
-#                         labels = c('midnight', '6am','noon', '6pm'),
-#                         expand = c(0,0))
-# 
-#  }
-# 
-#  # # test function
-#  # room.hourly.plot(
-#  #    hm = '005',
-#  #    rms_list = rms_indoor,
-#  #    met = 'pm25',
-#  #    # met_2 = 'co2', loc_2 = 'living'
-#  #    )
-#  
-#   ##functions that omit legends and lables to plot in a grid
-# 
-# 
-#   ##function to plot in a grid
-#  room.plot.grid <- function (hms, rms_list, met,
-#                                     method = 'spearman',
-#                                     func, ncolumn = 5,
-#                                     met_2 = NULL, loc_2 = NULL,
-#                                     data = omni_hourly
-#                                        ) {
-#    plots <- map(hms, room.hourly.plot,
-#                    data = data, rms_list = rms_list,
-#                    met = met, method = method,
-#                 met_2 = met_2, loc_2 = loc_2,
-#                 simple = TRUE)
-#    
-#    ##omit NULL values (from homes or rooms without valid data)
-#     plots <- plots[!sapply(plots, is.null)]
-#     
-#     legend <- g_legend(plots[[1]]) # extract legend from first plot
-#     
-#     # omit labels and such from plots
-#     plots <- lapply(plots,
-#                     function(myplot) {
-#                        
-# #   # change existing title
-# # # https://stackoverflow.com/questions/41940000/modifying-ggplot-objects-after-creation
-# # myplot<- ggplot_build(myplot)
-# # 
-# # myplot$plot$labels$title <-
-# #    sub('.*Home ', '',myplot$plot$labels$title) %>% # extract characters after 'Home'
-# #    substr(1,3) # extract first three remaining characters (home number)
-# # 
-# # # convert back to a ggplot object
-# # myplot <- ggplot_gtable(myplot)
-# # myplot <- as_ggplot(myplot)
-# 
-# # change all other labels
-#                        myplot+
-#       theme(
-#          axis.text.x = element_text(size = xsmall),
-#             axis.text.y = element_text(size = xsmall),
-#            axis.title.x = element_blank(),
-#            axis.title.y = element_blank(),
-#            plot.title = element_text(size = xsmall+1, hjust = 0.5),
-#            legend.title = element_text(size = xsmall),
-#            legend.text = element_text(size = xsmall),
-#          # plot.margin=unit(c(-0.25,0,0,0), "cm"), # to omit space between
-#            legend.position = 'none')
-#          
-#                        
-#                     }
-#     )
-#       
-#     # arrange all plots
-#     # reference: https://stackoverflow.com/questions/10706753/how-do-i-arrange-a-variable-list-of-plots-using-grid-arrange
-#     grid.arrange(arrangeGrob(grobs = plots, ncol = ncolumn),
-#                  legend, # add in legend
-#                  nrow=2, # one row for all plots, one row for legend
-#                  heights=c(corr_fig_height-1, 1), # second height is for legend
-#                  top = paste(met, ifelse(!is.null(met_2),
-#                                          paste('with', loc_2, met_2),
-#                                          ''))
-#     )
-#  }
-#  
-#  # # test funciton
-#  # room.plot.grid(
-#  #    hms = home.list(c(1,7,8,9)),
-#  #    rms_list = list(c('living', 'garage'), c('living', 'kitchen')),
-#  #    met = 'pm25',
-#  #    # met_2 = 'temp', loc_2 = 'outdoor'
-#  #    )
-#  
-# # between metric correlation plots---------------
-#  
-#  ##in a home/room at a given hour 
-#  metric.coeff.hour <- function(hm, met_pair,
-#                           hr, loc,
-#                           method,
-#                           data) {
-#    hour_data <-
-#      data %>%
-#      filter(home == hm, location == loc) %>%
-#      select(datehour, home, location, all_of(met_pair)) %>%
-#       ##make an hour column and filter data by hour of day
-#      mutate(hour = hour(datehour)) %>%
-#      filter(hour == hr)
-#    
-#       ##calculate R coefficient of choice for metrics at the filtered hour
-#    cor_results <- tryCatch(
-#      {
-#      a <- cor.test(hour_data %>% pull(met_pair[1]),
-#                           hour_data %>% pull(met_pair[2]),
-#                           method = method,
-#                    exact = FALSE # to avoid warning message
-#                    )
-#      # return results
-#      tibble('coeff' = a[['estimate']],
-#             'p_val' = a[['p.value']],
-#             'method' = method)
-#      },
-#                  error = function(e) {
-#                    # return empty values if error
-#                    tibble('coeff' = NA,
-#             'p_val' = NA,
-#             'method' = method)
-#                  })
-#     return(cor_results)
-# 
-#     }
-#  
-# #  # test funct
-# # test <- metric.coeff.hour('008', c('pm25', 'co2'),
-# #              23, 'living', 'spearman', omni_hourly)
-#  
-#  
-# 
-# 
-#  ##find correlation between metric pair by hour
-#  metric.cor.hourly <- function (hm, met_pair,
-#                            loc, method,
-#                            data) {
-#     
-#     cor_results <- sapply(c(0:23), metric.coeff.hour,
-#                           hm = hm,
-#                           loc = loc,
-#                           method = method,
-#                           met_pair = met_pair,
-#                           data = data
-# )
-#     
-#    tibble('hour' = c(0:23),
-#           
-#           ##make a column for correlation coefficient values
-#           'coeff' = cor_results[1,],
-#           
-#           ##make a column for correlation p-values
-#           'p_val' = cor_results[2,],
-#           'met_pair' = paste0(met_pair[1],'-', met_pair[2]))
-#  }
-# 
-#  
-# #  # test funct
-# # test <- metric.cor.hourly('008', c('pm25', 'co2'),
-# #              'living', 'spearman', omni_hourly)
-#  
-#  ##function to create a plot of correlation between
-#  ##multiple room pairs by hour
-#  ##with additional variable also plotted by hour
-#  
-#  metric.hourly.plot <- function (hm, mets_list, loc,
-#                                     met_2 = NULL, loc_2 = NULL,
-#                                  simple = FALSE,
-#                                     method = 'spearman',
-#                                     data = omni_hourly) {
-#    
-#    ##find correlations and pvalues for each room pair
-#    a <- map(mets_list, metric.cor.hourly,
-#                hm = hm,
-#                loc = loc,
-#                method = method,
-#                data = data
-# ) %>%
-# bind_rows()
-# 
-#    if(!is.null(met_2)){
-#    ## add second variable if specified
-#    a <-a %>%
-#      ##join with average hourly outdoor temp
-#      full_join(
-#        omni_hourly %>%
-#          filter(home == hm, location == loc_2) %>%
-#          select(datehour, all_of(met_2)) %>%
-#          group_by(hour = hour(datehour)) %>%
-#          summarize(var_2 = mean(!!sym(met_2), na.rm = TRUE),
-#                    var_2_sd = sd(!!sym(met_2), na.rm = TRUE),
-#                    var_2_high = var_2+var_2_sd,
-#                    var_2_low = var_2-var_2_sd,
-#                    .groups = 'drop'),
-#        by = 'hour'
-#      )
-#      ##add scale and units for 2nd y axis
-#          if(met_2 == 'co2') {
-#                   scale_ratio <- 2000 
-#                   unit <- 'ppb'
-#          }else if (met_2 == 'temp'){
-#                   scale_ratio <- 50 
-#                   unit <- 'deg C'
-#                   } else if (met_2 == 'humid') {
-#                      scale_ratio <- 100
-#                      unit <- '%'
-#             }
-#    }
-#    
-# # plot
-#    ggplot(a, aes(x = hour)) + 
-#      ggtitle(paste('Home', hm))+
-#      geom_point(aes(y = as.numeric(coeff),
-#                     shape = ifelse(p_val < 0.05, 'p < 0.05', 'p > 0.05'),
-#                     color = met_pair),
-#                 size = ifelse(simple == FALSE, 4, 2))+
-#      scale_shape_manual(
-#        breaks = c('p < 0.05', 'p > 0.05'),
-#        values = c(16,4),
-#        name = 'Significance'
-#      )+
-#      ylab(expression("Spearman's"~rho))+
-#      xlab('Hour of Day')+
-#       theme_bw()+
-#      scale_color_manual(
-#        values = inter_metric_colors,
-#               breaks = inter_metric_breaks,
-#        labels = inter_metric_labels,
-#        name = 'Metric Correlation')+
-#       {if(!is.null(met_2)) list(
-#               ##add points for CO2 levels in kitchen
-#      geom_point(aes(y = var_2/scale_ratio, size = paste(loc_2, met_2)),
-#                 color = 'dimgray'),
-#         scale_y_continuous(
-#        # Add a second axis and specify its features
-#        sec.axis = sec_axis( trans=~.*scale_ratio,
-#                             name = unit)
-#        ),
-#      #remove label for second legend
-#      scale_size_manual(NULL, values = 2),
-#       geom_errorbar(aes(ymin = var_2_low/scale_ratio,
-#                         ymax= var_2_high/scale_ratio),
-#                     color = 'dimgray')
-#      )}+
-#      coord_cartesian(ylim = c(-0.5,1))+
-#       geom_hline(yintercept = 0, linetype = 'dashed')+
-#      {if(simple == TRUE)
-#        theme(
-#          legend.box = 'horizontal'
-#        )
-#        }+
-#      theme(
-#                                   axis.text.x = element_text(size = medium),
-#            axis.title.x = element_text(size = medium),
-#            axis.title.y = element_text(size = medium),
-#            axis.text.y = element_text(size = medium),
-#            plot.title = element_text(size = medium, hjust = 0.5),
-#            legend.title = element_text(size = small),
-#            legend.text = element_text(size = small)
-#            )+
-#          scale_x_continuous(limits = c(0,24),
-#                        breaks = c(0,6,12,18),
-#                        labels = c('midnight', '6am','noon', '6pm'),
-#                        expand = c(0,0))
-#  }
-#  
-#  # # test function
-#  # metric.hourly.plot(
-#  #    hm = '005',
-#  #    mets_list = list(c('pm25', 'co2'), c('pm25', 'voc')),
-#  #    loc = 'living',
-#  # # met_2 = 'co2', loc_2 = 'living'
-#  # )
-#  
-#   ##functions that omit legends and lables to plot in a grid
-# 
-# 
-#   ##function to plot in a grid
-#  metric.plot.grid <- function (hms, mets_list, loc,
-#                                     method = 'spearman',
-#                                     func, ncolumn = 5,
-#                                     met_2 = NULL, loc_2 = NULL,
-#                                     data = omni_hourly
-#                                        ) {
-#    plots <- map(hms, metric.hourly.plot,
-#                    data = data, mets_list = mets_list,
-#                    loc = loc, method = method,
-#                 simple = TRUE,
-#                 met_2 = met_2, loc_2 = loc_2)
-#    
-#    ##omit NULL values (from homes or rooms without valid data)
-#     plots <- plots[!sapply(plots, is.null)]
-#     
-#     legend <- g_legend(plots[[1]]) # extract legend from first plot
-#     
-#     # omit labels and such from plots
-#     plots <- lapply(plots,
-#                     function(myplot) {
-#                        
-# #   # change existing title
-# # # https://stackoverflow.com/questions/41940000/modifying-ggplot-objects-after-creation
-# # myplot<- ggplot_build(myplot)
-# # 
-# # myplot$plot$labels$title <-
-# #    sub('.*Home ', '',myplot$plot$labels$title) %>% # extract characters after 'Home'
-# #    substr(1,3) # extract first three remaining characters (home number)
-# # 
-# # # convert back to a ggplot object
-# # myplot <- ggplot_gtable(myplot)
-# # myplot <- as_ggplot(myplot)
-# 
-# # change all other labels
-#                        myplot+
-#       theme(
-#          axis.text.x = element_text(size = xsmall),
-#             axis.text.y = element_text(size = xsmall),
-#            axis.title.x = element_blank(),
-#            axis.title.y = element_blank(),
-#            plot.title = element_text(size = xsmall, hjust = 0.5),
-#            legend.title = element_text(size = xsmall),
-#            legend.text = element_text(size = xsmall),
-#          # plot.margin=unit(c(-0.25,0,0,0), "cm"), # to omit space between
-#          
-#            legend.position = 'none')
-#                     }
-#     )
-#       
-#     # arrange all plots
-#     # reference: https://stackoverflow.com/questions/10706753/how-do-i-arrange-a-variable-list-of-plots-using-grid-arrange
-#     grid.arrange(arrangeGrob(grobs = plots, ncol = ncolumn),
-#                  legend, # add in legend
-#                  nrow=2, # one row for all plots, one row for legend
-#                  heights=c(corr_fig_height-1, 1), # second height is for legend
-#                  top = paste(loc, ifelse(!is.null(met_2),
-#                                          paste('with', loc_2, met_2),
-#                                          ''))
-#     )
-#  }
-#  
-#  # # test funciton
-#  # metric.plot.grid(
-#  #    hms = home.list(c(1:17)),
-#  #    mets_list = list(c('pm25', 'co2'), c('pm25', 'voc')),
-#  #    loc = 'living',
-#  #    # met_2 = 'temp', loc_2 = 'outdoor',
-#  #    )
-#  
-```
 
