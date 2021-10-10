@@ -1,0 +1,100 @@
+---
+title: "EPA Data"
+author: "Andrew Purgiel"
+date: "10/9/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# install.packages(pkgs="RAQSAPI", dependencies = TRUE )
+library(RAQSAPI)
+library(tidyverse)
+```
+
+
+# username and key for api
+```{r}
+api_email <- 'purgiel.andrew@gmail.com'
+api_key <- 'amberhawk83'
+
+aqs_credentials(api_email, api_key) 
+
+```
+
+
+# find air quality monitoring sites in Fort COllins
+
+```{r, eval = FALSE}
+co_code <- aqs_states() %>%filter(state == 'Colorado') %>% pull(stateFIPS)
+
+larimer_code <- aqs_counties_by_state(co_code) %>%filter(county_name == 'Larimer') %>% pull(county_code)
+
+sites <- aqs_sites_by_county(co_code, larimer_code)
+
+
+
+```
+
+# find pollutants
+
+```{r}
+aqs_classes()
+
+aqs_parameters_by_class('AQI POLLUTANTS')
+
+```
+
+
+#Define codes based on search
+```{r}
+co_code <- '08'
+larimer_code <- '069'
+csu_code <- '0009'
+pm25_code <- '88101'
+
+start <- as.Date('2016-01-01')
+end <- as.Date('2021-12-31')
+```
+
+
+# acquire data for site 
+
+```{r}
+
+
+daily_epa <-aqs_dailysummary_by_site(pm25_code, start, end,
+                         co_code, larimer_code, csu_code) %>% filter(event_type=='Included',
+                        sample_duration =='1 HOUR')%>%
+    mutate(date = as.Date(date_local),
+         month = month(date, label = TRUE, abbr = TRUE),
+         year = year(date))
+
+monthly_epa <- daily_epa %>%
+  group_by(month, year) %>%
+  summarise(mean = mean(arithmetic_mean), .groups = 'drop')
+
+
+
+```
+
+
+# data by month
+```{r}
+ggplot(monthly_epa)+
+  geom_line(aes(x = month, y = mean, color = as.factor(year),
+                group = as.factor(year)))+
+  scale_x_discrete()
+```
+
+
+# import omni data
+```{r}
+
+omni_hourly <- read_rds('./csv_created/omni_hourly_calibrated.rds') %>% filter(datehour<ymd_hms('2021-06-01 00:00:00'))
+
+```
+
