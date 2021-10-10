@@ -139,7 +139,19 @@ high.conf = function(x){
   gm(x)+1.96*std.error(x)
 }
 
+# make function to label metric names with subscripts
+labeller.metrics <- as_labeller(c('pm25'='PM[2.5]', 'voc'="TVOC",
+                                  'co2' = 'CO[2]', 'temp' = 'Temperature'),
+                           default = label_parsed)
 
+# make function to label metric names with subscripts and seasons
+labeller.all <- as_labeller(c(
+  'pm25'='PM[2.5]', 'voc'="TVOC",
+  'co2' = 'CO[2]', 'temp' = 'Temperature',
+  'ac' = 'AC', 'shoulder' = 'Shoulder', 'heat' = 'Heat',
+  'kitchen' = 'Kitchen', 'living' = 'Living', 'bedroom' = 'Bedroom',
+  'outdoor' = 'Outdoor', 'garage'= 'Garage'
+  ), default = label_parsed)
 
     
 ```
@@ -806,6 +818,7 @@ month.diurn('voc', a)
 
 
 # Multiple metrics in one plot
+
 ##overall monitoring period
 ```{r functions_diurnal_rooms}
 ##Function to make table for plots of real time OMNI data
@@ -904,22 +917,34 @@ limit_df <- dat %>%
                     alpha = if_else(err_ribbon == TRUE, 0.2, 0), color = NA)+
         labs(
           y = 'Average Value',
-             x = 'Hour of Day')+
+             x = 'Hour of Day',
+          size= 'Home-Hours of Data')+
         scale_x_continuous(limits = c(0,24),
                            breaks = c(0,6,12,18),
-                           expand = c(0,0))+
+                           expand = c(0,0),
+                           labels = c('12am', '6am', '12pm', '6pm'))+
         theme_bw()+
         # coord_cartesian(ylim = y_range)+
-        theme(plot.title = element_blank(),
-      axis.text.x = element_text(size = xsmall))+
+        theme(
+          plot.title = element_blank(),
+      axis.text.x = element_text(size = xsmall)
+      )+
         # make point size proportional to # of obs, with 0 obs = size 0
   geom_point(aes(size = n))+
-        scale_size_area(max_size = max_point_size)+
+        scale_size_area(max_size = max_point_size,
+                        )+
         facet_grid(rows = vars(metric), cols = vars(location),
-                   scales = 'free_y')+
+                   scales = 'free_y',
+                   labeller = labeller.all,
+                   switch = 'y')+
+        theme(
+      strip.background = element_rect(fill = NA, color = NA),
+      strip.placement = 'outside'
+              )+
         # use dummy df to define limits for each metric
         geom_blank(data = limit_df, aes(x = 15, y = limits))
-    }
+      
+      }
 
 
 
@@ -950,8 +975,9 @@ plot.diurnal(a)
 
 
     # plot without labels and such
-    plot.diurnal.season <- function(dat, err_ribbon = TRUE) {
+    plot.diurnal.season <- function(dat, n_homes, err_ribbon = TRUE) {
 
+      
       # make a dummy df in which to define limits for each metric
 limit_df <- dat %>%
   group_by(metric) %>%
@@ -965,7 +991,7 @@ limit_df <- dat %>%
          ) %>%
         pivot_longer(cols = c(max, min), names_to = 'side', values_to = 'limits')
 
-    
+
       ggplot(dat, aes(x = hour, y = mean.val
                       # color = home
                       ))+
@@ -980,10 +1006,15 @@ limit_df <- dat %>%
                     alpha = if_else(err_ribbon == TRUE, 0.2, 0), color = NA)+
         labs(
           y = 'Average Value',
-             x = 'Hour of Day')+
+             x = 'Hour of Day',
+          fill = 'Behavior-Defined Season',
+          color = 'Behavior-Defined Season',
+          size = 'Home-Hours of Data'
+          )+
         scale_x_continuous(limits = c(0,24),
                            breaks = c(0,6,12,18),
-                           expand = c(0,0))+
+                           expand = c(0,0),
+                           labels = c('12am', '6am', '12pm','6pm'))+
         theme_bw()+
         # coord_cartesian(ylim = y_range)+
         theme(plot.title = element_blank(),
@@ -994,7 +1025,9 @@ limit_df <- dat %>%
                  ))+
         scale_size_area(max_size = max_point_size)+
         facet_wrap(vars(metric),
-                   scales = 'free_y')+
+                   scales = 'free_y',
+                   labeller = labeller.all
+                   )+
                 scale_fill_manual(
           breaks = energy_breaks,
           values = energy_colors,
@@ -1002,7 +1035,18 @@ limit_df <- dat %>%
           aesthetics = c('fill', 'color')
         )+
         # use dummy df to define limits for each metric
-        geom_blank(data = limit_df, aes(x = 15, y = limits))
+        geom_blank(data = limit_df, aes(x = 15, y = limits))+
+        #ensure seaons legend on top
+        guides(
+    fill = guide_legend(order = 1),
+        color = guide_legend(order = 1),
+    size = guide_legend(order = 2)
+  )+
+        labs(tag = paste('*n homes =', n_homes) )+
+      theme(
+        plot.tag.position = c(.1,0.02),
+        strip.background = element_rect(fill = NA, color = NA)
+        )
     }
 
 
@@ -1067,7 +1111,7 @@ a$energy_cluster <- factor(a$energy_cluster, levels = c('overall', 'ac', 'should
 a$metric <- factor(a$metric, levels = c('pm25', 'voc', 'co2'))
 
 # plot
-plot.diurnal.season(a)
+plot.diurnal.season(a, n_homes = 5)
 
 
 
@@ -1100,7 +1144,7 @@ a$energy_cluster <- factor(a$energy_cluster, levels = c('overall', 'ac', 'should
 a$metric <- factor(a$metric, levels = c('pm25', 'voc', 'co2'))
 
 # plot
-plot.diurnal.season(a)
+plot.diurnal.season(a, n_homes = 5)
 
 
 
