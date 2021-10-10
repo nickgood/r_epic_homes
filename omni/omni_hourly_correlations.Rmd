@@ -182,7 +182,7 @@ corr_fig_width <- 10.5
 
 
 # room-correaltions
-```{r functions_correlation_additional variable, eval = TRUE}
+```{r functions_correlation, eval = TRUE}
 # define variables for testing----------------------
 
 # data <- omni_hourly
@@ -196,7 +196,6 @@ corr_fig_width <- 10.5
 # met_2 <- 'temp'
 # loc_2 <- 'outdoor'
 
-# between room correlation plots--------------------------
   # data making functions--------------
 
 ##in a home at a given hour 
@@ -223,7 +222,7 @@ corr_fig_width <- 10.5
                    exact = FALSE # to avoid warning message
                    )
      # return results
-     tibble('coeff' = a[['estimate']],
+     tibble('coeff' = a[['estimate']]%>% unname(),
             'p_val' = a[['p.value']],
             'method' = method)
      },
@@ -240,7 +239,6 @@ corr_fig_width <- 10.5
 #  # test funct
 # test <- room.coeff.hour('008', c('living', 'garage'),
 #              23, 'pm25', 'spearman', omni_hourly)
- 
  
 
 
@@ -260,10 +258,10 @@ corr_fig_width <- 10.5
    tibble('hour' = c(0:23),
           
           ##make a column for correlation coefficient values
-          'coeff' = cor_results[1,],
+          'coeff' = cor_results[1,]%>%unlist(),
           
           ##make a column for correlation p-values
-          'p_val' = cor_results[2,],
+          'p_val' = cor_results[2,]%>%unlist(),
           'loc_pair' = paste0(rm_pair[1],'-', rm_pair[2]))
  }
 
@@ -271,17 +269,11 @@ corr_fig_width <- 10.5
 #  # test funct
 # test <- room.cor.hourly('008', c('living', 'garage'),
 #                    'pm25', 'spearman', omni_hourly)
- 
 
-
-
- ##function to create a plot of correlation between
  ##multiple room pairs by hour
  ##with additional variable also plotted by hour
  
  room.hourly.home <- function (hm, rms_list, met,
-                                    met_2 = NULL, loc_2 = NULL,
-                               simple = FALSE,
                                     method = 'spearman',
                                     data = omni_hourly) {
    
@@ -295,25 +287,7 @@ corr_fig_width <- 10.5
 bind_rows() %>%
      mutate(home = hm, metric = met)
 
-   # if(!is.null(met_2)){
-   # ## add second variable if specified
-   # a <-a %>%
-   #   ##join with average hourly outdoor temp
-   #   full_join(
-   #     omni_hourly %>%
-   #       filter(home == hm, location == loc_2) %>%
-   #       select(datehour, all_of(met_2)) %>%
-   #       group_by(hour = hour(datehour)) %>%
-   #       summarize(var_2 = mean(!!sym(met_2), na.rm = TRUE),
-   #                 var_2_sd = sd(!!sym(met_2), na.rm = TRUE),
-   #                 var_2_high = var_2+var_2_sd,
-   #                 var_2_low = var_2-var_2_sd,
-   #                 .groups = 'drop'),
-   #     by = 'hour'
-   #   )
-   # 
-   # 
-   # }
+  
 
  }
 
@@ -327,8 +301,7 @@ bind_rows() %>%
  #    met = 'pm25',
  #    # met_2 = 'co2', loc_2 = 'living'
  #    )
- 
- 
+
  room.hourly.all <- function (rms_list, met,
                                     method = 'spearman',
                                     data = omni_hourly){
@@ -405,23 +378,79 @@ bind_rows()
 ```
 
 ## make data
-```{r}
+```{r, eval = FALSE}
+room_correlations_pm25 <- room.hourly.all(c(rms_indoor, rms_driver, rms_garage), 'pm25')
 
+
+room_correlations_voc <- room.hourly.all(c(rms_indoor, rms_driver, rms_garage), 'voc')
+
+room_correlations_temp <- room.hourly.all(c(rms_indoor, rms_driver, rms_garage), 'temp')
+
+room_correlations <- bind_rows(
+  room_correlations_pm25, room_correlations_voc, room_correlations_temp
+)
+
+write_csv(room_correlations, './csv_created/room_correlations.csv')
 ```
 
 
 ## plot all homes
 ```{r, fig.height = 5, fig.width = 11}
 
- # test function
- test <- room.hourly.all(
-   rms_indoor[1], 'temp'
- )
+room_correlations <- read_csv('./csv_created/room_correlations.csv')
 
- # test function
+# driver plot------------
+met <- 'pm25'
+
+# drivers plot
+ a <- room_correlations %>% filter(loc_pair %in% c('kitchen-living',
+                                                   'outdoor-living',
+                                                   'garage-living') &
+                                     metric == met)
+
+# make plot
  room.hourly.plot(
-   test, 'temp'
+   a, met
     )
+ 
+ 
+ met <- 'voc'
+
+# drivers plot
+ a <- room_correlations %>% filter(loc_pair %in% c('kitchen-living',
+                                                   'outdoor-living',
+                                                   'garage-living') &
+                                     metric == met)
+
+# make plot
+ room.hourly.plot(
+   a, met
+    )
+ 
+ # garage plot-----------
+ 
+ met <- 'pm25'
+ 
+ a <- room_correlations %>% filter(loc_pair %in% c('kitchen-garage',
+                                                   'outdoor-garage') &
+                                     metric == met)
+
+# make plot
+ room.hourly.plot(
+   a, met
+    ) 
+ 
+  met <- 'voc'
+ 
+ a <- room_correlations %>% filter(loc_pair %in% c('kitchen-garage',
+                                                   'outdoor-garage') &
+                                     metric == met)
+
+# make plot
+ room.hourly.plot(
+   a, met
+    ) 
+ 
 ```
 
 # metric-correlations
@@ -450,7 +479,7 @@ bind_rows()
                    exact = FALSE # to avoid warning message
                    )
      # return results
-     tibble('coeff' = a[['estimate']],
+     tibble('coeff' = a[['estimate']] %>% unname(),
             'p_val' = a[['p.value']],
             'method' = method)
      },
@@ -487,10 +516,10 @@ bind_rows()
    tibble('hour' = c(0:23),
           
           ##make a column for correlation coefficient values
-          'coeff' = cor_results[1,],
+          'coeff' = cor_results[1,]%>%unlist(),
           
           ##make a column for correlation p-values
-          'p_val' = cor_results[2,],
+          'p_val' = cor_results[2,]%>%unlist(),
           'met_pair' = paste0(met_pair[1],'-', met_pair[2]))
  }
 
@@ -504,8 +533,6 @@ bind_rows()
  ##with additional variable also plotted by hour
  
   metric.hourly.home <- function (hm, loc, mets_list, met,
-                                    met_2 = NULL, loc_2 = NULL,
-                               simple = FALSE,
                                     method = 'spearman',
                                     data = omni_hourly) {
  ##find correlations and pvalues for each room pair
@@ -546,7 +573,7 @@ bind_rows()
  
  
  # test function
- # test <- metric.hourly.all(list(c('co2', 'lux')), 'living')
+ test <- metric.hourly.all(met_pairs_pollutants, 'living')
  
  
   # plotting functions---------------
@@ -602,22 +629,39 @@ bind_rows()
 
 ## make data
 
-```{r}
+```{r, eval = FALSE}
+metric_correlations_living <- metric.hourly.all(c(met_pairs_proxy, met_pairs_pollutants), 'living')
 
-# metric.hourly.all(met_pairs_proxy)
+
+metric_correlations_garage <- metric.hourly.all(c(met_pairs_proxy, met_pairs_pollutants), 'garage')
+
+metric_correlations_bedroom <- metric.hourly.all(c(met_pairs_proxy, met_pairs_pollutants), 'bedroom')
+
+
+metric_correlations <- bind_rows(
+  metric_correlations_living, metric_correlations_garage,
+  metric_correlations_bedroom
+)
+
+write_csv(metric_correlations, './csv_created/metric_correlations.csv')
 ```
 
 ## plot all homes
 ```{r, fig.height = 5, fig.width = 11}
+ 
+metric_correlations <- read_csv('./csv_created/metric_correlations.csv')
 
- # test function
- test <- metric.hourly.all(
-   rms_indoor[1], 'temp'
- )
+loc <- 'living'
+ 
+ a <- metric_correlations %>% filter(met_pair %in% c('co2-voc',
+                                                   'co2-lux') &
+                                     location == loc)
 
+# make plot
  metric.hourly.plot(
-   test, 'living'
-    )
+   a, loc
+    ) 
+
 ```
 
 
