@@ -838,7 +838,7 @@ diurnal.table <- function(data,
   a <- data %>%
     filter(datehour > ymd_hms(start_date) &
              datehour < ymd_hms(end_date) &
-             location %in% locations_all) %>%
+             location %in% locations) %>%
     select(datehour, home, location, all_of(met), energy_cluster)
   
   #if geo is FALSE (default), use arithmetic mean and standard deviation
@@ -894,7 +894,7 @@ diurnal.table <- function(data,
 # test <- diurnal.table(omni_hourly, 'pm25', groupers = c('location'))
 
 
-    # plot without labels and such
+    # plot 
     plot.diurnal <- function(dat, err_ribbon = TRUE) {
 
       # make a dummy df in which to define limits for each metric
