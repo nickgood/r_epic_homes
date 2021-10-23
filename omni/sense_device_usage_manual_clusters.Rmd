@@ -1,0 +1,860 @@
+---
+title: "Define Seasons Based on Device Time On"
+output: html_document
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.path = 'figures/',
+  warning = FALSE,
+  message = FALSE,
+  echo = FALSE,
+  fig.width = 10, fig.height = 16,
+  cache = FALSE)
+
+```
+
+```{r source_functions_libraries, eval = TRUE}
+# reads source
+source("../functions_epic.R")
+# add extra libraries for cluster analysis
+library('cluster')
+library('factoextra')
+
+
+```
+
+```{r functions_misc}
+
+##Define a char vector of home numbers using a number vector,
+##ex: x <- home.list(c(1:15)) for homes 1-15
+threedig <- function(x) {
+  if (nchar(x) == 1) {a <- paste0('00', x)
+  return(a)
+  }
+  
+  if (nchar(x) == 2) {a<- paste0('0', x)
+  return(a)
+  }
+  else return(a)
+}
+
+home.list <- function(x) sapply(x, threedig)
+```
+
+
+# Manual Clustering  
+
+```{r define_variables, eval = TRUE}
+# define variables
+homes_all <- home.list(1:17)
+homes_ac <- c('001', '002', '006', '007', '008', '009', '012', '014')
+homes_no_ac <- c('004', '010', '011', '013', '015')
+
+# classify homes into "tiers" based on cluster pattern
+homes_tier3<-home.list(c(1,2,7,9,12)) # ac-shoulder-heat
+homes_tier2<-home.list(c(4,10,11,13,15)) # shoulder-heat (sometimes second shoulder)
+homes_tier1<-home.list(c(6,8,14))
+
+# just compare methods for daily fraction of time-on (pct)
+# heat_percentile_thresh <- 0.25
+
+max_heat_fraction <- 0.15
+ac_usage_thresh <- 0
+
+# color blind pallette
+# check http://www.cookbook-r.com/Graphs/Colors_(ggplot2)/#a-colorblind-friendly-palette
+cbbPalette <- c('black' = "#000000",
+                'light_orange' = "#E69F00",
+                'light_blue' = "#56B4E9",
+                'green' = "#009E73",
+                'yellow' = "#F0E442",
+                'dark_blue' = "#0072B2",
+                'dark_orange' = "#D55E00",
+                'purple' = "#CC79A7"
+                )
+# define colors for energy clusters
+energy_colors <- c(cbbPalette['light_blue'],
+                   cbbPalette['green'],
+                   cbbPalette['dark_orange'])%>% unname()
+
+energy_breaks <- c('ac', 'shoulder', 'heat')
+energy_labels <- c('Summer', 'Shoulder', 'Winter')
+
+resolution <- 'hour'
+```
+
+
+```{r data_import, eval = FALSE}
+
+data <- (
+  if(resolution == 'hour'){
+  read_rds("../output_thesis/sense/sense_hourly_thesis.rds")} else if(resolution == 'minute'){
+  read_rds("../output_thesis/sense/sense_all_thesis.rds")}
+  )%>%
+  filter(datetime < ymd('2021-06-01'))
+
+
+# test <- data %>%
+#   group_by(job_id) %>%
+#   summarize(end = max(datetime))
+```
+
+---
+
+heating threshold set at `r max_heat_fraction` of max month daily fraction on
+
+ac threshold set at `r ac_usage_thresh`% for daily % time on
+
+```{r function_cluster}
+# for testing--------------
+
+# home_id <- '009'
+# devices <- 'furnace'
+# measure <- 'pct'
+# 
+# rm(home_id, devices, measure)
+
+# functions-------------------
+cluster.manual <- function(home_id, devices,
+                           include_zero, # if TRUE, include zero in calculation of quartile for daily heat-use
+                           measure = 'pct', # pct (fraction on) or consumption
+                           return_data = FALSE) {
+  
+  if(resolution == 'hour'){
+unit_per_day <-  24 # amoutn of units in each day
+units <- 'hours'
+}else if(resolution == 'minute'){
+unit_per_day <-  60*24 # amoutn of units in each day
+units <- 'mins'
+}
+  
+  a <- data %>%
+    filter(job_id == home_id) %>%
+    mutate(dateday = floor_date(datetime, unit = 'day'),
+           sense_device_name = if_else(is.na(sense_device_name),
+                                       device_id, sense_device_name)) %>%
+    group_by(sense_device_name, dateday) %>%
+    summarise(
+      on_per_day = n(), # amount of hours device was on during specified day
+      consumption = sum(consumption_kwh, na.rm = TRUE),
+      .groups = "drop") %>%
+    mutate(
+         pct = on_per_day * 100 / unit_per_day,
+         pct = if_else(pct == Inf, 0, pct)) %>% # make cluster of time periods
+    select(-c(on_per_day))%>%
+    pivot_wider(names_from = sense_device_name, values_from = c(pct, consumption),
+                values_fill = 0 # make device usage minutes zero if not registered
+                # in a certain day
+    ) %>%
+    select(dateday, ends_with(all_of(devices))) %>%
+    select(dateday, starts_with(measure)) %>%
+    #rename specific heat and ac columns to generic terms
+    rename_at(vars(contains(c('heat', 'furnace'))), list(~sub('.*','heat',.))) %>%
+    rename_at(vars(contains('ac')), list(~sub('.*','ac',.)))
+  
+  # find heat threshold value based on percent of max month
+  heat_thresh_value <-
+  #   if(include_zero == TRUE) {
+  #   a %>% pull(heat) %>% quantile(heat_percentile_thresh)
+  # } else if(include_zero == FALSE){
+  #         a %>% filter(heat >0) %>% pull(heat)%>%
+  #     quantile(heat_percentile_thresh)
+  #   }
+    a %>%
+    #find month with max avg daily heat pct on
+    # and make threshold 15% of that value
+    group_by(month = month(dateday, label = TRUE, abbr = TRUE)) %>%
+    summarise(avg_heat = mean(heat, na.rm = TRUE)) %>%
+    pull(avg_heat) %>%
+    max()*max_heat_fraction
+  
+  # make a df with clusters
+  a_cl <- a %>%
+    ### add in manual clustering method
+    
+    # make level of use columns for heat and ac (unscaled)
+    # heat based on quantile
+    # ac based on value
+    mutate(heat_use = if_else(heat>heat_thresh_value, 'high', 'low'),
+           ac_use = if_else(ac> ac_usage_thresh, 'high', 'low')) %>%
+    mutate(energy_cluster = case_when(
+      heat_use == 'high' ~ 'heat',
+      heat_use == 'low' & ac_use == 'high' ~ 'ac',
+      heat_use == 'low' & ac_use == 'low' ~ 'shoulder'
+    )) %>%
+    select(-c(heat_use, ac_use))%>%
+    mutate(home = home_id) # add column identifying home
+  
+  
+  if(return_data == TRUE) a_cl else if(return_data == FALSE){
+    
+    # # boxplot of unscaled daily device usage fraction
+    # a_dev <- a %>%
+    #   pivot_longer(cols = c(heat,ac), names_to = 'device', values_to = 'usage')
+    # 
+    # boxplot <- ggplot(a_dev, aes(y = usage))+
+    #   geom_boxplot()+
+    #   facet_wrap(vars(device))+
+    #   ggtitle(home_id)
+    
+    
+    # cluster_point_plot <- 
+    #   ggplot(a_cl, aes(x= heat, y = ac, color = energy_cluster))+
+    #   geom_point()+
+    #   # facet_wrap(vars(cluster_method))+
+    #   scale_color_manual(values = c('red', 'blue', 'darkgreen'),
+    #                      breaks = c('heat', 'ac', 'shoulder'))+
+    #   ggtitle(home_id)
+    
+    
+    
+    #plot the cluster number over date to see if there is a "trend"
+    cluster_time_plot <- ggplot(a_cl, aes(x = as.Date(dateday), y = 1)) +
+      # color data point by cluster
+      geom_tile(aes(fill = energy_cluster))+
+      scale_fill_manual(values = energy_colors,
+                        breaks = energy_breaks,
+                        labels = energy_labels)+ 
+      scale_x_date(date_breaks = "1 month", date_labels = '%B')+
+      theme_bw()+
+      theme(
+        axis.title.y = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank()
+      )+
+      # facet_wrap(vars(cluster_method))+
+      ggtitle(paste('Home', home_id, measure))
+    
+    # return plots
+    list(
+      # boxplot,
+      # cluster_point_plot,
+      cluster_time_plot)
+    
+  }
+}
+
+# # test function
+# test <- cluster.manual('001', c('heat 6','ac'), return_data = TRUE, include_zero = zero_choice)
+
+
+# function for homes with only heating
+cluster.manual.heat <- function(home_id, devices,
+                                measure = 'pct', # pct (fraction on) or consumption
+                                include_zero,
+                                return_data = FALSE) {
+  
+    if(resolution == 'hour'){
+unit_per_day <-  24 # amoutn of units in each day
+units <- 'hours'
+}else if(resolution == 'minute'){
+unit_per_day <-  60*24 # amoutn of units in each day
+units <- 'mins'
+}
+  
+  a <- data %>%
+    filter(job_id == home_id) %>%
+    mutate(dateday = floor_date(datetime, unit = 'day'),
+           sense_device_name = if_else(is.na(sense_device_name),
+                                       device_id, sense_device_name)) %>%
+    group_by(sense_device_name, dateday) %>%
+    summarise(
+      on_per_day = n(), # amount of hours device was on during specified day
+      consumption = sum(consumption_kwh, na.rm = TRUE),
+      .groups = "drop") %>%
+    mutate(
+         pct = on_per_day * 100 / unit_per_day,
+         pct = if_else(pct == Inf, 0, pct)) %>% # make cluster of time periods
+    select(-c(on_per_day))%>%
+    pivot_wider(names_from = sense_device_name, values_from = c(pct, consumption),
+                values_fill = 0 # make device usage minutes zero if not registered
+                # in a certain day
+    ) %>%
+    select(dateday, ends_with(all_of(devices))) %>%
+    select(dateday, starts_with(measure)) %>%
+    #rename specific heat and ac columns to generic terms
+    rename_at(vars(contains(c('heat', 'furnace'))), list(~sub('.*','heat',.)))
+  
+  
+  # find heat threshold value based on percentile
+  heat_thresh_value <-
+  #   if(include_zero == TRUE) {
+  #   a %>% pull(heat) %>% quantile(heat_percentile_thresh)
+  # } else if(include_zero == FALSE){
+  #         a %>% filter(heat >0) %>% pull(heat)%>%
+  #     quantile(heat_percentile_thresh)
+  #   }
+    a %>%
+    #find month with max avg daily heat pct on
+    # and make threshold 10% of that value
+    group_by(month = month(dateday, label = TRUE, abbr = TRUE)) %>%
+    summarise(avg_heat = mean(heat, na.rm = TRUE)) %>%
+    pull(avg_heat) %>%
+    max()*max_heat_fraction
+  
+  # make a df with clusters
+  a_cl <- a %>%
+    ### add in manual clustering method
+    
+    # make level of use columns for heat and ac (unscaled)
+    # heat based on quantile
+    mutate(heat_use = if_else(heat>heat_thresh_value, 'high', 'low')) %>%
+    mutate(energy_cluster = case_when(
+      heat_use == 'high' ~ 'heat',
+      heat_use == 'low'  ~ 'shoulder',
+    )) %>%
+    select(-c(heat_use)) %>%
+    mutate(home = home_id) # add column identifying home
+  
+  if(return_data == TRUE) a_cl else if(return_data == FALSE){
+    
+    
+    # # boxplot of unscaled daily device usage fraction
+    # a_dev <- a %>%
+    #   pivot_longer(cols = c(heat), names_to = 'device', values_to = 'usage')
+    # 
+    # boxplot <- ggplot(a_dev, aes(y = usage))+
+    #   geom_boxplot()+
+    #   ggtitle(home_id)
+    
+    
+    #plot the cluster number over date to see if there is a "trend"
+    cluster_time_plot <- ggplot(a_cl, aes(x = as.Date(dateday), y = 1)) +
+      # color data point by cluster
+      geom_tile(aes(fill = energy_cluster))+
+      scale_fill_manual(values = energy_colors,
+                        breaks = energy_breaks,
+                        labels = energy_labels,
+                        name = 'Season')+
+      scale_x_date(date_breaks = "1 month", date_labels = '%B')+
+      theme_bw()+
+      theme(
+        axis.title.y = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank()
+      )+
+      # facet_wrap(vars(cluster_method))+
+      ggtitle(paste('Home', home_id, measure))
+    
+    # return plots
+    list(
+      # boxplot,
+      cluster_time_plot)                  
+  }
+  
+}
+
+# # test function
+# cluster.manual.heat('004', c('furnace'))
+
+
+```
+
+
+
+## Tier 3 Homes
+```{r plot_manual_cluster_tier3, eval = FALSE, fig.width=8, fig.height=1, eval = FALSE}
+
+
+
+hm <- '001'
+# 2 feasible ac units...
+home_001 <- cluster.manual(hm, c('heat 6','ac'))
+
+
+hm <- '002'
+#
+home_002 <- cluster.manual(hm, c('furnace','ac 2'))
+
+
+hm <- '007'
+# 
+home_007 <- cluster.manual(hm, c('heat 2','ac'))
+
+
+hm <- '009'
+# many heats that could be feasible...
+# consider summing consumption from heat 2 and 3 with furnace to cluster
+home_009 <- cluster.manual(hm, c('furnace','ac'))
+
+
+hm <- '012'
+#
+home_012 <- cluster.manual(hm, c('furnace','ac'))
+
+
+
+```
+
+## Tier 2 Homes
+```{r plot_manual_cluster_tier2, eval = FALSE, fig.width=8, fig.height=1, eval = FALSE}
+
+hm <- '004'
+# no AC
+cluster.manual.heat(hm, c('furnace'))
+
+
+
+hm <- '010'
+# no ac (later enrollment), also no one heat that makes complete sense by itself...
+cluster.manual.heat(hm, c('heat 2'))
+
+
+hm <- '011'
+# no ac (later enrollment)
+cluster.manual.heat(hm, c('heat 6'))
+
+
+
+hm <- '013'
+# only 4 days of ac detected, so not used to cluster
+# no heats consume much, but heat 2 is on most often/constently
+cluster.manual.heat(hm, c('heat 2'))
+
+
+
+hm <- '015'
+# no ac, multiple feasible heats
+cluster.manual.heat(hm, c('furnace'))
+
+
+```
+
+## Tier 1 Homes
+```{r plot_manual_cluster_tier1, eval = FALSE, fig.width=8, fig.height=1, eval = FALSE}
+
+
+hm <- '006'
+#
+cluster.manual(hm, c('heat 1','ac'))
+
+
+
+hm <- '008'
+# many heats that could be feasible...
+# heat 1 and 2 on approx same fraction, but 2 consumes more energy
+cluster.manual(hm, c('heat 2','ac'))
+
+
+
+hm <- '014'
+# heat doesn't look feasible...
+# ac on at unexpected months
+cluster.manual(hm, c('heat 1','ac'))
+
+
+
+```
+
+
+## Make Data with Cluster Column
+
+```{r cluster_data_maker, eval = FALSE}
+zero_choice <- FALSE
+
+hm <- '001'
+# 2 feasible ac units...
+cluster_df_001 <- cluster.manual(hm, c('heat 6','ac'), return_data = TRUE,
+                                 include_zero = zero_choice)
+
+
+hm <- '002'
+#
+cluster_df_002 <- cluster.manual(hm, c('furnace','ac 2'), return_data = TRUE, include_zero = zero_choice)
+
+
+hm <- '007'
+# 
+cluster_df_007 <- cluster.manual(hm, c('heat 2','ac'), return_data = TRUE, include_zero = zero_choice)
+
+
+hm <- '009'
+# many heats that could be feasible...
+# consider summing consumption from heat 2 and 3 with furnace to cluster
+cluster_df_009 <- cluster.manual(hm, c('furnace','ac'), return_data = TRUE, include_zero = zero_choice)
+
+
+
+hm <- '012'
+#
+cluster_df_012 <- cluster.manual(hm, c('furnace','ac'), return_data = TRUE, include_zero = zero_choice)
+
+# tier 2 homes
+
+hm <- '004'
+# no AC
+cluster_df_004 <- cluster.manual.heat(hm, c('furnace'), return_data = TRUE, include_zero = zero_choice)
+
+
+
+hm <- '010'
+# no ac (later enrollment), also no one heat that makes complete sense by itself...
+cluster_df_010 <- cluster.manual.heat(hm, c('heat 2'), return_data = TRUE, include_zero = zero_choice)
+
+
+hm <- '011'
+# no ac (later enrollment)
+cluster_df_011 <- cluster.manual.heat(hm, c('heat 6'), return_data = TRUE, include_zero = zero_choice)
+
+
+
+hm <- '013'
+# only 4 days of ac detected, so not used to cluster
+# no heats consume much, but heat 2 is on most often/constently
+cluster_df_013 <- cluster.manual.heat(hm, c('heat 2'), return_data = TRUE, include_zero = zero_choice)
+
+
+
+hm <- '015'
+# no ac, multiple feasible heats
+cluster_df_015 <- cluster.manual.heat(hm, c('furnace'), return_data = TRUE, include_zero = zero_choice)
+
+
+# tier 1 homes
+
+hm <- '006'
+#
+cluster_df_006 <- cluster.manual(hm, c('heat 1','ac'), return_data = TRUE, include_zero = zero_choice)
+
+
+
+hm <- '008'
+# many heats that could be feasible...
+# heat 1 and 2 on approx same fraction, but 2 consumes more energy
+cluster_df_008 <- cluster.manual(hm, c('heat 1','ac'), return_data = TRUE, include_zero = zero_choice)
+
+
+
+hm <- '014'
+# heat doesn't look feasible...
+# ac on at unexpected months
+cluster_df_014 <- cluster.manual(hm, c('heat 1','ac'), return_data = TRUE, include_zero = zero_choice)
+
+
+# combine all data frames
+daily_energy_data_clustered <- 
+  lapply(home.list(c(1,2,4,6:15)),
+         function(x) get(paste0('cluster_df_', x))) %>%
+  bind_rows()%>%
+  # add column for home tier
+  mutate(home_type = case_when(
+    home %in% homes_tier3 ~ 'tier3',
+    home %in% homes_tier2 ~ 'tier2',
+    home %in% homes_tier1 ~ 'tier1',
+    TRUE ~ 'unclassified'))
+
+# make csv file (mutating date to character to avoid time change)
+# and backup
+write_csv(daily_energy_data_clustered %>%
+            mutate(dateday = as.character(dateday)), './csv_created_sense/daily_energy_data_clustered.csv')
+
+write_csv(daily_energy_data_clustered %>%
+            mutate(dateday = as.character(dateday)), paste0('./csv_created_sense/daily_energy_data_clustered_', Sys.Date(),'.csv')
+)
+
+```
+
+## Make color plot with all homes
+```{r read_energy_cluster_df}
+# test <- read_csv('./csv_created_sense/daily_energy_data_clustered_nozero.csv')
+daily_energy_data_clustered <- read_csv('./csv_created_sense/daily_energy_data_clustered.csv')
+# 
+#   # add column for home tier
+#   mutate(home_type = case_when(
+#     home %in% homes_tier3 ~ 'tier3',
+#     home %in% homes_tier2 ~ 'tier2',
+#     home %in% homes_tier1 ~ 'tier1',
+#     TRUE ~ 'unclassified'))
+
+```
+
+
+```{r cluster_end_points}
+# # find where clusters start (first occurence of 6 consecutive days in cluster)
+# 
+# # #test: define start based on first occurence
+# # test <- daily_energy_data_clustered %>%
+# #   group_by(home) %>%
+# #   summarise(shoulder_start = dateday[which(energy_cluster == 'heat')[1]])
+# 
+# a <- daily_energy_data_clustered %>%
+#   filter(home == '009') %>%
+#   arrange(dateday)  
+# 
+# y <- rle(a$energy_cluster) 
+# 
+# heat_indeces <- which(y$values == 'heat' & y$lengths>=8)
+# 
+# final_heat_index <- heat_indeces[length(heat_indeces)]
+# final_heat_length <- y$lengths[final_heat_index]
+# a$dateday[sum(y$lengths[1:final_heat_index])+1]
+# # need to add condition if NA (if the last heat period is the end,
+# # so nothing occurs after the last index)
+# 
+# 
+# # return position of end of 8-day stretch
+#     a$dateday[sum(y$lengths[1:(i_heat-1)])+1]
+
+# test with function
+season_end_points <- map(homes_all, function(x_home) {
+
+a <- daily_energy_data_clustered %>%
+  filter(home == x_home) %>%
+  arrange(dateday)  
+
+  # define sets of days based on their consecutive energy_cluster value
+  # (and the lengths of each set)
+y <- rle(a$energy_cluster) 
+
+# look for shoulder dates in tier 3
+if(x_home %in% c(homes_tier3,
+                 # special case Tier 2 homes
+                 '010'
+                 )) {
+
+#label a set TRUE if it contains 8 or more consecutive shoulder days
+    z <- y$values == 'shoulder' &
+      # y$lengths >= 8
+      y$lengths >= ifelse(x_home == '012', 5, 8) # home 12 special case
+    # find first set of clustered shoulder days that is 8 or more days long
+    i_shoulder <- which(z)[1] 
+    # return NA if there is never a 8-day stretch of shoulder days
+    shoulder_start <- if (is.na(i_shoulder)) NA else 
+    # return first day if that is when 8-day stretch starts
+    if (i_shoulder == 1) a$dateday[1] else
+    # return position of start of 8-day stretch
+    a$dateday[sum(y$lengths[1:(i_shoulder-1)])+1]
+} else shoulder_start <- NA
+
+# look for heat dates in tier 2 and 3
+
+if(x_home %in% c(homes_tier3, homes_tier2)) {
+
+    #same for heat days
+    z <- y$values == 'heat' & 
+      y$lengths >= ifelse(x_home == '012', 6, 8) # home 12 special case
+    # find first set of clustered heat days that is 8 or more days long
+    if(x_home == '010') i_heat <- which(z)[2]  else# home 010 is special case
+    i_heat <- which(z)[1]
+#     # NOT WORKING ensure that heat set of heat days is after shoulder days
+#     if(!is.na(i_heat) & !is.na(i_shoulder)) {
+#              iter <- 0
+# while(i_heat < i_shoulder){
+#       i_heat <- which(z)[1+iter]
+#       iter <- iter+1
+# }
+#     }
+    # return NA if there is never a 8-day stretch of heat days
+    heat_start <- if (is.na(i_heat)) NA else 
+    # return first day if that is when 8-day stretch starts
+    if (i_heat == 1) a$dateday[1] else
+    # return position of start of 8-day stretch
+    a$dateday[sum(y$lengths[1:(i_heat-1)])+1]
+    
+} else heat_start <- NA
+
+
+# look for end dates of heat seasons 
+if(x_home %in% c(
+                 homes_tier2, homes_tier3
+                 )) {
+
+# determine index of heating day spans with lengths of 8 days or greater
+heat_indeces <- which(y$values == 'heat' & y$lengths>=8)
+
+final_heat_index <- heat_indeces[length(heat_indeces)]
+final_heat_length <- y$lengths[final_heat_index]
+heat_end <- a$dateday[sum(y$lengths[1:final_heat_index])+1]
+
+} else heat_end <- NA
+
+    return(tibble('home' = x_home, 'shoulder_start' = shoulder_start,
+                  'heat_start' = heat_start, 'heat_end' = heat_end))
+  }) %>% bind_rows()
+
+```
+
+```{r plot_cluster_color_all_homes}
+# for reference:
+# https://stackoverflow.com/questions/59398026/adding-geom-segment-to-faceted-plot-that-have-free-x-axis
+a <- daily_energy_data_clustered %>%
+  left_join(season_end_points, by = 'home')%>%
+  group_by(home_type) %>%
+  # make a column that will allow for proper positioning of lines
+  mutate(plot_home = case_when(
+    home == '006' ~ '001',
+    home == '008' ~ '002',
+    home == '014' ~ '003',
+    home == '004' ~ '001',
+    home == '010' ~ '002',
+    home == '011' ~ '003',
+    home == '013' ~ '004',
+    home == '015' ~ '005',    
+    home == '007' ~ '003',
+    home == '009' ~ '004',
+    home == '012' ~ '005',
+    TRUE ~ home))%>%
+  mutate(
+    dateday = as.Date(dateday),
+    shoulder_start = as.Date(shoulder_start),
+         heat_start = as.Date(heat_start),
+         heat_end = as.Date(heat_end)
+         )
+
+
+  
+  # line_data <- a %>%
+#   group_by(home_type) %>%
+#   summarise(n_homes = length(unique(home))) %>%
+#   mutate(func = paste0('seq(1,', n_homes, ') - 0.5'))
+
+ # parse(text = paste0('seq(1,', 5, ') - 0.5')) %>%eval()
+
+# define labels for facets
+type_labs <- c("Group 1", "Group 2", "Group 3")
+names(type_labs) <- c("tier1", "tier2", "tier3")
+
+#plot the cluster over date
+ggplot(a) +
+  # color data point by cluster
+  geom_tile(aes(x = dateday, y = home, fill = energy_cluster))+
+  scale_fill_manual(values = energy_colors,
+                        breaks = energy_breaks,
+                        labels = energy_labels,
+                    name = 'Season')+
+  scale_x_date(date_breaks = "1 month", date_labels = '%b')+
+  theme_bw()+
+  theme(
+    # axis.title.y = element_blank(),
+    # axis.text.y = element_blank(),
+    axis.ticks.y = element_blank()
+  )+
+  #below line not working...
+  # geom_hline(data = line_data, aes(yintercept = seq(1,n_homes)-0.5)))+
+  geom_hline(aes(yintercept = as.numeric(plot_home)-0.5), color = 'grey')+
+    geom_hline(aes(yintercept = as.numeric(plot_home)+0.5), color = 'grey')+
+
+  # below allows for only homes within each tier to be plotted
+  # and keeps bar height constant
+  facet_grid(home_type~.,
+             scales = "free",
+             space = "free_y",
+             labeller = labeller(home_type = type_labs))+
+  xlab('Date')+
+  ylab('Home')+
+  theme_classic()+
+          geom_segment(
+                 aes(x = shoulder_start, xend = shoulder_start,
+                     y = as.numeric(plot_home)-0.5,
+                     yend=as.numeric(plot_home)+0.5), lwd = 1)+
+  geom_segment(
+                 aes(x = heat_start, xend = heat_start,
+                     y = as.numeric(plot_home)-0.5,
+                     yend=as.numeric(plot_home)+0.5), lwd = 1)+
+  geom_segment(
+                 aes(x = heat_end, xend = heat_end,
+                     y = as.numeric(plot_home)-0.5,
+                     yend=as.numeric(plot_home)+0.5), lwd = 1)
+
+
+
+```
+
+## make cluster percent csv
+```{r}
+
+##  count percentage of days in each season (not including group1)
+
+season_pcts <- daily_energy_data_clustered %>%
+  group_by(home_type) %>%
+  mutate(n_home_days = n()) %>%
+  ungroup() %>%
+  group_by(energy_cluster, home_type) %>%
+  summarize(
+    n_home_days_cluster = unique(n_home_days),
+    pct_season = n()/n_home_days_cluster*100,
+    pct_season = pct_season %>% signif(2),
+    .groups = 'drop'
+  )
+
+write_csv(season_pcts, './csv_created_sense/season_pcts.csv')
+```
+
+
+## Make Cluster Dataframe
+
+
+```{r make_cluster_csv, eval = FALSE}
+
+energy_cluster_df <- map(homes_all, function(x_home) {
+    
+first_date <- daily_energy_data_clustered %>%
+  filter(home == x_home)%>%
+  pull(dateday) %>% min() %>% as.character()
+
+first_date <- ifelse(is_empty(first_date), NA, first_date)
+
+should_start <- season_end_points %>% 
+  filter(home == x_home) %>%
+  pull(shoulder_start) %>% as.character()
+
+should_start <- if(x_home %in% c('010')) should_start else
+  if (x_home %in% homes_tier2) first_date else
+    ifelse(is_empty(should_start), NA, should_start)
+
+ht_start <- season_end_points %>% 
+  filter(home == x_home) %>%
+  pull(heat_start) %>% as.character()
+
+ht_start <- ifelse(is_empty(ht_start), NA, ht_start)
+
+ht_end <- season_end_points %>% 
+  filter(home == x_home) %>%
+  pull(heat_end) %>% as.character()
+
+ht_end <- ifelse(is_empty(ht_end), NA, ht_end)
+
+
+last_date <- daily_energy_data_clustered %>%
+  filter(home == x_home)%>%
+  pull(dateday) %>% max() %>% as.character()
+
+last_date <- ifelse(is_empty(last_date), NA, last_date)
+
+tibble(home = rep(x_home, 3),
+         cluster_type = c('ac', 'shoulder', 'heat'),
+         start_date = if (x_home %in% homes_tier1) c(NA,NA,NA) else
+             c(ifelse(x_home %in% homes_tier3,
+                               first_date, NA),
+                        should_start,
+                        ht_start),
+         end_date = if (x_home %in% homes_tier1) c(NA,NA,NA) else
+           c(ifelse(x_home %in% homes_tier3,
+                               should_start, NA),
+                        ht_start,
+                        ifelse(!is.na(ht_end), ht_end, last_date)))
+
+}) %>%
+  bind_rows()
+
+
+# create csv
+write_csv(energy_cluster_df, './csv_created_sense/energy_cluster_df.csv')
+
+
+
+
+# make a home type (tier) csv
+home_type_df <- tibble('home' = home.list(1:17)) %>%
+  mutate(home_type = case_when(
+    home %in% homes_tier3 ~ 'tier3',
+    home %in% homes_tier2 ~ 'tier2',
+    home %in% homes_tier1 ~ 'tier1',
+    TRUE ~ 'unclassified'))
+
+#create csv
+write_csv(home_type_df, './csv_created_sense/home_type_df.csv')
+
+
+```
+

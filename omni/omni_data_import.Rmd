@@ -1,0 +1,689 @@
+---
+title: "Import and Clean Omni Data"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: paper
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.path = 'figures/',
+  warning = FALSE,
+  message = FALSE,
+  echo = FALSE,
+  fig.width = 10, fig.height = 3,
+  cache = FALSE)
+```
+
+---
+
+```{r}
+library(dplyr)
+library(purrr)
+library(tidyr)
+library(openair)
+library(ggplot2)
+library(readr)
+library(googlesheets4)
+library(lubridate)
+library(data.table)
+library(kableExtra)
+
+```
+
+```{r}
+clean_data <- function(x){
+  #print(x)
+  f <- read_rds(x)
+  
+  # make blank dataframe for files with no data
+  # or specific error message
+  blank_df <- 
+    tibble(timestamp = NA_character_,
+          co2 = NA_real_,
+          voc = NA_real_,
+          temp = NA_real_,
+          lux = NA_real_,
+          humid = NA_real_,
+          pm25 = NA_real_,
+          score = NA_real_,
+          spl_a  = NA_real_,    
+          datetime = NA_character_,
+          filename = NA_character_)
+  
+  # insert blank dataframe if connection error occurs on a day
+  if(grepl("upstream connect error or disconnect/reset before headers.",
+           f, fixed = TRUE)) blank_df
+  
+  else if(length(f$data) > 0){
+  data_long <- as_tibble(f) %>%
+  unnest_wider(data) %>%
+  select(-indices) %>%
+  mutate(df = map(sensors, ~ .x %>% map_df(magrittr::extract, c("comp", "value")))) %>%
+  unnest(df) %>%
+  select(-sensors, -score) %>%
+  pivot_wider(names_from = "comp", values_from = "value") %>%
+  mutate(datetime = format(as.POSIXct(strptime(timestamp,format = "%FT%H:%M:%S",tz = "GMT")),
+                          tz = "US/Mountain",
+                          usetz = TRUE),
+         filename = x)
+  
+    # insert blank dataframe if no data is recorded on a day
+ } else blank_df
+}
+
+
+```
+
+```{r define_variables}
+#define the homes that will be used later in analysis
+homes_no5 <- c(
+  map(c(1:4,6:9), function(x) paste0('00', x)),
+  map(c(10:16), function(x) paste0('0', x))
+  )%>% unlist()
+
+```
+
+# Search for files that cause errors when reading in
+
+```{r error_file_search, eval = FALSE}
+
+# home 003 kitchen gives error: column 'timestamp' does not exist
+id_home <- "002"
+location <- "kitchen"
+pattern = paste0(".*", id_home, "_", location, ".*.rds$")
+files <- list.files("../drive_sync/epic_homes/r_epic_homes/output/omni", pattern = pattern, full.names = TRUE)
+
+data <- map(files, clean_data) %>%
+  bind_rows() %>%
+  mutate_at(vars(contains("time")), ymd_hms) %>%
+  filter(rowSums(is.na(.)) != ncol(.)) %>% # omit a row if every value is NA
+  mutate(home = id_home, location = location) # add home and location id
+
+
+test <- data %>%
+  filter(timestamp %>% is.na())
+clean_data <- function(x){
+  #print(x)
+  f <- read_rds(x)
+  
+  # make blank dataframe for files with no data
+  # or specific error message
+  blank_df <- 
+    tibble(timestamp = NA_character_,
+          co2 = NA_real_,
+          voc = NA_real_,
+          temp = NA_real_,
+          lux = NA_real_,
+          humid = NA_real_,
+          pm25 = NA_real_,
+          score = NA_real_,
+          spl_a  = NA_real_,    
+          datetime = NA_character_,
+          filename = NA_character_)
+  
+  # insert blank dataframe if connection error occurs on a day
+  if(grepl("upstream connect error or disconnect/reset before headers.",
+           f, fixed = TRUE)) blank_df
+  
+  else if(length(f$data) > 0){
+  data_long <- as_tibble(f) %>%
+  unnest_wider(data) %>%
+  select(-indices) %>%
+  mutate(df = map(sensors, ~ .x %>% map_df(magrittr::extract, c("comp", "value")))) %>%
+  unnest(df) %>%
+  select(-sensors, -score) %>%
+  pivot_wider(names_from = "comp", values_from = "value") %>%
+  mutate(datetime = format(as.POSIXct(strptime(timestamp,format = "%FT%H:%M:%S",tz = "GMT")),
+                          tz = "US/Mountain",
+                          usetz = TRUE),
+         filename = x)
+  
+    # insert blank dataframe if no data is recorded on a day
+ } else blank_df
+}
+
+
+
+
+
+# columns change on 2021-01-27_2021-01-28 to include pm10est? cause error in kitchen007
+# columns change on 2021-01-17_2021-01-18 to stop including pm10est? cause error in garage007
+
+
+
+  #check how many columns each of the files I've downloaded have
+  col.check <- function(hm, rm) {
+  read.table(paste0("../output/omni_clean/omni_", hm, "_", rm, ".csv"),             # Read only header of example data
+           head = TRUE,
+           nrows = 1,
+           sep = ',') %>%
+      colnames()
+  }
+    
+  home <- '003'
+
+  lapply(c('living', 'bedroom', 'kitchen', 'outdoor', 'garage'), col.check,
+         hm = home)
+
+  
+
+```
+
+
+# Make CSVs of data and merge into one csv
+
+```{r function_data_maker, eval = FALSE}
+
+# function to make files for multiple homes/locations
+
+data.maker <- function(id_home, location) {
+pattern = paste0(".*", id_home, "_", location, ".*.rds$")
+files <- list.files("../drive_sync/epic_homes/r_epic_homes/output/omni", pattern = pattern, full.names = TRUE)
+
+# # if want to put end_date on file name
+# end_date <- map(files, function(x) {
+#   # extract ending date of file from file name
+#   substr(x, nchar(x)-13, nchar(x)-4)
+# }
+# ) %>%
+#   # find most recent dated file for given home/sensor
+#   unlist() %>%
+#   as.Date() %>%
+#   max()
+
+data <- map(files, clean_data) %>%
+  bind_rows() %>%
+  mutate_at(vars(contains("time")), ymd_hms) %>%
+  filter(rowSums(is.na(.)) != ncol(.)) %>% # omit a row if every value is NA
+  mutate(home = id_home, location = location) %>% # add home and location id
+  select(-c(timestamp,filename))
+
+# create a foder to store data in if doesn't aready exist
+folder_dated <- paste0('./csv_created/omni_raw_', Sys.Date(),'/')
+
+ifelse(!dir.exists(file.path(folder_dated)), dir.create(file.path(folder_dated)), FALSE)
+
+write_rds(data, paste0(folder_dated, id_home, '_', location,
+                       '.rds'))
+
+} %>% tryCatch(error = function(e) paste('error for', location, id_home,
+                                         '\nremove tryCatch and re-run to see error'))
+
+
+```
+
+```{r make_data_individuals, eval = FALSE}
+
+# # test for just one sensor
+# map('outdoor', data.maker, id_home = '003')
+
+locations_all <- c( 'bedroom', 'living', 'kitchen', 'garage', 'outdoor')
+
+# # make files for one home for all locations
+# map(locations_all, data.maker, id_home = '002')
+
+# make files for homes for all locations
+
+
+
+map(c('017'), function(x_home) {
+  map(c(locations_all), function(x_location) {
+    data.maker(id_home = x_home, location = x_location)
+    })
+})
+
+# test a file
+# test <- read_rds('./csv_created/omni_raw_2021-07-14/004_living.rds')
+
+```
+
+
+# Clean minutely data
+
+
+```{r import_all_data, eval = FALSE}
+
+omni_data <- read_rds(paste0('./csv_created/pre-calibration/omni_all_locations_raw_',
+'2021-07-14.rds'))
+
+```
+
+
+```{r clean_data_further, eval = FALSE}
+
+ # remove unneeded columns
+omni_data_clean <- omni_data
+# find and remove (average) duplicates
+
+# clean duplicates from sensor overlaps----------
+ 
+ # remove home 003 outdoor from March 21 to March 23
+# when temp was above 15 (from overlap with living room sensor)
+omni_data_clean <- omni_data_clean %>%
+    filter(!(home=='003' & location == 'outdoor'&
+             between(datetime, ymd_hms('2021-03-21 17:59:00'),
+                     ymd_hms('2021-03-23 23:59:59')) &
+                     temp >15))
+
+  # average dupicates in home 009 living due to sensor overlap
+ a <- omni_data_clean %>%
+    filter(!(home=='009' & location == 'living'))
+
+
+b <- omni_data_clean %>%
+  filter(home=='009', location == 'living') %>%
+    group_by(datetime, home, location) %>% 
+    summarise_if(is.numeric, list(mean), na.rm = TRUE, .groups = 'drop')
+
+omni_data_clean <- bind_rows(a,b)
+
+  # average dupicates in home 003 living due to sensor overlap
+ a <- omni_data_clean %>%
+    filter(!(home=='003' & location == 'living'))
+
+
+b <- omni_data_clean %>%
+  filter(home=='003', location == 'living') %>%
+    group_by(datetime, home, location) %>% 
+    summarise_if(is.numeric, list(mean), na.rm = TRUE, .groups = 'drop')
+
+
+omni_data_clean <- bind_rows(a,b)
+ 
+
+
+# delete duplicates from pm10_est addition------------
+
+# from april 7 to april 15 there are some nearly identical values
+# in all cols except pm10_est (see range calculation below)
+
+ a <- omni_data_clean %>%
+    filter(!between(datetime, ymd_hms('2021-04-07 00:00:00'),
+                     ymd_hms('2021-04-15 23:59:59')))
+
+
+b <- omni_data_clean %>%
+  filter(between(datetime, ymd_hms('2021-04-07 00:00:00'),
+                     ymd_hms('2021-04-15 23:59:59')))
+
+# calculate range of values on duplicate timestamps over pm10_est issue date range
+# b_range <- b %>%
+#     group_by(datetime, home, location) %>% 
+#   summarise_if(is.numeric, list(range = function(x) max(x)-min(x))) %>%
+#   ungroup()
+
+b <- b %>%
+    group_by(datetime, home, location) %>%
+  summarise_if(is.numeric, mean, na.rm = TRUE, .groups = 'drop')
+
+# test <- b %>% filter(home == '001', location == 'garage')
+
+# merge and detlete pm10_est col
+omni_data_clean <- bind_rows(a,b) %>%
+  select(-pm10_est)
+
+
+# average duplicates from daylight savings------------
+
+# use data.table to count duplicates
+b_dt <- omni_data_clean %>%  data.table()
+
+a <-  (b_dt[, count:= .N,
+            by = omni_data_clean %>% select(c(datetime, home, location)) ]) %>%
+  as.data.frame()
+
+# unique rows
+unique<- a %>%
+  filter(count == 1) %>%
+  select(-count)
+
+# duplicate rows
+duplicates<- a %>%
+  filter(count >1) %>%
+  select(-count)
+
+# average duplicates that are from daylight savings
+avg_daylight <-  duplicates %>%
+  filter(between(datetime, ymd_hms("2020-10-31 23:59:00"),
+                                ymd_hms("2020-11-01 01:59:00"))) %>%
+  group_by(datetime, home, location) %>% 
+  summarise_if(is.numeric, mean) %>%
+  ungroup()
+
+
+duplicates_no_daylight <-  duplicates %>%
+  filter(!between(datetime, ymd_hms("2020-10-31 23:59:00"),
+                                ymd_hms("2020-11-01 01:59:00"))) 
+  
+
+  # combine rows into dataframe without duplicates
+ omni_data_clean <- bind_rows(unique,duplicates_no_daylight,avg_daylight)
+  
+ # test to ensure no duplicates are remaining (should be no rows)----------
+ 
+ if(nrow(duplicates_no_daylight)>0) {
+stop('duplicates outside of daylight savings time exist')}
+
+# method 2---------
+#   # find duplicates by date logged for each sensor
+#   duplicates <- omni_data %>%
+#   select(-c(timestamp, score, lux, filename, spl_a, pm10_est)) %>%
+#     group_by(datetime, home, location) %>% 
+#     summarise(n = n(), .groups = 'drop') %>%
+#   filter(n >1)
+# 
+# # ignore dupicates from daylight savings
+# duplicates_not_daylight <- duplicates %>%
+#   filter(!between(datetime,
+#                  ymd_hms('2020-11-01 01:00:00'),
+#                  ymd_hms('2020-11-01 02:00:00')))
+# 
+# if(duplicates_not_daylight %>% nrow() > 0) {
+# stop('duplicates other than daylight savings time exist')}
+# 
+# # # test home 3 duplicates
+# # test <- omni_data %>% filter(home=='003', location == 'outdoor',
+# #                              datetime >  ymd_hms('2020-11-06 01:00:00'))
+# #   
+# # home3 <- read_csv('./csv_created/omni_raw_2021-07-06/003_outdoor.csv') %>%
+# #   select(-filename)
+# # 
+# # testhome3 <- home3 %>%   
+# #   group_by(datetime, home, location) %>% 
+# #     summarise(n = n(), .groups = 'drop') %>%
+# #   filter(n >1)
+# 
+# # average duplicates if only sparce/due to daylight savings
+#   # find duplicates by date logged for each sensor
+#   omni_data_clean <- omni_data %>%
+#       select(-c(timestamp, score, filename)) %>%
+#     group_by(datetime, home, location) %>% 
+#     summarise_if(is.numeric, list(mean), na.rm = TRUE, .groups = 'drop')
+
+  
+  
+  
+ 
+ # omit unrealistic temperatures-------------
+
+  omni_data_clean <- omni_data_clean %>%
+  mutate(temp = ifelse(temp > 100, NA, temp))
+
+ 
+ # copy outdoor data for outdoor duplex units ----------------
+ omni_data_clean <- omni_data_clean %>%
+   bind_rows(
+     omni_data_clean %>%
+               filter(home == '014' & location == 'outdoor') %>%
+               mutate(home = '013'),
+     omni_data_clean %>%
+               filter(home == '015' & location == 'outdoor') %>%
+               mutate(home = '016')
+     )
+
+  # write data and backup------------------- 
+
+write_rds(omni_data_clean, paste0('./csv_created/pre-calibration/omni_all_locations_pre-cal_', Sys.Date(), '.rds'))
+
+write_rds(omni_data_clean, paste0('./csv_created/pre-calibration/omni_all_locations_pre-cal.rds'))
+ 
+```
+
+
+# create data of multiple resolutions from cleaned data
+
+
+```{r hourly_data_rds, eval = FALSE}
+
+omni_hourly_data <- omni_data_clean %>%
+  group_by(datehour = floor_date(datetime, unit = 'hour'),
+           home, location) %>%
+  summarise_if(is.numeric, list(mean), na.rm = TRUE) %>%
+  ungroup()
+
+# make csv and backup------------------------
+
+write_rds(omni_hourly_data, paste0('./csv_created/pre-calibration/omni_hourly_data_pre-cal_',
+Sys.Date(),'.rds'))
+
+write_rds(omni_hourly_data, paste0('./csv_created/pre-calibration/omni_hourly_data_pre-cal.rds'))
+
+```
+
+```{r daily_data_rds, eval = FALSE}
+
+  omni_daily_data <- omni_data_clean %>%
+  group_by(dateday = floor_date(datetime, unit = 'day'),
+           home, location) %>%
+  summarise_if(is.numeric, list(mean), na.rm = TRUE) %>%
+  ungroup()
+
+# make csv and backup------------------------
+write_rds(omni_daily_data, paste0('./csv_created/pre-calibration/omni_daily_data_pre-cal_',
+Sys.Date(),'.rds'))
+
+write_rds(omni_daily_data, paste0('./csv_created/pre-calibration/omni_daily_data_pre-cal.rds'))
+
+```
+
+# calibrate data with filter concentrations
+
+```{r import_uncalibrated_data}
+omni_data_precal <- 
+  # read in uncalibrated data
+  read_rds(paste0('./csv_created/pre-calibration/omni_all_locations_pre-cal.rds')) %>%
+  filter(home %in% homes_no5)
+
+```
+
+
+
+```{r import_filter_data}
+filter_data <- read_rds('../output_thesis/pm25/pm25.rds')
+```
+
+
+# create correction factor
+
+```{r find_correction_ratios_for_all_sensors}
+
+# add correciton factor to real-time pm2.5 data
+blank_data <- filter_data %>%
+  filter(location == 'blank'& id_home %in% homes_no5) %>%
+  select(visit, id_home, d_mass_blank = d_mass)
+
+filter_data_correct <- filter_data %>%
+    filter(location != 'blank'& id_home %in% homes_no5) %>%
+  left_join(blank_data, by = c('visit', 'id_home')) %>%
+  mutate(conc_correct = if_else(duration >= 24, ((d_mass-d_mass_blank)*1000)/(volume/1000),
+                                NA_real_))%>%
+  # duplicate results for livingroom to all indoor rooms
+  select(id_home, location, visit, conc_correct) %>%
+  pivot_wider(names_from = c(location), values_from = conc_correct) %>%
+  mutate(kitchen = living, bedroom = living) %>%
+  pivot_longer(cols = -c(id_home, visit) , names_to = 'location',
+               values_to = 'conc_correct')
+  
+# make dataframe of corrrection factors
+grav_cf_df <- omni_data_precal %>%
+  #calculate TWA for pm2.5 for each home/location
+  group_by(home, location) %>%
+  summarise_at(vars(pm25), funs(twa = mean, n_hours = n()/(60/5),
+                                )) %>%
+  ungroup() %>%
+  # match filter-based concentration to TWA for each home/location
+  left_join(filter_data_correct, by = c('home' = 'id_home', 'location')) %>%
+  mutate(
+    grav_cf = twa/conc_correct
+         # # fill in NA values with median correction factor
+         # grav_cf = ifelse(is.na(conc_correct), median(grav_cf, na.rm = TRUE),
+         #                  grav_cf)
+  )
+
+```
+
+* check between rooms and ensure same calibration value can be used for all indoor rooms
+```{r}
+# a <- grav_cf_df %>% filter(location %in% c('living', 'kitchen', 'bedroom'))
+# ggplot(a, aes(y = twa, x = location))+
+#   geom_boxplot()
+
+```
+
+
+*look at correction factor spread (for median)
+```{r}
+# check spread of correction factor values
+ggplot(grav_cf_df, aes(y = grav_cf))+
+  geom_boxplot()
+
+```
+
+* after omitting negatives...
+```{r, fig.height=3, fig.width=3}
+
+grav_omit <- grav_cf_df %>% filter(!is.na(grav_cf) & grav_cf < 0) %>%nrow()
+grav_all <- grav_cf_df %>% filter(!is.na(grav_cf)) %>%nrow()
+
+
+grav_cf_df_clean <- grav_cf_df %>%
+  filter(!is.na(grav_cf) & grav_cf >0)
+
+# check spread of correction factor values
+ggplot(grav_cf_df_clean, aes( x = 1, y = grav_cf))+
+  geom_boxplot(outlier.shape = NA)+
+  geom_jitter( width = 0.15, )+
+  theme_classic()+
+  theme(
+    axis.text.x = element_blank(),
+    axis.title.x = element_blank(),
+    axis.ticks.x = element_blank()
+  )+
+  ylab('Gravimetric Correction Factor')
+  
+
+```
+
+
+*look at regression of TWA to filter values
+
+```{r}
+model <- lm("twa~conc_correct+0", data = grav_cf_df_clean)
+
+# print model results
+broom::tidy(model, conf.int = TRUE) %>%
+  kable(digits = c(NA, 2, 2, 2, 6 , 2, 2), caption = "OMNI vs. Filter PM2.5") %>%
+  kable_paper(bootstrap_options = "striped", full_width = F)
+```
+
+
+```{r fig_omni_vs_filter, fig.width=4.5, fig.height=4.5}
+
+# make predictions based on model
+predicted_df <- data.frame(twa_pred = predict(model, grav_cf_df_clean),
+                           conc_correct=grav_cf_df_clean$conc_correct)
+
+ggplot(grav_cf_df_clean, aes(x = conc_correct, y = twa)) +
+  geom_point(aes(
+    color = location
+    )) +
+  #geom_smooth(method = "lm", formula = "y ~ x", se = FALSE) +
+  theme_bw() +
+  geom_abline(slope = 1, intercept = 0, linetype = 'dashed') +
+  ylab("Omni (ug/m^3)") + xlab("Filter (ug/m^3)")+
+  geom_line(data = predicted_df, aes( y = twa_pred
+                                      # linetype = 'model'
+                                      ),
+            linetype = 'solid')+
+  scale_y_continuous(expand = c(0,0), limits = c(0,110))+
+  scale_x_continuous(expand = c(0,0), limits = c(0,110))
+# scale_linetype_manual(
+  #   values = c('dashed', 'solid'),
+  #   # breaks = c('dashed', 'solid'),
+  #   labels = c('1 to 1', 'Model')
+  # )
+
+
+
+  
+# # without filter "outliers"
+# 
+# a %>% grav_cf_df_clean %>% filter(conc_correct<50)
+# 
+# model <- lm("twa~conc_correct+0", data = a)
+
+```
+
+
+* calibrate with decided method of correction factor
+```{r}
+# find the median value of correction factors (exclude negatives)
+# and use that to correct all households
+grav_cf_median <- grav_cf_df_clean %>%
+  pull(grav_cf) %>% median()
+
+omni_data_cal <- omni_data_precal %>%
+  mutate(pm25 = pm25/grav_cf_median)
+
+```
+
+# Add in energy cluster column
+
+```{r}
+daily_energy_df <- read_csv('../sense/csv_created_sense/daily_energy_data_clustered.csv')
+
+omni_data_cal <- omni_data_cal %>%
+  mutate(dateday = floor_date(datetime, unit = 'day')%>%as.Date())%>%
+  left_join(daily_energy_df, by = c('dateday', 'home'))
+
+```
+
+
+```{r}
+# make rds file and backup-----------
+write_rds(omni_data_cal, paste0('./csv_created/omni_calibrated_',
+Sys.Date(),'.rds'))
+
+write_rds(omni_data_cal, paste0('./csv_created/omni_calibrated.rds'))
+```
+
+```{r hourly_cal_data_rds}
+
+omni_hourly_data <- omni_data_cal %>%
+  select(-heat, -ac) %>%
+  group_by(datehour = floor_date(datetime, unit = 'hour'),
+           home, location) %>%
+  summarise_if(is.numeric, list(mean), na.rm = TRUE) %>%
+  ungroup() %>%
+  mutate(dateday = floor_date(datehour, unit = 'day')%>%as.Date())%>%
+  left_join(daily_energy_df, by = c('dateday', 'home'))
+
+# make rds file and backup-----------------
+write_rds(omni_hourly_data, paste0('./csv_created/omni_hourly_calibrated_',
+Sys.Date(),'.rds'))
+
+write_rds(omni_hourly_data, paste0('./csv_created/omni_hourly_calibrated.rds'))
+
+```
+
+```{r daily_cal_data_rds}
+
+  omni_daily_data <- omni_data_cal %>%
+    select(-heat, -ac) %>%
+  group_by(dateday = floor_date(datetime, unit = 'day'),
+           home, location) %>%
+  summarise_if(is.numeric, list(mean), na.rm = TRUE) %>%
+  ungroup()%>%
+  mutate(dateday = dateday %>%as.Date())%>%
+  left_join(daily_energy_df, by = c('dateday', 'home'))
+
+# make rds file and backup-----------------
+write_rds(omni_daily_data, paste0('./csv_created/omni_daily_calibrated_',
+Sys.Date(),'.rds'))
+
+write_rds(omni_daily_data, paste0('./csv_created/omni_daily_calibrated.rds'))
+
+
+```

@@ -1,0 +1,1362 @@
+---
+title: "omni_autocorrelation"
+author: "Andrew Purgiel"
+date: "1/13/2021"
+output: html_document
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(
+  fig.path = 'figures/',
+  warning = FALSE,
+  message = FALSE,
+  echo = FALSE,
+  fig.width = 10, fig.height = 3,
+  cache = FALSE)
+```
+
+```{r libraries}
+library(dplyr)
+library(purrr)
+library(tidyr)
+library(openair)
+library(ggplot2)
+library(readr)
+library(googlesheets4)
+library(lubridate)
+library(gridExtra) #for making ggplot autocorrelation plot grids
+library(ggpubr) # for making time series plot grids (with common legends)
+library(tseries) # for tests of stationarity
+
+```
+
+
+```{r data_import, eval = FALSE}
+
+##Import CSV with Real Time Data
+omni_data<- read_rds('./csv_created/omni_calibrated.rds')
+
+
+```
+
+
+```{r functions_misc}
+
+##Define a char vector of home numbers using a number vector,
+##ex: x <- home.list(c(1:15)) for homes 1-15
+threedig <- function(x) {
+  if (nchar(x) == 1) {a <- paste0('00', x)
+  return(a)
+  }
+  
+  if (nchar(x) == 2) {a<- paste0('0', x)
+  return(a)
+  }
+  else return(a)
+}
+
+home.list <- function(x) sapply(x, threedig)
+
+
+#function to make density plot of variable x (a column)
+dens.plot <- function(data, x) {
+  
+ggdensity(pull(data, all_of(x)), 
+          main = paste("Density plot of", x),
+          xlab = x)
+}
+
+```
+
+```{r define_variables}
+
+
+#define homes for analysis
+homes_all <- home.list(c(1:4, 7:16))
+
+# define indoor rooms
+locations_indoor <- c('living', 'bedroom', 'kitchen')
+
+# # define homes that have data for all indoor rooms (if needed)
+# homes_avail <- homes_all[-2]
+
+# define metrics for acf testing
+metrics_all <- c('pm25', 'voc', 'co2', 'temp', 'humid')
+
+clusters_all <- c('heat', 'shoulder', )
+
+#define sizes for plot text
+xsmall <- 2
+small <- 6
+medium <- 12
+large <- 16
+
+```
+
+
+```{r function_count_missing_values, include = FALSE, eval = FALSE}
+
+##function to count missing day values for a home/room
+count.missing <- function(data, hm, loc, metric,
+                          # if start/end date not specified, first and last
+                          # date for specified home/location used
+                          start_date = '1971-01-01 00:00:00',
+                          end_date = '2099-01-01 00:00:00',
+                          unit = 'day') {
+  
+  
+    if (unit == 'hour') {
+
+  avg_data <- data %>%
+  filter(home == hm & location == loc) %>%
+    filter(datetime > ymd_hms(start_date) & datetime < ymd_hms(end_date)) %>%
+  mutate(date = floor_date(datetime, unit = 'hours')) %>%
+  group_by(date) %>%
+  summarize_if(is.numeric, list(~mean(., na.rm = TRUE))) %>%
+  ungroup() %>%
+        complete(date = seq(ymd_hms(min(date)), ymd_hms(max(date)),
+        dhours(1)))
+
+  
+
+    }
+  
+  if (unit == 'day') {
+
+          avg_data <- data %>%
+  filter(home == hm & location == loc) %>%
+                filter(datetime > ymd_hms(start_date) & datetime < ymd_hms(end_date)) %>%
+  mutate(date = floor_date(datetime, unit = 'days')) %>%
+  group_by(date) %>%
+  summarize_if(is.numeric, list(~mean(., na.rm = TRUE))) %>%
+  ungroup() %>%
+    complete(date = seq(min(date), max(date), by="day"))
+
+  }
+  
+      a<- avg_data %>%
+    select(all_of(metric)) %>%
+    is.na() %>%
+    sum()
+      
+  return(a)
+}
+
+```
+
+```{r count_missing_values, include = FALSE, eval = FALSE}
+
+# # see which homes/locations do not have missing daily average values
+#  sapply(homes_all, count.missing,
+#         loc = 'living',
+#         data = omni_data,
+#        metric = 'pm25')
+
+```
+
+```{r create_daily_df, eval = FALSE}
+
+# all homes/locations in one dataframe
+# with missing dates put in as NA values
+## daily
+omni_daily_data_complete <- omni_data %>%
+  mutate(date = floor_date(datetime, unit = 'days')) %>%
+  group_by(home, location, date) %>%
+  summarize_if(is.numeric, list(~mean(., na.rm = TRUE))) %>%
+    complete(date = seq(min(date), max(date), by="day")) %>%
+  ungroup()%>%
+  mutate(date = ymd(date)) %>%
+  arrange(home, location, date)
+
+
+# # to insert NA rows between each group (could modify to add multiple NAs)
+# # from https://stackoverflow.com/questions/43403282/add-row-in-each-group-using-dplyr-and-add-row
+# indices <- seq(nrow(a)) %>%
+#     split(group_indices(a, home, location)) %>%
+#     map(~c(.x, rep(NA,10))) %>% # add in ten rows after each group
+#     unlist()
+
+# ## hourly
+# omni_hourly_data <- omni_data %>%
+#   mutate(date = floor_date(datetime, unit = 'hours')) %>%
+#   group_by(home, location, date) %>%
+#   summarize_if(is.numeric, list(~mean(., na.rm = TRUE))) %>%
+#   complete(date = seq(ymd_hms(min(date)), ymd_hms(max(date)),
+#                       dhours(1))) %>%
+#   ungroup()%>%
+#   arrange(home, location, date)
+
+
+```
+
+```{r add_clusters, eval = FALSE}
+# add home types ------------------
+
+# classify homes into "types" based on cluster pattern
+# and add home types to data
+
+home_type_df <- read_csv('../sense/csv_created_sense/home_type_df.csv')
+
+homes_tier3<-home_type_df %>% filter(home_type == 'tier3') %>%
+  pull(home) # ac-shoulder-heat
+
+homes_tier2<-home_type_df %>% filter(home_type == 'tier2') %>%
+  pull(home) # shoulder-heat (sometimes second shoulder)
+
+homes_tier1<-home_type_df %>% filter(home_type == 'tier1') %>%
+  pull(home)
+
+
+omni_daily_data_complete<- omni_daily_data_complete %>%
+  mutate(home_type = case_when(
+    home %in% homes_tier3 ~ 'tier3',
+    home %in% homes_tier2 ~ 'tier2',
+    home %in% homes_tier1 ~ 'tier1',
+    TRUE ~ 'unclassified'))
+
+
+
+# add date range clusters to data -------------------------
+
+energy_cluster_df <- read_csv('../sense/csv_created_sense/energy_cluster_df.csv')
+
+############# using for loop
+
+# make an empty column to fill with cluster function
+omni_daily_data_complete$energy_cluster <- NA
+
+#specify all homes that have specified energy clusters
+homes_clustered <- levels(as.factor(energy_cluster_df$home))
+
+for(i in 1:length(homes_clustered)) { 
+  # for each home
+  # identify the df matrix index of each cluster cluster_type
+  cluster_type_indeces <- which(energy_cluster_df$home == homes_clustered[i])
+
+    for(j in 1:length(cluster_type_indeces)) {
+    # for each cluster type in each home in the energycluster dataframe
+      # indentify the values in the data that are match the home
+      # and are within the dates specified by the cluster
+    omni_daily_data_complete$energy_cluster[
+      which(omni_daily_data_complete$home == homes_clustered[i] &
+              between(omni_daily_data_complete$date,
+                      energy_cluster_df[cluster_type_indeces[j],
+                                      'start_date'][[1]],
+                      energy_cluster_df[cluster_type_indeces[j],
+                                      'end_date'][[1]])
+      )
+      # add the identified cluster type of each value
+      # in the new column in the data
+    ] <- energy_cluster_df[cluster_type_indeces[j], 'cluster_type'][[1]]
+  }
+}
+
+# convert any NA clusters to "unclassified"
+omni_daily_data_complete <- omni_daily_data_complete %>%
+  mutate(energy_cluster = if_else(is.na(energy_cluster), 'unclassified', energy_cluster))
+
+
+########### using lapply
+# lapply('001', function(x_home) {
+#   
+#   lapply(
+#     # apply the function to all the energy clusters for a given home
+#     c(1:length(which(energy_clusters$home == hm))),
+#      function(cluster_type_index) {
+#       
+#       omni_daily_data_complete$energy_cluster[
+#         which(omni_daily_data_complete$home == x_home &
+#                 between(omni_daily_data_complete$date,
+#                         energy_clusters[which(energy_clusters$home == x_home)[cluster_type_index],
+#                                         'start_date'][[1]],
+#                         energy_clusters[which(energy_clusters$home == x_home)[cluster_type_index],
+#                                         'end_date'][[1]])
+#         )
+#       ]<- energy_clusters[which(energy_clusters$home == x_home)[cluster_type_index], 'type'][[1]]
+#     }
+#   )
+# }
+# )
+
+
+###########other possible method?
+# https://stackoverflow.com/questions/35636315/replace-values-in-a-dataframe-based-on-lookup-table
+
+
+```
+
+```{r daily_df_csv, eval = FALSE}
+# make a df with rows of NA for days within each home with no data
+write_csv(omni_daily_data_complete, paste0('./csv_created/omni_daily_data_complete.csv'))
+
+# create dated backup
+write_csv(omni_daily_data_complete, paste0('./csv_created/omni_daily_data_complete_', Sys.Date(),'.csv'))
+
+```
+
+```{r import_daily_data}
+omni_daily_data_complete <- read_csv('./csv_created/omni_daily_data_complete.csv')
+
+```
+
+```{r import_assessment_data}
+
+assessment_data <- read_csv('../drive_sync/epic_homes/data/homes/home_assessment_data.csv')
+
+# # using googlesheets4
+# assessment_data <- read_sheet('https://docs.google.com/spreadsheets/d/12vWpqdmzIII0vEKH79xpmICUYGuzc8PjfBT2_3YjIHU/edit?usp=sharing', sheet = 'data')
+```
+
+
+```{r ts_grid_function, include = FALSE}
+#function to put plots in a grid
+ts.grid <- function(plots, title,
+                     y_val = NULL, ncol = 4, nrow = 4) {
+  ##omit NULL values (from homes or rooms without valid data)
+  plots <- plots[!sapply(plots, is.null)]
+  
+  do.call('grid.arrange', c(plots, top = title, left = y_val,
+                            ncol = ncol, nrow = nrow))  
+  
+}
+
+# NOTE, if there are no homes with valid data in selection (plots <- NULL)
+# the function will return the error: 
+### Error in unit(rep(1, nrow), "null") : 'x' and 'units' must have length > 0
+
+```
+
+# Will stationarity be an issue?
+
+```{r stationarity, fig.width=10.5, fig.height=8, eval = FALSE}
+# check stationarity before doing acf calcs and plots
+
+# make time series plot for all available sensors
+map(
+  metrics_all, function(x_metric){
+    
+    map(
+      locations_indoor, function(x_location){
+        
+        map(
+          homes_all, function(x_home) {
+            
+            ggplot(omni_daily_data_complete %>% filter(home == x_home & location == x_location),
+                   aes(x = as.Date(date), y = UQ(as.name(x_metric)),
+                       color=case_when(grepl('heat', energy_cluster)~ 'red',
+                                       energy_cluster == 'ac' ~ 'blue',
+                                       grepl('shoulder', energy_cluster)~ 'darkgreen',
+                                       energy_cluster == 'unclassified' ~ 'black')))+
+              scale_color_identity(name = "Cluster",
+                                   breaks = c("blue", "darkgreen", "red", "black"),
+                                   labels = c("AC", "Shoulder", "Heat", "Unclassified"),
+                                   guide = "none")+
+              geom_line()+
+              ggtitle(paste(x_home))+
+              theme(axis.title = element_blank(),
+                    # axis.text.x = element_blank(),
+                    axis.ticks = element_blank(),
+                    panel.grid.minor.x = element_blank(),
+                    panel.grid.major.x = element_blank(),
+                    panel.border = element_blank(),
+                    plot.title = element_text(hjust = 0.5))
+            
+            
+          }
+        ) %>% ts.grid( title = paste(x_location, x_metric))
+        
+      }
+    )
+  }
+)
+
+# # for one home
+#    
+# hm <- '010'
+# loc <- 'bedroom'
+# metric <- 'temp'
+# 
+# ggplot(omni_daily_data_complete %>% filter(home == hm & location == loc),
+#                aes(x = as.Date(date), y = UQ(as.name(metric)),
+#                    color=case_when(grepl('heat', energy_cluster)~ 'red',
+#                                    energy_cluster == 'ac' ~ 'blue',
+#                                    grepl('none|shoulder', energy_cluster)~ 'darkgreen',
+#                                    energy_cluster == 'unclassified' ~ 'black')))+
+#           scale_color_identity(name = "Cluster",
+#                                breaks = c("blue", "darkgreen", "red", "black"),
+#                                labels = c("AC", "Shoulder", "Heat", "Unclassified"),
+#                                guide = "legend")+
+#           geom_line()+
+#           ggtitle(paste(hm, loc))+
+#   theme(axis.title = element_blank(),
+#           # axis.text.x = element_blank(),
+#           axis.ticks = element_blank(),
+#           # panel.grid.minor.x = element_blank(),
+#           # panel.grid.major.x = element_blank(),
+#           panel.border = element_blank(),
+#           plot.title = element_text(hjust = 0.5))
+
+
+# # plot differenced time series
+# diff_data <- omni_daily_data_complete %>%
+#   filter(home == hm & location == loc) %>%
+#   mutate(diff = c(NA, diff(pull(., all_of(metric),1))))
+# 
+# 
+# 
+# diff_data <- omni_daily_data_complete %>%
+#   filter(home == hm & location == loc) %>%
+#   # make column of metric differenced with itself by one day
+#   mutate(diff = c(NA, diff(pull(., all_of(metric),1))))
+#   # # set up for faceting
+#   # pivot_longer(cols = c(all_of(metric), diff),
+#   #              names_to = 'data_set', values_to = 'value') %>%
+#   # mutate(data_set = if_else(data_set == 'diff',
+#   #                           paste0(quo_name(metric), '_diff'),
+#   #                           data_set))
+# 
+# ggplot(diff_data,
+#        aes(x = as.Date(date), y = value))+
+#   geom_line()+
+#   ggtitle(paste(hm, loc))+
+#   facet_wrap(vars(data_set), scales = 'free')
+# 
+# diff_data2 <- diff_data[-c(1,101),]
+# 
+# # plot results for one location and metric
+# lapply('002', function(x) {
+#   ggacf(hm = x,
+#         data = diff_data2,
+#         loc = 'living', lag_max_plot = 14, metric = 'diff',
+#   )[['plot']]
+# }
+# )
+
+
+```
+
+```{r stationarity_tests}
+
+
+
+# variables for testing -------------
+
+
+# x_home <- '001'
+# x_location <- 'living'
+# x_metric <- 'pm25'
+# x_cluster <- 11
+# rm(x_home, x_location, x_cluster, x_metric)
+
+
+# stationarity tests------------
+
+cluster_method <- 'month'
+
+
+data <- omni_daily_data_complete %>%
+  mutate(month = month(date))
+
+stat_test <- lapply(metrics_all, function(x_metric) {
+    
+    lapply(locations_indoor, function(x_location) {
+      
+      lapply(homes_all, function(x_home) {
+        
+         lapply(if(cluster_method == 'month') c(1:12) else clusters_all,
+               function(x_cluster) {
+                 
+a <- data %>%
+  filter(home == x_home & location == x_location &
+           if(cluster_method == 'month') {
+             month == x_cluster
+             } else energy_cluster == x_cluster)
+
+# return NULL if condition does not exist
+if(length(a %>% pull(x_metric)) == 0) return() 
+
+# count fraction of missing readings
+missing <- sum(is.na(pull(a, all_of(x_metric))))/length(pull(a, all_of(x_metric)))
+if(missing==1) return() # return NULL if all values are missing
+
+a <-  a %>% fill(all_of(x_metric)) # fill in NA's with previous value
+
+# trim NA values off of beginning of sample
+a <- (a[min(which(!is.na(a %>% pull(x_metric)))):length(a %>% pull(x_metric)),]) %>%
+  pull(x_metric)
+
+if(length(a)<3) return()
+                 adf <- adf.test(a)
+                 kpss <- kpss.test(a)
+                 
+                 list( 'home' = x_home, 'energy_cluster' = x_cluster,
+                       'location' = x_location, 'adf_p' = adf$p.value,
+                       'kpss_p' = kpss$p.value, 'missing_frac' = missing)
+               }
+        ) %>%
+        bind_rows()
+      }
+      ) %>%
+        bind_rows()
+    }
+    ) %>%
+      bind_rows()
+  }
+  ) %>%
+  bind_rows()
+
+stat_test_summary<- stat_test %>%
+  group_by(energy_cluster) %>%
+  summarise(frac_pass_adf = sum(adf_p<0.05)/n(),
+            frac_pass_kpss = sum(kpss_p>0.05)/n(),
+            n_samples = n())
+
+# calculate summary if omissions of data with missing values occur
+stat_test_summary_omit<- stat_test %>%
+  filter(missing_frac < 0.11) %>%
+  group_by(energy_cluster) %>%
+  summarise(frac_pass_adf = sum(adf_p<0.05)/n(),
+            frac_pass_kpss = sum(kpss_p>0.05)/n(),
+            n_samples = n())
+
+
+
+
+# testing-----------------------
+
+# a <- omni_daily_data_complete %>%
+#   mutate(month = month(date))%>%
+#   filter(home == '004', month == 1, location == 'kitchen')
+# 
+# missing <- sum(is.na(pull(a, all_of('pm25'))))/length(pull(a, all_of('pm25')))
+# if(missing>0.11) return()
+# 
+# a <-  a %>% fill(all_of('pm25')) # fill in NA's with previous value
+# 
+# # trim NA values off of beginning of sample
+# a <- (a[min(which(!is.na(a %>% pull('pm25')))):length(a %>% pull('pm25')),]) %>%
+#   pull('pm25')
+# 
+# 
+# adf.test(a)
+# kpss.test(a)
+
+
+# # fill in NA's with previous value
+# a <- omni_daily_data_complete %>%
+#   filter(home == '001', energy_cluster == 'heat', location == 'living') %>%
+#   fill(all_of('pm25'))
+# # trim NA values off of beginning of sample
+# a <- (a[min(which(!is.na(a %>% pull('pm25')))):length(a %>% pull('pm25')),]) %>%
+#   pull('pm25')
+# 
+# if(length(a)<3) return()
+#                  test <- adf.test(a)
+#                  test$p.value
+#                  
+#  kpss.test(a)
+#  kpss.test(b)
+#           b <- a[!is.na(a)] 
+#           
+#    test <-  data.frame(x = c(NA,3,5,5,NA,NA,NA,6, NA,7,NA))
+#    test2 <- test %>% fill(x)
+
+   # test if input to lapply/map is blank
+#    x <- data.frame(z = c('a','a','c','d'), y = c('j','u','k','l'))
+# x %>%
+#                  filter(x == 'e') %>%
+#                  pull(y) %>%
+#                  as.factor() %>% levels()
+# map(x %>%
+#                  filter(x == 'e') %>%
+#                  pull(y) %>%
+#                  as.factor() %>% levels(), function(x) x) %>% bind_rows()
+```
+
+# Autocorrelation plots  
+
+```{r ggacf_omission_criteria}
+# not omitted, but highligthed in ggacf plots, and possibly omitted later
+days_avail_min <- 25
+pairs_min <- 20
+missing_pct_min <- 1/9*100
+
+```
+
+
+
+```{r ggacf_function, include= FALSE}
+
+# # variables for testing-----------------
+# data <- omni_daily_data_complete
+# hm <- '015'
+# loc <- 'living'
+# metric <- 'pm25'
+# lag.max <- 14
+# cluster <- 'shoulder'
+# type <- 'correlation'
+
+##Define an autocorrelation plot function in ggplot------------------
+
+###Make acf function in ggplot
+##from: https://stackoverflow.com/questions/28857241/r-combine-plots-that-use-parmfrow-internally
+
+ggacf <- function(data,  hm, loc, metric,
+                  lag_max_plot = 30,
+                  cluster = NULL,
+                       ci=0.95, type="correlation",
+                       xlab="Lag", ylab=NULL,
+                       ylim=NULL, simple = FALSE,
+                       ci.col="blue") {
+
+    x <- data %>% 
+    filter(home == hm & location == loc)
+  
+  x<- if(!is.null(cluster)) {
+    # filter by cluster if cluster is specified
+    x %>% 
+      filter(energy_cluster == cluster) %>%
+      pull(all_of(metric))
+    }else {
+    x %>% 
+      pull(all_of(metric))
+    }
+
+  if(length(x) < 3) return() # don't calculate anything if there are less than 
+  
+  # count days in monitoring period with available data
+  days_avail <- sum(!is.na(x))
+  
+  # count percentage of missing values
+  missing <- sum(is.na(x))/length(x)*100
+  
+  # set limit of how many lags for which the function performs calculations
+  lag_max_calc <- if_else(length(x)<=31, length(x)-1, 30)
+  
+  x_acf <- acf(x, plot=F, lag.max=lag_max_calc, type=type,
+               
+               ##if missing a value, continue calculation
+               ##with line below in acf function
+               na.action = na.pass
+  )
+  
+  # find actual n value (doesn't count when one of the data in a pair is NA)
+  lags <- c(1:lag_max_calc)
+  
+  lag_counts <- map(lags, function(x) {
+    data %>%
+      filter(home == hm & location == loc)%>%
+      pull(all_of(metric)) %>%
+      diff(lag = x) %>%
+      is.na() %>%
+      `!` %>% #count how many are not NA
+      sum()
+  }
+  ) %>% 
+    unlist() %>%
+    as.data.frame()%>%
+    rename('n_lag'= '.') %>%
+    mutate(lag = lags)
+  
+  df_acf <- data.frame(lag=x_acf$lag, acf=x_acf$acf,
+                       n_lag = if(type == 'correlation') {
+                         c(NA,lag_counts$n_lag)
+                       } else if(type == 'partial') lag_counts$n_lag ) %>%
+    mutate(
+      # from UMich Notes, Sales et al. 1980
+      ci_high = -qnorm((1-ci)/2)/sqrt(n_lag),
+      ci_low = qnorm((1-ci)/2)/sqrt(n_lag)
+      
+    )
+
+  # add ach50 value for home on plot
+# add ach50 for home to plot
+ach50 <- assessment_data %>% filter( home == hm) %>%
+  pull(ach50)
+ach50 <- if(is_empty(ach50)) 'not measured' else if (is.na(ach50)) {
+  'not measured'} else ach50
+  
+  #plot
+  plot <- ggplot(df_acf, aes(x=lag, y=acf)) +
+    geom_hline(yintercept=0) +
+    geom_segment(aes(xend=lag, yend=0,
+                     color = ifelse(n_lag < pairs_min,
+                    'red',
+                    'black'))) +
+    geom_line(aes(x = lag, y = ci_high),
+              linetype = 'dashed', color = ci.col)+
+    geom_line(aes(x = lag, y = ci_low),
+              linetype = 'dashed', color = ci.col)+
+    # geom_text(aes(x = lag, y = acf+0.05, label = n_lag),
+    #           size = xsmall)+ # annotate w/ n used to calculate acf for each lag
+    theme_bw() +
+    xlab("Lag") +
+    ggtitle(if_else(simple == TRUE,
+                    paste(hm, '*missing', signif(missing,3), '%'),
+                    paste(hm, loc, metric, cluster))) +
+    {if (simple != TRUE) {
+      annotate( 'text', x = Inf, y = Inf, hjust = 1, vjust = 1,
+              label = paste("*missing", signif(missing,3), "% of daily values\n",
+                            "in home sampling period"), size = small)}}+
+    coord_cartesian(xlim=c(0, lag_max_plot), ylim = c(-0.5,1))+
+    
+    scale_color_identity(name = paste(">=", pairs_min, 'correlation pairs'),
+                               breaks = c("black", "red"),
+                               labels = c("yes", "no"),
+                               guide = "legend")+
+    annotate('text', x = lag_max_plot/2, y = 0.75, hjust = 0.5,
+             label =
+               # paste('ACH50 =', ach50)
+               bquote(ACH[50] ==  ~ .(ach50))
+             )+ # annotate with ach50
+    {if(simple == TRUE) {
+      theme(axis.title = element_blank(),
+          axis.text = element_text( size = small),
+          axis.ticks = element_blank(),
+          panel.grid.minor.x = element_blank(),
+          panel.grid.major.x = element_blank(),
+          panel.border = element_blank(),
+          plot.title = element_text(hjust = 0.5, size = small),
+          legend.position = 'none')}}+
+    if (is.null(ylab))
+      ylab(ifelse(type=="partial", "PACF", "ACF"))
+  else
+    ylab(ylab)
+  
+  # find first lag point when acf goes inside confidence intervals
+  a <- df_acf %>%
+    filter(acf <= ci_high
+           & acf >= ci_low
+    ) %>%
+    pull(lag)
+  
+  lag_signif <- ifelse(length(a)>0, min(a), Inf) %>%
+    as.data.frame() %>%
+    rename('lag_signif' = '.') %>%
+    mutate(home = hm, location = loc, metric = metric,
+           days_avail = days_avail, missing_pct = missing, acf_type = type,
+           energy_cluster = cluster)
+  
+  return(list('lag_signif' = lag_signif, 'plot' = plot))
+}
+
+# testing-------------
+# # test for one home, loc, metric
+lapply('015', ggacf,
+       data = omni_daily_data_complete,
+       loc = 'living', lag_max_plot = 10,
+       metric = 'pm25', simple= TRUE,
+       cluster = 'shoulder')
+```
+
+
+```{r test_acf_data_resolution_effect, eval = FALSE}
+# is the point at which data crosses conf_int
+# affected by resolution of data?
+
+# daily
+acf(omni_daily_data_complete %>%
+      filter(home == '002' & location == 'living') %>%
+      select(pm25),
+    na.action = na.pass, lag.max = 10)
+
+map(homes_all, function (x){
+  acf(omni_daily_data_complete %>% filter(home == x & location == 'living') %>%select(pm25),
+      na.action = na.pass,
+      lag.max = 48)
+})
+
+# hourly
+acf(omni_hourly_data %>% filter(home == '002' & location == 'living') %>%select(pm25),
+    na.action = na.pass, lag.max = 240)
+
+map(homes_all, function (x){
+  acf(omni_hourly_data %>% filter(home == x & location == 'living') %>%select(pm25),
+                             na.action = na.pass,
+      lag.max = 240)
+  })
+
+```
+
+```{r test_ggacf_to_acf_func, eval = FALSE}
+# does my function compare to the default acf, just with different conf_int?
+
+acf(omni_daily_data_complete %>%
+      filter(home == '002' & location == 'living') %>%
+      select(pm25),
+    na.action = na.pass, lag.max = 10)
+
+lapply(homes_all, ggacf,
+       data = omni_daily_data_complete, loc = 'living', lag_max_plot = 10, metric = 'pm25')
+
+
+  
+```
+
+```{r ggacf_grid_function, include = FALSE}
+#function to put plots in a grid
+acf.grid <- function(plots, title,
+                     y_val = 'ACF', ncol = 4, nrow = 4) {
+  ##omit NULL values (from homes or rooms without valid data)
+  plots <- plots[!sapply(plots, is.null)]
+  
+  do.call('grid.arrange', c(plots, top = title, left = y_val,
+                            ncol = ncol, nrow = nrow))
+  
+}
+
+# NOTE, if there are no homes with valid data in selection (plots <- NULL)
+# the function will return the error: 
+### Error in unit(rep(1, nrow), "null") : 'x' and 'units' must have length > 0
+
+```
+
+
+
+
+## Plots of all homes without clusters
+
+
+```{r ggacf_grid_plots_no_clusters, fig.width=8, fig.height=4.5, eval = FALSE}
+
+# plots for all homes, locations, and metrics (no clusters)
+
+    # all locs/metrics  
+      lapply(locations_indoor, function(x_location) {
+        
+        lapply(metrics_all, function(x_metric) {
+          
+          lapply(homes_all, function(x_home) {
+            ggacf(hm = x_home,
+                  data = omni_daily_data_complete,
+                  loc = x_location, lag_max_plot = 30, metric = x_metric,
+                  simple = TRUE
+            )[['plot']]
+          }
+          ) %>%
+            acf.grid(title = paste(x_location, x_metric, 'no clusters'))
+        }
+        )
+      }
+      )
+
+# # not in grid
+#   plots <- lapply(metrics_all, function(x_metric) {
+#     
+#     lapply(locations_indoor, function(x_location) {
+#       
+#       lapply(homes_all, function(x_home) {
+#         ggacf(hm = x_home,
+#               data = omni_daily_data_complete,
+#               loc = x_location, lag_max_plot = 14, metric = x_metric
+#         )[['plot']]
+#       }
+#       ) 
+#     }
+#     ) 
+#   }
+#   )
+
+# # no grid
+#   plots <- lapply(metrics_all, function(x_metric) {
+#     
+#     lapply(locations_indoor, function(x_location) {
+#       
+#       lapply(homes_all, function(x_home) {
+#         ggacf(hm = x_home,
+#               data = omni_daily_data_complete,
+#               loc = x_location, lag_max_plot = 14, metric = x_metric
+#         )[['plot']]
+#       }
+#       ) 
+#     }
+#     ) 
+#   }
+#   )
+
+# one location/metric at a time
+# loc <- 'living'
+# metric <- 'pm25'
+# 
+#       lapply(homes_all, function(x_home) {
+#         ggacf(hm = x_home,
+#               data = omni_daily_data_complete,
+#               loc = loc, lag_max_plot = 30, metric = metric,
+#               simple = TRUE
+#         )[['plot']]
+#       }
+#       ) %>%
+#   acf.grid(title = paste(loc, metric, 'no clusters'), ncol = 4)
+#       
+# metric <- 'voc'
+# 
+# 
+#       lapply(homes_all, function(x_home) {
+#         ggacf(hm = x_home,
+#               data = omni_daily_data_complete,
+#               loc = loc, lag_max_plot = 30, metric = metric,
+#               simple = TRUE
+#         )[['plot']]
+#       }
+#       ) %>%
+#   acf.grid(title = paste(loc, metric, 'no clusters'), ncol = 4)
+#       
+#       metric <- 'voc'
+# 
+#       
+# loc <- 'living'
+# metric <- 'pm25'
+#       lapply(homes_all, function(x_home) {
+#         ggacf(hm = x_home,
+#               data = omni_daily_data_complete,
+#               loc = loc, lag_max_plot = 30, metric = metric,
+#               simple = TRUE
+#         )[['plot']]
+#       }
+#       ) %>%
+#   acf.grid(title = paste(loc, metric, 'no clusters'), ncol = 4)
+      
+    
+
+```
+
+### for some homes, acf stops decreasing (especially pm25), likely due to non-stationarity of data  
+### will shorter time periods avoid this?  
+
+```{r test_ggacf_n_sample, fig.width=8, fig.height=4.5, eval = FALSE}
+# how does the total amount of days sampled affect the plot?
+
+# plot results for one location and metric at each home
+
+# all dates
+loc <- 'living'
+metric <- 'pm25'
+
+      lapply(homes_all, function(x_home) {
+        ggacf(hm = x_home,
+              data = omni_daily_data_complete,
+              loc = loc, lag_max_plot = 30, metric = metric,
+              simple = TRUE
+        )[['plot']]
+      }
+      ) %>%
+  acf.grid(title = paste(loc, metric, 'all dates'))
+
+      
+
+            
+# multpile smaller date ranges
+
+                        date_ranges <- list(c('2020-11-01', '2020-12-31'),
+                                c('2021-01-01', '2021-02-28'),
+                                c('2021-03-01', '2021-04-30'))
+                        
+                 lapply(date_ranges, function(x_date_range) {
+                       
+                   # date_range <- unlist(x_date_range)
+                   # another month
+            lapply(homes_all, function(x_home) {
+        ggacf(hm = x_home,
+              data = omni_daily_data_complete %>%
+          filter(date>= ymd(x_date_range[1]) & date <=ymd(x_date_range[2])),
+              loc = loc, lag_max_plot = 30, metric = metric,
+              simple = TRUE
+        )[['plot']]
+      }
+      ) %>%
+  acf.grid(title = paste(loc, metric,
+                            month(x_date_range[1], label = TRUE, abbr = TRUE),
+                         '-',
+                         month(x_date_range[2], label = TRUE, abbr = TRUE))
+           )   
+                 }
+                 )
+
+```
+
+### shorter time periods due seem to avoid the slow decrease, see home 002 only has slight issue in one time period
+
+```{r ggacf_grid_plots_with_clusters, fig.width=8, fig.height=4.5, eval = TRUE}
+# plots for all homes, locations, and metrics (with clusters)
+  lapply(metrics_all, function(x_metric) {
+    
+    lapply(locations_indoor, function(x_location) {
+      
+      lapply(omni_daily_data_complete %>%
+                 pull(energy_cluster) %>%
+                 as.factor() %>% levels(),
+               function(x_cluster) {
+                 
+      lapply(homes_all, function(x_home) {
+        
+        # if cluster exists for given house, return plot
+                if (x_cluster %in%
+                    (omni_daily_data_complete %>%
+                    filter(home == x_home) %>%
+                    pull(energy_cluster) %>%
+                    as.factor() %>% levels())
+                ) { 
+                  ggacf(hm = x_home,
+              data = omni_daily_data_complete,
+              loc = x_location, lag_max_plot = 30, metric = x_metric,
+              cluster = x_cluster, simple = TRUE
+        )[['plot']]
+                  } else{
+                    # if cluster does not exist for home, return NULL
+                    NULL
+                  }
+               }
+      ) %>%
+          acf.grid(title = paste(x_location, x_metric, x_cluster)) 
+      }
+      ) 
+    }
+    ) 
+  }
+  )
+
+
+
+```
+
+## Calculate how many lags (days) it takes for pollutant/metric to
+## not be significantly autocorrelated
+
+
+```{r lag_df_csv, eval = FALSE}
+
+# return data for all homes, locations, and metrics (no clusters)
+acf_lags_no_cluster <- 
+  lapply(metrics_all, function(x_metric) {
+    
+    lapply(locations_indoor, function(x_location) {
+      
+      lapply(homes_all, function(x_home) {
+        ggacf(hm = x_home,
+              data = omni_daily_data_complete,
+              loc = x_location, lag_max_plot = 14, metric = x_metric
+        )[['lag_signif']]
+      }
+      ) %>%
+        bind_rows()
+    }
+    ) %>%
+      bind_rows()
+  }
+  ) %>%
+  bind_rows() %>%
+  mutate(energy_cluster = 'all_dates')
+
+
+# return data for all homes, locations, and metrics (with clusters)
+acf_lags_cluster <- 
+  lapply(metrics_all, function(x_metric) {
+    
+    lapply(locations_indoor, function(x_location) {
+      
+      lapply(homes_all, function(x_home) {
+        
+        lapply(omni_daily_data_complete %>%
+                 filter(home == x_home) %>%
+                 pull(energy_cluster) %>%
+                 as.factor() %>% levels(),
+               function(x_cluster) {
+                 
+        ggacf(hm = x_home,
+              data = omni_daily_data_complete,
+              loc = x_location, lag_max_plot = 14, metric = x_metric,
+              cluster = x_cluster
+        )[['lag_signif']]
+               }
+      ) %>%
+        bind_rows()
+      }
+      ) %>%
+        bind_rows()
+    }
+    ) %>%
+      bind_rows()
+  }
+  ) %>%
+  bind_rows()
+
+
+# bind results into one dataframe
+acf_lags <- acf_lags_cluster %>% bind_rows(acf_lags_no_cluster)
+
+
+#write file
+write_csv(acf_lags, paste0('./csv_created/acf_lags.csv'))
+
+# create dated backup
+write_csv(acf_lags, paste0('./csv_created/acf_lags_',Sys.Date(), '.csv'))
+
+
+```
+
+```{r acf_lag_data_import}
+acf_lags <- read_csv('./csv_created/acf_lags.csv')
+```
+
+
+```{r lag_df_omissions}
+
+# and omit samples that have less than ___ available days
+# and omit samples with a missing pct greater than ____
+
+
+acf_lags_filter <- acf_lags %>%
+  # mutate(lag_signif = if_else(is.infinite(lag_signif), 35, lag_signif)) %>%
+  filter(days_avail >=days_avail_min & missing_pct <= missing_pct_min)
+
+n_metrics_lags <- acf_lags %>% pull(metric) %>% as.factor() %>% levels() %>% length()
+
+a <- acf_lags %>% filter(days_avail < days_avail_min)
+b <- a %>% filter(missing_pct > missing_pct_min) 
+
+```
+
+### omitted `r a %>% nrow()/n_metrics_lags` monitoring periods for each metric
+### because less than `r days_avail_min` available days  
+
+### omitted `r b %>% nrow()/n_metrics_lags` additional monitoring periods for each metric
+### because missing more than `r missing_pct_min`% of days within period
+
+
+```{r lag_plots, eval = TRUE}
+
+######## one metric
+met <- 'pm25'
+
+
+
+
+a <- acf_lags_filter %>% 
+  filter(metric == met)
+
+# # look at possible effects of sample size
+# ggplot(data = a , aes(x = days_avail, y = lag_signif))+
+#   geom_point(aes(color = location))+
+#   facet_wrap(vars(energy_cluster))
+
+
+inf_count <-a %>% filter(lag_signif %>%is.infinite()) %>% nrow()
+
+# a <- a %>%
+#   filter(lag_signif %>%is.finite())
+
+# make n labels
+n_labels <- a %>%
+filter(lag_signif %>%is.finite()) %>%
+  group_by(location, energy_cluster) %>%
+  summarise(
+    label_position=median(lag_signif, na.rm= TRUE)+5,
+    label_value=n(), .groups = 'drop'
+  ) %>%
+  mutate(label_value = paste0('n=',label_value))
+
+# boxplots by location
+ggplot(data = a , aes(x = location, y = lag_signif))+
+  geom_boxplot(outlier.shape = NA)+
+  geom_jitter(aes(
+    shape = ifelse(is.infinite(lag_signif),
+                    4,
+                    16)
+    ), height = 0)+
+  facet_wrap(vars(energy_cluster))+
+  ggtitle(label = paste0(met, ', lags before acf is insignficant'))+
+  scale_y_continuous(oob= scales::squish_infinite)+
+            scale_shape_identity(name = "Insignifiance reached within 30 days",
+                               breaks = c(16, 4),
+                               labels = c("Yes", "No"),
+                               guide = "legend")+
+  labs(tag = paste0('* how keep include >30 values\nbut omit from boxplot stats?\n',
+                    'n does not include inf values'))+
+  theme(plot.tag.position = c(.7, .3))+
+  geom_text(data=n_labels, aes(x = location, y=label_position,
+                               label=label_value),vjust=0)
+
+
+
+# boxplots by location, pooled clusters
+
+# make n labels
+n_labels <- a %>%
+  filter(energy_cluster %in% c('ac', 'shoulder', 'heat'))%>%
+  filter(lag_signif %>%is.finite()) %>%
+  group_by(location) %>%
+  summarise(
+  label_position=median(lag_signif, na.rm= TRUE)+5,
+  label_value=n(), .groups = 'drop'
+) %>%
+  mutate(label_value = paste0('n=',label_value))
+
+
+ggplot(data = a  %>% filter(energy_cluster %in% c('ac', 'shoulder', 'heat')),
+       aes(x = location, y = lag_signif))+
+  geom_boxplot(outlier.shape = NA)+
+  geom_text(data=n_labels, aes(x = location, y=label_position,
+                               label=label_value),vjust=0)+
+
+  geom_jitter(aes(
+    color=case_when(energy_cluster == 'heat' ~ 'red',
+                    energy_cluster == 'ac' ~ 'blue',
+                    energy_cluster == 'shoulder' ~ 'darkgreen'), 
+    # can only use the below lines if Inf values are present
+    # if(any(lag_signif== Inf)) {
+    #   shape = ifelse(is.infinite(lag_signif),
+    #                4, 16)}
+  ), height = 0)+
+  ggtitle(label = paste0(met, ', lags before acf is insignficant'))+
+  scale_y_continuous(oob= scales::squish_infinite)+
+  scale_color_identity(name = "Cluster",
+                       breaks = c("blue", "darkgreen", "red"),
+                       labels = c("AC", "Shoulder", "Heat"),
+                       guide = "legend")+
+scale_shape_identity(name = "Insignifiance reached within 30 days",
+                     breaks = c(16, 4),
+                     labels = c("Yes", "No"),
+                     guide = "legend")
+
+
+
+####### compare all metrics, pooled cluster periods
+a <- acf_lags_filter %>% 
+  filter(energy_cluster %in% c('ac', 'shoulder', 'heat'))
+
+inf_count <-a %>% filter(lag_signif %>%is.infinite()) %>% nrow()
+
+# make n labels
+n_labels <- a %>%
+  filter(lag_signif %>%is.finite()) %>%
+  group_by(location, metric) %>%
+  summarise(
+    label_position=median(lag_signif, na.rm= TRUE)+5,
+    label_value=n(), .groups = 'drop'
+  ) %>%
+  mutate(label_value = paste0('n=',label_value))
+
+# boxplots by location, pooled clusters
+ggplot(data = a ,
+       aes(x = location, y = lag_signif))+
+  geom_boxplot(outlier.shape = NA)+
+  geom_jitter(aes(
+    color=case_when(energy_cluster == 'heat' ~ 'red',
+                    energy_cluster == 'ac' ~ 'blue',
+                    energy_cluster == 'shoulder' ~ 'darkgreen',
+                    energy_cluster == 'unclassified' ~ 'black'),
+    shape = ifelse(is.infinite(lag_signif),
+                   4,
+                   16)
+  ), height = 0)+
+  facet_wrap(vars(metric))+
+  ggtitle(label = 'Lags before acf is insignficant')+
+  scale_y_continuous(oob= scales::squish_infinite)+
+  scale_color_identity(name = "Cluster",
+                       breaks = c("blue", "darkgreen", "red", "black"),
+                       labels = c("AC", "Shoulder", "Heat", "Unclassified"),
+                       guide = "legend")+
+  geom_text(data=n_labels, aes(x = location, y=label_position,
+                               label=label_value),vjust=0)+
+  scale_shape_identity(name = "Insignifiance reached within 30 days",
+                       breaks = c(16, 4),
+                       labels = c("Yes", "No"),
+                       guide = "legend")
+
+
+
+####### compare all metrics, pooled rooms
+
+# make n labels
+n_labels <- a %>%
+  filter(lag_signif %>%is.finite()) %>%
+  group_by(energy_cluster, metric) %>%
+  summarise(
+    label_position=median(lag_signif, na.rm= TRUE)+5,
+    label_value=n(), .groups = 'drop'
+  ) %>%
+  mutate(label_value = paste0('n=',label_value))
+
+# boxplots by cluster, pooled rooms
+ggplot(data = a ,
+       aes(x = energy_cluster, y = lag_signif))+
+  geom_boxplot(outlier.shape = NA)+
+  geom_jitter(aes(
+    color=case_when(location == 'bedroom' ~ 'purple',
+                    location == 'living' ~ 'orange',
+                    location == 'kitchen' ~ 'brown'),
+    shape = ifelse(is.infinite(lag_signif),
+                   4,
+                   16)
+  ), height = 0)+
+  facet_wrap(vars(metric))+
+  ggtitle(label = 'Lags before acf is insignficant')+
+  scale_y_continuous(oob= scales::squish_infinite)+
+  scale_color_identity(name = "Cluster",
+                       breaks = c("purple", "orange", "brown"),
+                       labels = c("bedroom", "living", "kitchen"),
+                       guide = "legend")+
+  geom_text(data=n_labels, aes(x = energy_cluster, y=label_position,
+                               label=label_value),vjust=0)+
+  scale_shape_identity(name = "Insignifiance reached within 30 days",
+                       breaks = c(16, 4),
+                       labels = c("Yes", "No"),
+                       guide = "legend")
+
+
+
+```
+
+## seems to be not much difference in significant lag by room,
+## but may be difference between clusters
+## however, this could be due to heating periods beings longer, and less stationary
+
+```{r lag_table_csv, eval = TRUE}
+# don't include Inf values in calculations
+acf_lags_finite <- acf_lags_filter %>%
+    filter(!is.infinite(lag_signif))
+
+
+lag_summary_cluster <- acf_lags_finite %>%
+    filter(energy_cluster %in% c('heat', 'ac', 'shoulder'))%>%
+  group_by(metric, energy_cluster) %>%
+  summarise(median = median(lag_signif),
+            q3 = quantile(lag_signif, probs= 3/4),
+                        mean = mean(lag_signif),
+            sd = sd(lag_signif), 
+                 n = sum(days_avail),
+                        .groups = 'drop')
+
+lag_summary_total <- acf_lags_finite %>%
+  filter(energy_cluster %in% c('heat', 'ac', 'shoulder'))%>%
+  group_by(metric) %>%
+  summarise(median = median(lag_signif),
+            q3 = quantile(lag_signif, probs= 3/4),
+                                    mean = mean(lag_signif),
+            sd = sd(lag_signif), 
+                 n = sum(days_avail),
+            .groups = 'drop') %>%
+  mutate(energy_cluster = 'total')
+
+lag_summary <- bind_rows(lag_summary_total, lag_summary_cluster)
+
+# write file
+write_csv(lag_summary, paste0('./csv_created/lag_summary.csv'))
+# create dated backup file
+write_csv(lag_summary, paste0('./csv_created/lag_summary_', Sys.Date(), '.csv'))
+
+```
+
+
+
+```{r ggacf_partial, eval = FALSE}
+
+# plot results for one location and metric
+lapply(homes_all, function(x) {
+  ggacf(hm = x,
+        data = omni_daily_data_complete,
+        loc = 'living', lag_max_plot = 14, metric = 'pm25', type = 'partial'
+  )[['plot']]
+}
+)
+```
