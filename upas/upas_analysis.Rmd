@@ -1,0 +1,337 @@
+---
+title: "UPAS Analysis"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: paper
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.path = 'figures/',
+  warning = FALSE,
+  message = FALSE,
+  echo = FALSE,
+  fig.width = 10, fig.height = 3,
+  cache = FALSE)
+```
+
+```{r}
+source("../functions_epic.R")
+```
+
+---
+
+# Read Metadata
+
+```{r}
+grav_meta <- read_sheet("18_J7ZQgnuji-r6ovpTjmlvdz3xUGBYzy0u_ACadLG-c",
+                        sheet = "metadata")
+
+meta <- read_rds("../output/upas/upas_summary.rds")
+
+upas_log <- read_sheet("1PnPjgbYWljb5oXoSCBqpJb2pi7gU0Kzre5lx4H-3i70",
+                       sheet = "upas", col_types = "c")
+```
+
+---
+
+# Gravimetric
+
+* Read Data
+
+```{r}
+grav <- read_sheet("18_J7ZQgnuji-r6ovpTjmlvdz3xUGBYzy0u_ACadLG-c",
+                   sheet = "data", col_types = "c") %>%
+  filter(date > as.Date("2021-01-01")) %>%
+  mutate(id_filter = str_pad(id_filter, 4, "left", "0"),
+         id_keeper = str_pad(id_keeper, 4, "left", "0"))
+```
+
+* Organize Data
+
+```{r}
+pm25 <- grav %>%
+  mutate(date = as.Date(date, format = "%Y-%m-%d")) %>%
+  left_join(upas_log %>% select(id_filter, id_home, visit, location),
+            by = "id_filter") %>%
+  left_join(meta %>% select(id_home, visit, location,
+                            volume, duration,
+                            start, end),
+            by = c("id_home", "visit", "location")) %>%
+  mutate_at(vars("mass", "volume", "duration"), as.numeric)
+```
+
+* Check for transcription errors
+
+```{r}
+delta <- pm25 %>%
+  group_by(id_filter, type) %>%
+  summarise(delta = max(mass, na.rm = TRUE) - min(mass, na.rm = TRUE),
+            .groups = "drop") %>%
+  filter(delta > 0.05) # difference greater than 0.05 mg
+```
+
+Note there are `r nrow(delta)` replicate measurements with a difference in mass above 0.05 mg. 
+
+
+## PM2.5
+
+* Calculate PM2.5 concentration
+
+```{r}
+pm25 <- pm25 %>%
+  group_by(id_home, visit, location, type, volume, duration, start, end) %>%
+  summarise(mass = mean(mass, na.rm = TRUE), .groups = "drop") %>%
+  pivot_wider(names_from = "type", values_from = "mass") %>%
+  mutate(d_mass = post - pre,
+         conc = (d_mass * 1000) / (volume / 1000)) %>%
+  mutate(conc = if_else(duration < 24, NA_real_, conc)) # samples must be longer than 24 hours
+```
+
+* Plot PM2.5 concentration
+
+```{r}
+ggplot(pm25 %>% filter(!grepl("blank", location))) +
+  geom_boxplot(aes(x = location, y = conc)) +
+  theme_bw() +
+  xlab("") + ylab("PM2.5 Concentration (ug/m^3)") +
+  ggtitle("Samples") +
+  scale_y_log10()
+```
+
+* impute blank concentration equivalent
+
+```{r}
+blanks <- pm25 %>% 
+  filter(location == "blank") %>%
+  mutate(conc = (d_mass * 1000) / ((24*7*60*2)/1000)) # seven day sample
+```
+
+* blank equivalent concentration
+
+```{r, fig.width=5}
+ggplot(blanks, aes(y = conc)) +
+  geom_boxplot() +
+  theme_bw() +
+  xlab("") + ylab("PM2.5 Concentration (ug/m^3)") +
+  ggtitle("Blanks")
+```
+
+```{r}
+lod <- sd(blanks$conc, na.rm = TRUE) * 3
+```
+
+The LOD is currently `r round(lod, 3)` micrograms per cubic meter.
+
+* Sample duration
+
+```{r}
+ggplot(meta, aes(x = as.numeric(duration) /24 )) +
+  geom_histogram(bins = 7, fill = "grey80", color = "blue") +
+  theme_bw() +
+  xlab("Days") +
+  ggtitle("Sample duration")
+```
+
+## Compare to OMNI
+
+* Sample Info
+
+```{r}
+data <- pm25 %>%
+  filter(!grepl("blank", location)) %>%
+  na.omit() %>%
+  mutate(pattern = paste("^omni.*", id_home, location, sep = "_"),
+         files = map2("../output/omni", pattern, list.files, full.names = TRUE),
+         start_ = as.Date(start) - 1,
+         end_ = as.Date(end) + 1,
+         dates = map2(start_, end_, seq.Date, by = "day"),
+         dates = map(dates, paste, collapse = "|"),
+         files = map2(dates, files, grep, value = TRUE)) %>%
+  select(-start_, -end_) %>%
+  mutate(omni = map(files, read_omni_rds_files))
+```
+
+```{r}
+out <- data %>%
+  filter(lengths(files) > 0) %>%
+  mutate(pm25_omni = pmap(list(start, end, omni), pm25_mean)) %>%
+  mutate(pm25_all = map(.x = omni, .f = ~mean(.x$pm25, na.rm = TRUE))) %>%
+  unnest(pm25_omni) %>%
+  select(-omni) %>% 
+  mutate(diff = ((conc - pm25_omni)^2)^0.5,
+         g = if_else(diff > 3, TRUE, FALSE))
+```
+
+```{r}
+out %>% group_by(g) %>% count()
+```
+
+
+```{r fig_omni_vs_filter, fig.width=1.5, fig.height=1.5}
+ggplot(out, aes(x = conc, y = pm25_omni, color = location)) +
+  geom_point() +
+  #geom_smooth(method = "lm", formula = "y ~ x", se = FALSE) +
+  theme_bw() +
+  geom_abline(slope = 1, intercept = 0) +
+  ylim(0,NA) + xlim(0,NA) +
+  ylab("OMNI (ug/m^3)") + xlab("Filter (ug/m^3)")
+```
+
+```{r}
+model <- lm("pm25_omni~conc", data = out)
+
+broom::tidy(model, conf.int = TRUE) %>%
+  kable(digits = c(NA, 1, 1, 1, 6 , 1, 1), caption = "OMNI vs. Filter PM2.5") %>%
+  kable_paper(bootstrap_options = "striped", full_width = F)
+```
+
+
+
+---
+
+# Black Carbon
+
+* read data
+
+```{r}
+files <- list.files("../../data/filters/soot_scan_csv", full.names = TRUE, pattern = ".csv$")
+
+data_bc <- map(files, read_csv, col_types = cols(.default = "c")) %>%
+  bind_rows() %>%
+  rename_all(clean_names) %>%
+  mutate(when = sub("epic_", "", description),
+         date_analyzed = as.Date(datetime, format = "%m/%d/%y")) %>%
+  select(filter_id, sampleir, when, date_analyzed) %>%
+  rename(id_filter = "filter_id", ir = "sampleir") %>%
+  mutate(id_filter = str_pad(id_filter, 4, side = "left", pad = "0")) %>%
+  mutate(ir = as.numeric(ir))
+```
+
+* organize data
+
+```{r}
+bc_dates <- data_bc %>%
+  left_join(upas_log %>% select(id_home, visit, location, id_filter),
+            by = "id_filter") %>%
+  left_join(meta %>% select(id_home, visit, location,
+                            volume, duration,
+                            start, end),
+            by = c("id_home", "visit", "location")) %>%
+  select(id_filter, when, date_analyzed) %>%
+  group_by(id_filter, when, date_analyzed) %>%
+  summarise_all(first, .groups = "drop") %>%
+  pivot_wider(names_from = "when", values_from = "date_analyzed") %>%
+  rename(date_pre = "pre", date_post = "post")
+```
+
+* blank dates
+
+```{r}
+blank_dates <- data_bc %>%
+  left_join(upas_log %>% select(id_home, visit, location, id_filter),
+            by = "id_filter") %>%
+  left_join(meta %>% select(id_home, visit, location,
+                            volume, duration,
+                            start, end),
+            by = c("id_home", "visit", "location")) %>%
+  filter(location == "blank") %>%
+  select(id_filter, when, date_analyzed) %>%
+  group_by(id_filter, when, date_analyzed) %>%
+  summarise_all(first, .groups = "drop") %>%
+  pivot_wider(names_from = "when", values_from = "date_analyzed") %>%
+  rename(date_pre = "pre", date_post = "post")
+```
+
+* blank values
+
+```{r}
+blank_values <- data_bc %>%
+  left_join(upas_log %>% select(id_home, visit, location, id_filter),
+            by = "id_filter") %>%
+  left_join(meta %>% select(id_home, visit, location,
+                            volume, duration,
+                            start, end),
+            by = c("id_home", "visit", "location")) %>%
+  filter(location == "blank") %>%
+  select(id_filter, when, ir) %>%
+  group_by(id_filter, when) %>%
+  summarise(ir = mean(ir, na.rm = TRUE), .groups = "drop") %>%
+  pivot_wider(names_from = "when", values_from = "ir")
+```
+
+* blank day of analysis correction
+
+```{r}
+blanks_bc <- blank_values %>%
+  left_join(blank_dates, by = c("id_filter")) %>%
+  mutate(delta = post - pre)
+```
+
+* change in blank ATN
+
+Note: samples 0001 to 0100 all have the same pre-scan day
+
+```{r}
+ggplot(blanks_bc, aes(x = date_post, y = delta)) +
+  geom_point() +
+  theme_bw() +
+  ylab("Post:Pre dAtn") +
+  xlab("Date Post")
+```
+
+```{r}
+blanks_bc_mean <- blanks_bc %>%
+  group_by(date_pre, date_post) %>%
+  summarise(blank_atn_cor = mean(delta, na.rm = TRUE), .groups = "drop")
+
+blanks_bc_mean
+```
+
+* Calculate BC
+
+```{r}
+data_bc <- data_bc %>%
+  group_by(id_filter, when) %>%
+  summarise(ir = mean(ir, na.rm = TRUE), .groups = "drop") %>%
+  pivot_wider(names_from = "when", values_from = "ir") %>%
+  na.omit() %>%
+  left_join(upas_log %>% select(id_home, visit, location, id_filter),
+            by = "id_filter") %>%
+  left_join(meta %>% select(id_home, visit, location,
+                            volume, duration,
+                            start, end),
+            by = c("id_home", "visit", "location")) %>%
+  mutate_at(vars("volume", "duration"), as.numeric)
+```
+
+```{r}
+bc <- data_bc %>%
+  left_join(bc_dates, by = c("id_filter")) %>%
+  left_join(blanks_bc_mean, by = c("date_pre", "date_post")) %>%
+  mutate(duration = if_else(location == "blank", 168, duration)) %>% # assume blanks run for 7 days
+  filter(duration > 24) %>% # only samples that ran for > 24 hours
+  mutate(bc = bc_calc(pre + blank_atn_cor, post, 2, 0.00045, duration * 60 * 60))
+```
+
+* Plot BC
+
+```{r}
+ggplot(bc %>% filter(!(location == "bedroom")), aes(x = location, y = bc)) +
+  geom_boxplot() +
+  theme_bw() +
+  ylab("micrograms per cubic meter") +
+  xlab("") +
+  ggtitle("BC Mass Equivalent")
+```
+
+---
+
+# Write Data
+
+```{r}
+write_rds(bc, "../output/bc/bc.rds")
+write_rds(pm25, "../output/pm25/pm25.rds")
+```
+

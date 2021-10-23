@@ -1,0 +1,106 @@
+---
+title: "Sense Explore"
+output: html_document
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.path = 'figures/',
+  warning = FALSE,
+  message = FALSE,
+  echo = FALSE,
+  fig.width = 10, fig.height = 3,
+  cache = FALSE)
+```
+
+```{r}
+# reads source
+source("../functions_epic.R")
+```
+
+```{r}
+data <- read_rds("../output/sense_all.rds")
+```
+
+---
+
+# Time variation
+
+```{r}
+p_data <- data %>%
+  filter(sense_device_name == "consumption") %>%
+  rename(date = datetime)
+```
+
+```{r timeseries_all, fig.width=10, fig.height=6}
+timeVariation(p_data, pollutant = "avg_wattage", ylab = "W")
+```
+
+```{r timeseries_home, fig.width=10, fig.height=6}
+timeVariation(p_data, pollutant = "avg_wattage", group = "job_id", ylab = "W")
+```
+
+---
+
+# Devices
+
+```{r}
+device_data <- data %>%
+  select(job_id, datetime, device_id, sense_device_name, device_type) %>%
+  filter(sense_device_name != "consumption" & sense_device_name != "always on") %>%
+  mutate(date = as.Date(datetime)) %>%
+  group_by(job_id, date, device_id) %>%
+  summarise_all(first) %>%
+  group_by(job_id, date) %>%
+  count()
+```
+
+```{r n_devices, fig.width = 10, fig.height = 4}
+ggplot(device_data, aes(x = date, y = n, color = job_id)) +
+  geom_point() + geom_line() +
+  theme_bw() +
+  xlab("") + ylab("Number of active devices") +
+  labs(color = "Home") +
+  scale_x_date(date_labels = "%b")
+```
+
+---
+
+# Drier
+
+```{r}
+device_data <- data %>%
+  select(job_id, datetime, device_id, sense_device_name, device_type) %>%
+  filter(sense_device_name != "consumption" & sense_device_name != "always on") %>%
+  filter(grepl("dryer", sense_device_name) == TRUE) %>%
+  pull(sense_device_name) %>%
+  unique()
+device_data
+```
+
+```{r}
+device_data <- data %>%
+  filter(grepl("dryer", sense_device_name) == TRUE) %>%
+  group_by(job_id) %>%
+  summarise_all(first)
+
+device_data
+```
+
+So far the SENSE has identified dryers in `r nrow(device_data)` homes.
+
+```{r}
+device_data <- data %>%
+  filter(grepl("dryer", sense_device_name) == TRUE) %>%
+  mutate(date = as.Date(datetime)) %>%
+  filter(job_id != "013")
+```
+
+```{r fig_dryer, fig.width=10, fig.height=6}
+ggplot(device_data, aes(x = datetime, y = avg_wattage, group = date, color = job_id)) +
+  geom_boxplot(outlier.size = 0.25, outlier.alpha = 0.5) +
+  theme_bw() +
+  facet_wrap(~job_id, scales = "free", ncol = 2) +
+  xlab("")
+```
+
+

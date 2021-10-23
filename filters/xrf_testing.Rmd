@@ -1,0 +1,113 @@
+---
+title: "XRF - Testing"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: paper
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.path = 'figures/',
+  warning = FALSE,
+  message = FALSE,
+  echo = FALSE,
+  fig.width = 10, fig.height = 4,
+  cache = FALSE)
+```
+
+```{r}
+library(dplyr)
+library(purrr)
+library(tidyr)
+library(openair)
+library(ggplot2)
+library(readr)
+library(lubridate)
+library(readxl)
+library(forcats)
+```
+
+---
+
+# Read
+
+```{r}
+files <- list.files("../../data/filters", "^xrf.*", full.names = "TRUE")
+```
+
+```{r}
+nice_names <- function(x){gsub(" ", "_", tolower(x))}
+```
+
+```{r}
+mass <- read_xlsx(files[1], sheet = "ug_cm2", col_types = "text") %>%
+  pivot_longer(cols = -"filter_id", names_to = "var", values_to = "val") %>%
+  mutate(val = as.numeric(gsub("\\[|\\]", "", val)))
+```
+```{r}
+error <- read_xlsx(files[1], sheet = "uncertainty", col_types = "text") %>%
+  pivot_longer(cols = -"filter_id", names_to = "var", values_to = "val") %>%
+  mutate(val = as.numeric(val)) %>%
+  rename(error = "val")
+```
+```{r}
+data <- mass %>%
+  left_join(error,  by = c("filter_id", "var")) %>%
+  mutate(ug = val * pi * ((3.7)/2)^2, # mass on filter (ug/cm^2 * filter area)
+         vol = 0.001 * 60 * 24 * 7,       # volume sampled (m^3 @ 1 L/min for 7 days)
+         conc_eqv = ug / vol,         # mass / volume
+         error_conc_eqv = (error * pi * ((3.7)/2)^2) / vol) # mass / volume
+```
+
+# Plot
+
+```{r fig_xrf_unloaded_emfab, fig.height = 12, fig.width = 8}
+ggplot(data, aes(x = filter_id, y = val)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = val - error, ymax = val + error)) +
+  theme_bw() +
+  facet_wrap(~var, ncol = 3, scales = "free_y") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  xlab("") + ylab("ug/cm2") +
+  ggtitle("Mass per unit area")
+```
+
+* Equivalent mass concentration, sampling at 1 L/min for 7 days onto a 37 mm filter
+
+```{r fig_xrf_unloaded_emfab_conc, fig.height = 12, fig.width = 8}
+ggplot(data, aes(x = filter_id, y = conc_eqv)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = conc_eqv -  error_conc_eqv,
+                    ymax = conc_eqv +  error_conc_eqv)) +
+  theme_bw() +
+  facet_wrap(~var, ncol = 3, scales = "free_y") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  xlab("") + ylab("ug/m^3") +
+  ggtitle("Equivalent concentration")
+```
+
+# Variability
+
+```{r}
+variability <- data %>%
+  group_by(var) %>%
+  summarise(mean = mean(conc_eqv, na.rm = TRUE),
+            min = min(conc_eqv, na.rm = TRUE),
+            max = max(conc_eqv, na.rm = TRUE),
+            range = max - min,
+            variability = range * 100 / mean) %>%
+  ungroup() %>%
+  mutate(var = fct_reorder(var, mean))
+```
+
+
+```{r fig_xrf_emfab_unloaded_mean_range}
+ggplot(variability, aes(y = mean, x = var)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = min,
+                    ymax = max)) +
+  theme_bw() +
+  ylab("Equivalent Conc. (ug/m^3)") + xlab("")
+```
+

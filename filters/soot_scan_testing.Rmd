@@ -1,0 +1,96 @@
+---
+title: "Soot Scan - Testing"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: paper
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.path = 'figures/',
+  warning = FALSE,
+  message = FALSE,
+  echo = FALSE,
+  fig.width = 8, fig.height = 4,
+  cache = FALSE)
+```
+
+```{r}
+library(dplyr)
+library(purrr)
+library(tidyr)
+library(openair)
+library(ggplot2)
+library(readr)
+library(lubridate)
+```
+
+---
+
+# Read data
+
+```{r}
+files <- list.files("../../data/filters", ".*soot_scan.*.csv$", full.names = "TRUE")
+```
+
+```{r}
+nice_names <- function(x){gsub(" ", "_", tolower(x))}
+```
+
+```{r}
+df <- read_csv(files[2], col_types = cols()) %>%
+  rename_all(nice_names) %>%
+  mutate(rep = as.factor(rep),
+         date = as.factor(date))
+```
+
+* `r length(unique(df$filter_id))` unloaded filters,  repeated soot scan measurements
+
+# Plot
+
+```{r soot_scan_blanks}
+ggplot(df, aes(x = filter_id, y = ir, color = date)) +
+  geom_point() +
+  theme_bw() +
+  xlab("")
+```
+
+
+# Variability 
+
+* remove first 3 measurements (instrument warming up)
+
+```{r}
+df_clean <- df %>% 
+  filter (!(filter_id == "001" & rep == "1")) %>%
+  filter (!(filter_id == "002" & rep == "1")) %>%
+  filter (!(filter_id == "003" & rep == "1")) %>%
+  group_by(filter_id, date) %>%
+  summarise(mean_ir = mean(ir, na.rm = TRUE)) %>%
+  ungroup()
+```
+
+```{r}
+flow_lpm <- 1
+duration_days <- 7
+filter_diam_mm <- 37
+
+a <- pi * ((filter_diam_mm - 2)/(2 * 1000))^2   # m^2 (filter effective area)
+q <- flow_lpm / (60 * 1000)                      # m^3/s (1 L/min)
+dt <- duration_days * 24 * 60 * 60                # s (7 days)
+rho_atn <- 12.5                              # m^2/g
+```
+
+```{r}
+d_bc <- tibble(max = max(df_clean$mean_ir),
+               min = min(df_clean$mean_ir),
+               d_atn = 100 * log(max/min),
+               b_atn = (a * d_atn) / (q * dt),
+               vol = q * dt,
+               r = exp(-d_atn / 100) * 0.88 + 0.12,
+               bc_conc = 1e4 * b_atn / (rho_atn * r))
+```
+
+
+For a `r duration_days` day sample, at `r flow_lpm` L/min, onto a `r filter_diam_mm` filter, repeated on `r length(unique(df_clean$date))` days, the effective blank-to-blank variabilty in BC is `r round(d_bc$bc_conc[1], 1)` $\mu g/m^{-3}$, based on the maximum and minimum IR transmission. 

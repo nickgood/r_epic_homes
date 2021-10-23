@@ -1,0 +1,59 @@
+---
+title: "Sense"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: paper
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.path = 'figures/',
+  warning = FALSE,
+  message = FALSE,
+  echo = FALSE,
+  fig.width = 10, fig.height = 3,
+  cache = FALSE)
+```
+
+```{r}
+library(dplyr)
+library(purrr)
+library(tidyr)
+library(openair)
+library(ggplot2)
+library(readr)
+library(lubridate)
+```
+
+---
+
+# Read data
+
+```{r}
+files <- list.files("../../data/sense", ".*.csv$", full.names = "TRUE")
+```
+
+```{r}
+nice_names <- function(x){gsub(" ", "_", tolower(x))}
+```
+
+```{r}
+sense_data <- read_csv(files[1], skip = 1, col_types = cols()) %>%
+  rename_all(nice_names) %>%
+  mutate_if(is.character, tolower) %>%
+  mutate(datetime = force_tz(datetime, "US/Mountain")) # asume timestamp is Mountain
+```
+
+# Plot
+
+```{r fig_total_kwh}
+ggplot(sense_data %>% filter(name == "total usage"),
+  aes(x = datetime, y = kwh)) +
+  geom_line() +
+  geom_point(color = "#F9461C") +
+  theme_bw() +
+  xlab("")
+```
+
+---

@@ -1,0 +1,112 @@
+---
+title: "Sense Dashboard"
+output: html_document
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.path = 'figures/',
+  warning = FALSE,
+  message = FALSE,
+  echo = FALSE,
+  fig.width = 10, fig.height = 3,
+  cache = FALSE)
+```
+
+```{r}
+# reads source
+source("../functions_epic.R")
+```
+
+---
+
+# Read metadata
+
+```{r}
+f <- list.files("../../data/sense/metadata", ".csv$", full.names = TRUE)
+
+meta <- read_csv(f, col_types = cols()) %>%
+  rename_all(clean_names) %>%
+  filter(!is.na(job_id))
+```
+
+---
+
+# Read data
+
+```{r}
+f <- list.files("../../data/sense/homes", ".csv$", full.names = TRUE)
+
+read_sense <- function(f){
+  read_csv(f, col_types = cols()) %>%
+  rename_all(clean_names)
+}
+
+raw_data <- map(f, read_sense) %>% 
+  bind_rows()
+```
+
+---
+
+# Organize data
+
+```{r}
+data <- raw_data %>%
+  mutate(datetime = with_tz(datetime_utc, "US/Mountain")) %>%
+  select(datetime, serial_number, device_id, sense_device_name, device_type,
+         consumption_kwh, avg_wattage) %>%
+  left_join(meta %>% select("monitor_serial_number", "job_id"),
+            by = c("serial_number" = "monitor_serial_number")) %>%
+  mutate_if(is.character, tolower) %>%
+  filter(!is.na(job_id)) %>%
+  distinct()
+```
+
+---
+
+# Consumption
+
+```{r, fig.width= 8, fig.height=20}
+p_data <- data %>%
+  filter(sense_device_name == "consumption")
+
+ggplot(p_data, aes(x = datetime, y = consumption_kwh)) +
+  geom_line() +
+  theme_bw() +
+  facet_wrap(~job_id, nrow = length(unique(p_data$job_id))) +
+  xlab("") + ylab("kWh") +
+  ggtitle("Household Energy Consumption")
+```
+
+---
+
+# Hourly Data
+
+```{r}
+data_hourly <- data %>%
+  mutate(year = year(datetime),
+         month = month(datetime),
+         day = day(datetime),
+         hod = hour(datetime)) %>%
+  group_by(job_id, year, month, day, hod, 
+           serial_number, device_id, sense_device_name, device_type) %>%
+  summarise(datetime = first(datetime),
+            consumption_kwh = sum(consumption_kwh, na.rm = TRUE),
+            avg_wattage = mean(avg_wattage, na.rm = TRUE,
+            max_wattage = max(avg_wattage, na.rm = TRUE)),
+            .groups = "drop") %>%
+  mutate(datetime = floor_date(datetime, unit = "hours"))
+```
+
+---
+
+# Write
+
+```{r}
+write_rds(data, "../output/sense/sense_all.rds") # one-minute data
+write_rds(data_hourly, "../output/sense/sense_hourly.rds") # one-hour data
+```
+
+---
+
+
+

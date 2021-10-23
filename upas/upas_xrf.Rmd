@@ -1,0 +1,66 @@
+---
+title: "XRF Analysis"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: paper
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.path = 'figures/',
+  warning = FALSE,
+  message = FALSE,
+  echo = FALSE,
+  fig.width = 10, fig.height = 3,
+  cache = FALSE)
+```
+
+```{r}
+source("../functions_epic.R")
+```
+
+---
+
+# Read Metadata
+
+```{r}
+meta <- read_rds("../output/upas/upas_summary.rds") %>%
+  select(id_home, visit, location, volume, duration)
+
+upas_log <- read_sheet("1PnPjgbYWljb5oXoSCBqpJb2pi7gU0Kzre5lx4H-3i70",
+                       sheet = "upas", col_types = "c") %>%
+  select(-date_time_start, -notes)
+```
+
+---
+
+# XRF Analysis
+
+* read data
+
+```{r}
+files <- list.files("../../data/filters/xrf_xlsx", full.names = TRUE, pattern = "6-24-21 XRF.csv$")
+```
+
+```{r}
+xrf <- read_csv(files, col_types = cols()) %>%
+  slice(2:n()) %>% # remove units row
+  rename_all(clean_names) %>% # give columns nice names
+  mutate_all(as.numeric) %>% # convert columns to numeric
+  mutate(id_filter = str_pad(as.character(filter_id), 4, side = "left", pad = "0")) %>% # add id column
+  select(-filter_id) %>% # remove old id column
+  left_join(upas_log, by = "id_filter") %>%
+  left_join(meta, by = c("visit", "id_home", "location"))
+```
+
+
+---
+
+# Write Data
+
+```{r, include=FALSE}
+write_csv(xrf, "../output/xrf/xrf.csv")
+write_rds(xrf, "../output/xrf/xrf.rds")
+```
+

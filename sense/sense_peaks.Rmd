@@ -1,0 +1,95 @@
+---
+title: "Finding Peaks"
+output: html_document
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.path = 'figures/',
+  warning = FALSE,
+  message = FALSE,
+  echo = FALSE,
+  fig.width = 10, fig.height = 3,
+  cache = FALSE)
+```
+
+```{r}
+# reads source
+source("../functions_epic.R")
+```
+
+---
+
+```{r}
+library(pracma)
+library(padr)
+```
+
+```{r}
+df <- read_rds("../output/sense/sense_all.rds")
+```
+
+```{r}
+furnace <- df %>% 
+  filter(sense_device_name == "furnace") %>%
+  filter(job_id == "002") %>%
+  mutate(month = month(datetime))
+```
+
+```{r, fig.height=20, fig.width=10}
+ggplot(furnace, aes(y = avg_wattage, x = datetime)) +
+  geom_point() +
+  geom_line() +
+  theme_bw() +
+  facet_wrap(~month, ncol = 1, scales = "free_x")
+```
+
+```{r}
+series <- furnace %>% select(datetime, avg_wattage)
+
+series_padded <- series %>% pad(interval = "min") %>%
+  mutate(avg_wattage = if_else(is.na(avg_wattage), 0, avg_wattage)) %>%
+  mutate(day = day(datetime),
+         hour = hour(datetime))
+```
+
+```{r}
+ggplot(series_padded, aes(y = avg_wattage, x = datetime)) +
+  geom_point() +
+  geom_line() +
+  theme_bw()
+```
+
+```{r}
+input <- series_padded
+```
+
+```{r}
+output <- findpeaks(input %>% pull(avg_wattage), 
+          nups = 2, ndowns = 2,
+          zero = "+",
+          minpeakheight = -Inf, minpeakdistance = 1,
+          threshold = 0, npeaks = 0, sortstr = FALSE) %>%
+  as_tibble() %>%
+  rename(peak_height = "V1", row = "V2") %>%
+  select(peak_height, row)
+
+result <- input  %>%
+  mutate(row = row_number()) %>%
+  left_join(output, by = "row")
+```
+
+```{r, fig.height=40}
+ggplot(result %>% mutate(month = month(datetime)), aes(y = avg_wattage, x = datetime)) +
+  geom_line() +
+  geom_point(aes(y = peak_height), color = "red") +
+  theme_bw() +
+  facet_wrap(~month, ncol = 1, scales = "free_x")
+```
+
+```{r}
+out <- filter_sense(x = df, id = "002", device_name = "furnace") %>%
+  pad_sense() %>%
+  findpeaks_sense()
+```
+
+

@@ -1,0 +1,67 @@
+---
+title: "Sense Fraction In Use"
+output: html_document
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.path = 'figures/',
+  warning = FALSE,
+  message = FALSE,
+  echo = FALSE,
+  fig.width = 10, fig.height = 3,
+  cache = FALSE)
+```
+
+```{r}
+# reads source
+source("../functions_epic.R")
+```
+
+```{r}
+data <- read_rds("../output/sense_all.rds")
+```
+
+---
+
+# Home 001 Device Use
+
+```{r}
+home_001 <- data %>%
+  filter(job_id == "001")
+```
+
+```{r}
+home_001_f <- home_001 %>%
+  mutate(hod = hour(datetime),
+         sense_device_name = if_else(is.na(sense_device_name), device_id, sense_device_name)) %>%
+  group_by(sense_device_name, hod) %>%
+  summarise(start = min(datetime),
+            end = max(datetime),
+            mins = n(),
+            .groups = "drop") %>%
+  mutate(d_min =  as.numeric(end - start)  / (60 * 24),
+         pct = mins * 100 / d_min,
+         pct = if_else(pct == Inf, 0, pct),
+         pct = if_else(d_min < 50, 0, pct))
+
+```
+
+```{r, fig.width=10, fig.height=16}
+ggplot(home_001_f, aes(x = hod, y = pct) ) +
+    geom_segment(aes(x = hod, xend = hod, y = 0, yend = pct), color = "grey") +
+    geom_point(size = 1, color="#69b3a2") +
+    coord_flip() +
+    theme_ipsum() +
+    theme(panel.grid.minor.y = element_blank(),
+      panel.grid.major.y = element_blank(),
+      legend.position="none") +
+    scale_x_continuous(breaks = c(0, 3, 6, 9, 12, 15, 18, 21, 24)) +
+    xlab("Hour of Day") +
+    ylab("Time in use (%)") +
+    #scale_x_log10() +
+  facet_wrap(~sense_device_name, ncol = 4, scales = "free")
+```
+---
+
+
+
