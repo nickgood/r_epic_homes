@@ -26,6 +26,8 @@ library(readr)
 library(googlesheets4)
 library(lubridate)
 library(gridExtra)
+# library(tidymodels) # to discretize data for histogram
+library(arules) # to discretize data for histogram
 ```
 
 ```{r data_import}
@@ -150,6 +152,8 @@ labeller.all <- as_labeller(c(
   ), default = label_parsed)
   
 ```
+
+
 
 # functions for plotting multiple time averaging periods in one grid
 ```{r functions_grids, eval = FALSE}
@@ -730,6 +734,171 @@ energy_colors <- c(cbbPalette['light_blue'],
 
 energy_breaks <- c('ac', 'shoulder', 'heat', 'overall')
 energy_labels <- c('Summer', 'Shoulder', 'Winter', 'Entire Period')
+```
+
+
+
+
+# make example time series plot and histograms
+```{r, fig.height= 3, fig.width = 7}
+a <- omni_hourly %>%
+  filter(home == '009', location == 'living') %>%
+  filter(datetime > '2020-9-27' & datetime < '2020-11-27') %>%
+  mutate(hour = hour(datetime))
+
+date_seq <- seq.POSIXt(min(a$datetime), max(a$datetime), by = '6 day') # make a sequence of sample cutoffs
+
+
+x_labels <- date_seq+ days(3)
+x_labels <- x_labels[1:(length(x_labels)-1)] # omit last value
+labels <- 1:(length(x_labels))
+
+ggplot()+
+  geom_line(data = a, aes(y = pm25, x = datetime))+
+  geom_segment(aes(x = date_seq,
+                   xend = date_seq,
+                   y = 0, yend = max(a$pm25)+10), color = cbbPalette['dark_orange'],
+               size = 1)+
+    geom_segment(aes(x = min(a$datetime),
+               xend = max( date_seq),
+               y = max(a$pm25)+10, yend = max(a$pm25)+10), color = cbbPalette['dark_orange'],
+               size = 1)+
+      geom_segment(aes(x = min(a$datetime),
+               xend = max( date_seq),
+               y = 0, yend = 0), color = cbbPalette['dark_orange'],
+               size = 1)+
+  geom_text(aes(x = x_labels, y = max(a$pm25)+5, label = labels), color = cbbPalette['dark_orange'])+
+  theme_classic()+
+  ylab(expression(paste('PM'[2.5], ', ug/m'^3)))+
+  xlab('Date')
+
+
+
+# show plot with just sample 5
+
+ggplot()+
+  geom_line(data = a, aes(y = pm25, x = datetime))+
+  geom_rect(aes(xmin = date_seq[5], xmax = date_seq[6],
+                   ymin = 0, ymax = max(a$pm25)+10),
+            color = cbbPalette['dark_orange'], fill = NA,
+               size = 1
+            )+
+  geom_text(
+    aes(y = max(a$pm25)),
+    x = date_seq[5]+ days(3), label = 'Sample', color = cbbPalette['dark_orange'])+
+  theme_classic()+
+  ylab(expression(paste('PM'[2.5], ', ug/m'^3)))+
+  xlab('Date')
+
+
+
+
+
+
+```
+
+
+```{r, fig.height= 2, fig.width = 3}
+
+# extract sample 5
+sample_dat <- a %>%
+  filter(datetime >= date_seq[5] & datetime < date_seq[6])
+
+# make density histograms of magnitudes of sample 5 and entire monitoring period,
+# ensuring to use the same bins for each
+a_mag <- table(discretize(a$pm25, method = 'interval', breaks = 20))%>%
+  data.frame() %>%
+  mutate(Freq = Freq/sum(Freq, na.rm = TRUE)) %>%
+  rename('longterm' = Freq)
+
+pm_breaks <- discretize(a$pm25, method = 'interval', breaks = 20, onlycuts = TRUE)
+
+sample_dat_mag <- table(discretize(sample_dat$pm25, method = 'fixed', breaks = pm_breaks)) %>%
+  data.frame()%>%
+  mutate(Freq = Freq/sum(Freq, na.rm = TRUE)) %>%
+  rename('sample' = Freq)
+
+data_mag <- a_mag %>%
+  left_join(sample_dat_mag, by = 'Var1') %>%
+  pivot_longer(cols = c(longterm, sample), names_to = 'origin', values_to = 'freq') %>%
+  rename('bin' = Var1) %>%
+  mutate(bin = gsub('^.*,|\\)$', '', bin),
+         bin = gsub(']', '', bin),
+         bin = as.numeric(bin))
+
+# # plot method 1
+# ggplot() +
+#   geom_histogram(data = a, aes(x = pm25, y = ..density..),
+#                  fill = 'black', alpha = 0.5)+
+#   geom_histogram(data = sample_dat, aes(x = pm25, y = ..density..),
+#                  fill = cbbPalette['dark_orange'], alpha = 0.5)+
+#   theme_classic()+
+#   xlab(expression(paste('PM'[2.5], ', ug/m'^3)))+
+#   ylab('Density')+
+#   theme(
+#     axis.text.y = element_blank(),
+#     axis.ticks.y = element_blank()
+#   )
+
+# plot method 2
+
+ggplot() +
+  geom_col(data = data_mag, aes(x = bin, y = freq, fill = origin),
+           position = 'dodge')+
+  theme_classic()+
+  xlab(expression(paste('PM'[2.5], ', ug/m'^3)))+
+  ylab('Density')+
+  theme(
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank()
+  )+
+  scale_fill_manual(
+    breaks = c('longterm', 'sample'),
+    labels = c('Entire Season', 'Sample'),
+    values = c('black', cbbPalette['dark_orange'] %>%unname()),
+    name = 'Data Set'
+  )+
+  theme(
+    legend.position = 'none'
+  )
+
+
+
+# histogram of time values
+a_hr <- a %>%
+  group_by(hour) %>%
+  summarise(mean = mean(pm25, na.rm = TRUE), .groups = 'drop') %>%
+  mutate(origin = 'longterm')
+
+sample_dat_hr <- sample_dat %>%
+  group_by(hour) %>%
+  summarise(mean = mean(pm25, na.rm = TRUE), .groups = 'drop') %>%
+  mutate(origin = 'sample')
+
+data_hr <- a_hr %>%
+  rbind(sample_dat_hr)
+
+ggplot() +
+  geom_col(data = data_hr, aes(x = hour, y = mean, fill = origin),
+                 position = 'dodge')+
+
+  theme_classic()+
+  ylab(expression(paste('Average PM'[2.5], ', ug/m'^3)))+
+  scale_fill_manual(
+    breaks = c('longterm', 'sample'),
+    labels = c('Entire Season', 'Sample'),
+    values = c('black', cbbPalette['dark_orange'] %>%unname()),
+    name = 'Data Set'
+  )+
+  scale_x_continuous(
+    breaks = c(0,6,12,18),
+    labels = c('12am', '6am', '12pm', '6pm')
+  )+
+  xlab('Hour of Day')+
+  theme(
+    legend.position = 'none'
+  )
+
 ```
 
 
