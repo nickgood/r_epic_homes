@@ -720,4 +720,325 @@ sample_results
 ```
 
 
+### Hourly Data
+
+```{r data_maker_hourly, eval = FALSE}
+# test function for multiple homes-----------------
+   test_homes <- c('007', '012')
+    test_cluster <- c('ac') # can do multiple
+    mets <- c('pm25', 'voc')
+    locs <- locations_indoor
+    
+    test<- lapply(locs, function(x_location) {
+      
+      lapply(mets, function(x_metric) {
+        
+        lapply(test_cluster, function(cluster_type) {
+          
+          lapply(test_homes, function(x_home) {
+            
+            start_date <- pick.start(x_home, cluster_type)
+            end_date <- pick.end(x_home, cluster_type)
+            sample_min <- pick.sample.min(met)
+            sample_max <- if_else(
+              as.numeric(as.Date(end_date) - as.Date(start_date))>=28,
+              28,
+              as.numeric(as.Date(end_date) - as.Date(start_date))
+            )
+            
+            entropy.table.hourly(
+              x_home, metric = x_metric,
+              date_ranges_entire = list(c(start_date,
+                                          end_date)),
+              tested_sample_sequence = 
+                c(1, seq(3,27,4)),
+              location_type = x_location,
+              all_time = all_time_choice) %>%
+              
+              # add in column for energy_cluster
+              mutate(energy_cluster = cluster_type) 
+          }
+          ) %>%
+            bind_rows()
+        }
+        ) %>%
+          bind_rows()
+      }
+      ) %>%
+        bind_rows()
+    }
+    ) %>%
+      bind_rows()
+    
+      # make dfs--------------------
+all_time_choice <- TRUE
+    overlap_choice <- FALSE
+# clust <- c('all','heat', 'shoulder', 'ac') # can do multiple
+clust <- clusters_all
+
+met <- 'pm25'
+loc <- 'living'
+lapply(clust, function(cluster_type) {
+  
+  rep_data <-  lapply(homes_all, function(x_home) {
+    
+    start_date <- pick.start(x_home, cluster_type)
+    end_date <- pick.end(x_home, cluster_type)
+    sample_min <- pick.sample.min(met)
+    sample_max <- if_else(
+      as.numeric(as.Date(end_date) - as.Date(start_date))>=28,
+      28,
+      as.numeric(as.Date(end_date) - as.Date(start_date))
+    )
+    
+    entropy.table.hourly(
+      x_home, metric = met,
+      date_ranges_entire = list(c(start_date,
+                                  end_date)),
+      tested_sample_sequence =
+        c(c(1:7), 10, 12, 14,17,21,24,28),
+      location_type = loc,
+        overlap = overlap_choice,
+      all_time = all_time_choice) %>%
+      
+      # add in column for energy_cluster
+      mutate(energy_cluster = cluster_type) 
+  }
+  ) %>%
+    bind_rows()
+  
+  # give a variable name to the created data
+  assign(paste(met, loc, cluster_type, 'rep_data_time_hourly_pdf', sep = '_'),
+         rep_data,
+         envir = .GlobalEnv)
+}
+)
+loc <- 'kitchen'
+lapply(clust, function(cluster_type) {
+  
+  rep_data <-  lapply(homes_all, function(x_home) {
+    
+    start_date <- pick.start(x_home, cluster_type)
+    end_date <- pick.end(x_home, cluster_type)
+    sample_min <- pick.sample.min(met)
+    sample_max <- if_else(
+      as.numeric(as.Date(end_date) - as.Date(start_date))>=28,
+      28,
+      as.numeric(as.Date(end_date) - as.Date(start_date))
+    )
+    
+    entropy.table.hourly(
+      x_home, metric = met,
+      date_ranges_entire = list(c(start_date,
+                                  end_date)),
+      tested_sample_sequence =
+        c(c(1:7), 10, 12, 14,17,21,24,28),
+      location_type = loc,
+        overlap = overlap_choice,
+      all_time = all_time_choice) %>%
+      
+      # add in column for energy_cluster
+      mutate(energy_cluster = cluster_type) 
+  }
+  ) %>%
+    bind_rows()
+  
+  # give a variable name to the created data
+  assign(paste(met, loc, cluster_type, 'rep_data_time_hourly_pdf', sep = '_'),
+         rep_data,
+         envir = .GlobalEnv)
+}
+)
+loc <- 'bedroom'
+lapply(clust, function(cluster_type) {
+  
+  rep_data <-  lapply(homes_all, function(x_home) {
+    
+    start_date <- pick.start(x_home, cluster_type)
+    end_date <- pick.end(x_home, cluster_type)
+    sample_min <- pick.sample.min(met)
+    sample_max <- if_else(
+      as.numeric(as.Date(end_date) - as.Date(start_date))>=28,
+      28,
+      as.numeric(as.Date(end_date) - as.Date(start_date))
+    )
+    
+    entropy.table.hourly(
+      x_home, metric = met,
+      date_ranges_entire = list(c(start_date,
+                                  end_date)),
+      tested_sample_sequence =
+        c(c(1:7), 10, 12, 14,17,21,24,28),
+      location_type = loc,
+        overlap = overlap_choice,
+      all_time = all_time_choice) %>%
+      
+      # add in column for energy_cluster
+      mutate(energy_cluster = cluster_type) 
+  }
+  ) %>%
+    bind_rows()
+  
+  # give a variable name to the created data
+  assign(paste(met, loc, cluster_type, 'rep_data_time_hourly_pdf', sep = '_'),
+         rep_data,
+         envir = .GlobalEnv)
+}
+)
+# loc <- 'pooled'
+# lapply(clust, function(cluster_type) {
+#   
+#   rep_data <-  lapply(homes_all, function(x_home) {
+#     
+#     start_date <- pick.start(x_home, cluster_type)
+#     end_date <- pick.end(x_home, cluster_type)
+#     sample_min <- pick.sample.min(met)
+#     sample_max <- if_else(
+#       as.numeric(as.Date(end_date) - as.Date(start_date))>=28,
+#       28,
+#       as.numeric(as.Date(end_date) - as.Date(start_date))
+#     )
+#     
+#     entropy.table.hourly(
+#       x_home, metric = met,
+#       date_ranges_entire = list(c(start_date,
+#                                   end_date)),
+#       tested_sample_sequence =
+#         c(c(1:7), 9, seq(11,27,4)),
+#       location_type = loc,
+#         overlap = overlap_choice,
+#       all_time = all_time_choice) %>%
+#       
+#       # add in column for energy_cluster
+#       mutate(energy_cluster = cluster_type) 
+#   }
+#   ) %>%
+#     bind_rows()
+#   
+#   # give a variable name to the created data
+#   assign(paste(met, loc, cluster_type, 'rep_data_time_hourly_pdf', sep = '_'),
+#          rep_data,
+#          envir = .GlobalEnv)
+# }
+# )
+
+  
+
+)
+entropy_time_hourly_pdf_df <- bind_rows(
+  pm25_bedroom_heat_rep_data_time_hourly_pdf,
+  pm25_living_heat_rep_data_time_hourly_pdf,
+  pm25_kitchen_heat_rep_data_time_hourly_pdf,
+  pm25_bedroom_shoulder_rep_data_time_hourly_pdf,
+  pm25_living_shoulder_rep_data_time_hourly_pdf,
+  pm25_kitchen_shoulder_rep_data_time_hourly_pdf,
+  pm25_bedroom_ac_rep_data_time_hourly_pdf,
+  pm25_living_ac_rep_data_time_hourly_pdf,
+  pm25_kitchen_ac_rep_data_time_hourly_pdf,
+# pm25_bedroom_all_rep_data_time_hourly_pdf,
+#   pm25_living_all_rep_data_time_hourly_pdf,
+#   pm25_kitchen_all_rep_data_time_hourly_pdf,
+voc_bedroom_heat_rep_data_time_hourly_pdf,
+  voc_living_heat_rep_data_time_hourly_pdf,
+  voc_kitchen_heat_rep_data_time_hourly_pdf,
+  voc_bedroom_shoulder_rep_data_time_hourly_pdf,
+  voc_living_shoulder_rep_data_time_hourly_pdf,
+  voc_kitchen_shoulder_rep_data_time_hourly_pdf,
+  voc_bedroom_ac_rep_data_time_hourly_pdf,
+  voc_living_ac_rep_data_time_hourly_pdf,
+  voc_kitchen_ac_rep_data_time_hourly_pdf
+  # voc_bedroom_all_rep_data_time_hourly_pdf,
+  # voc_living_all_rep_data_time_hourly_pdf,
+  # voc_kitchen_all_rep_data_time_hourly_pdf
+)
+
+
+
+# # if did months
+# entropy_time_hourly_pdf_df <-
+#   map(c('pm25', 'voc'), function(x_metric) {
+#     map(month.abb[1:12], function(x_cluster) {
+#       map(locations_indoor, function(x_location){
+#         get(paste(x_metric, x_location, x_cluster, 'rep_data_time_hourly_pdf', sep = '_'))
+#       }) %>% bind_rows()
+#     }) %>% bind_rows()
+#   }) %>% bind_rows()
+
+
+
+# if did pooled
+entropy_time_hourly_pdf_df_pooled <- bind_rows(
+  pm25_pooled_heat_rep_data_time_hourly_pdf,
+  pm25_pooled_shoulder_rep_data_time_hourly_pdf,
+  pm25_pooled_ac_rep_data_time_hourly_pdf,
+  pm25_pooled_all_rep_data_time_hourly_pdf,
+  voc_pooled_heat_rep_data_time_hourly_pdf,
+  voc_pooled_shoulder_rep_data_time_hourly_pdf,
+  voc_pooled_ac_rep_data_time_hourly_pdf,
+  voc_pooled_all_rep_data_time_hourly_pdf
+)
+# rm(
+#   pm25_pooled_heat_rep_data_time_hourly_pdf,
+#   pm25_pooled_shoulder_rep_data_time_hourly_pdf,
+#   pm25_pooled_ac_rep_data_time_hourly_pdf,
+#   pm25_pooled_all_rep_data_time_hourly_pdf,
+#   voc_pooled_heat_rep_data_time_hourly_pdf,
+#   voc_pooled_shoulder_rep_data_time_hourly_pdf,
+#   voc_pooled_ac_rep_data_time_hourly_pdf,
+#   voc_pooled_all_rep_data_time_hourly_pdf,
+#   entropy_time_hourly_pdf_df
+#   )
+# rm(
+#   pm25_bedroom_heat_rep_data_time_hourly_pdf,
+#   pm25_living_heat_rep_data_time_hourly_pdf,
+#   pm25_kitchen_heat_rep_data_time_hourly_pdf,
+#   pm25_bedroom_shoulder_rep_data_time_hourly_pdf,
+#   pm25_living_shoulder_rep_data_time_hourly_pdf,
+#   pm25_kitchen_shoulder_rep_data_time_hourly_pdf,
+#   pm25_bedroom_ac_rep_data_time_hourly_pdf,
+#   pm25_living_ac_rep_data_time_hourly_pdf,
+#   pm25_kitchen_ac_rep_data_time_hourly_pdf,
+#   voc_bedroom_heat_rep_data_time_hourly_pdf,
+#   voc_living_heat_rep_data_time_hourly_pdf,
+#   voc_kitchen_heat_rep_data_time_hourly_pdf,
+#   voc_bedroom_shoulder_rep_data_time_hourly_pdf,
+#   voc_living_shoulder_rep_data_time_hourly_pdf,
+#   voc_kitchen_shoulder_rep_data_time_hourly_pdf,
+#   voc_bedroom_ac_rep_data_time_hourly_pdf,
+#   voc_living_ac_rep_data_time_hourly_pdf,
+#   voc_kitchen_ac_rep_data_time_hourly_pdf,
+#   entropy_time_hourly_pdf_df
+# )
+# write csv files------------------------
+# if not pooled ---------------------
+write_rds(entropy_time_hourly_pdf_df, file =
+            paste0('./csv_created/representativeness_data/rep_data_time_hourly_pdf',
+                   ifelse(all_time_choice == TRUE, '', '_season'),
+                   ifelse(overlap_choice == TRUE, '', '_no_overlap'),
+                   ifelse(clust[1] %in% month.abb[1:12], '_month', ''),
+                   '.rds'))
+# make dated backup
+write_rds(entropy_time_hourly_pdf_df, file =
+            paste0('./csv_created/representativeness_data/rep_data_time_hourly_pdf_',
+                   Sys.Date(),
+                   ifelse(all_time_choice == TRUE, '', '_season'),
+                   ifelse(overlap_choice == TRUE, '', '_no_overlap'),
+                   ifelse(clust[1] %in% month.abb[1:12], '_month', ''),
+                   '.rds'))
+# if pooled--------
+write_rds(entropy_time_hourly_pdf_df_pooled, file =
+            paste0('./csv_created/representativeness_data/rep_data_time_hourly_pdf_pooled',
+                   ifelse(all_time_choice == TRUE, '', '_season'),
+                   ifelse(overlap_choice == TRUE, '', '_no_overlap'),
+                   ifelse(clust[1] %in% month.abb[1:12], '_month', ''),
+                   '.rds'))
+# make dated backup
+write_rds(entropy_time_hourly_pdf_df_pooled, file =
+            paste0('./csv_created/representativeness_data/rep_data_time_hourly_pdf_pooled_',
+                   Sys.Date(),
+                   ifelse(all_time_choice == TRUE, '', '_season'),
+                   ifelse(overlap_choice == TRUE, '', '_no_overlap'),
+                   ifelse(clust[1] %in% month.abb[1:12], '_month', ''),
+                   '.rds'))
+```
 
