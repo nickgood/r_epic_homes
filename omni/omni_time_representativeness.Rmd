@@ -770,13 +770,15 @@ sample_results
     ) %>%
       bind_rows()
     
+    
       # make dfs--------------------
 all_time_choice <- TRUE
     overlap_choice <- FALSE
 # clust <- c('all','heat', 'shoulder', 'ac') # can do multiple
 clust <- clusters_all
 
-met <- 'pm25'
+met <- 'co2'
+
 loc <- 'living'
 lapply(clust, function(cluster_type) {
   
@@ -923,33 +925,20 @@ lapply(clust, function(cluster_type) {
 # )
 
   
-
-)
 entropy_time_hourly_pdf_df <- bind_rows(
-  pm25_bedroom_heat_rep_data_time_hourly_pdf,
-  pm25_living_heat_rep_data_time_hourly_pdf,
-  pm25_kitchen_heat_rep_data_time_hourly_pdf,
-  pm25_bedroom_shoulder_rep_data_time_hourly_pdf,
-  pm25_living_shoulder_rep_data_time_hourly_pdf,
-  pm25_kitchen_shoulder_rep_data_time_hourly_pdf,
-  pm25_bedroom_ac_rep_data_time_hourly_pdf,
-  pm25_living_ac_rep_data_time_hourly_pdf,
-  pm25_kitchen_ac_rep_data_time_hourly_pdf,
-# pm25_bedroom_all_rep_data_time_hourly_pdf,
-#   pm25_living_all_rep_data_time_hourly_pdf,
-#   pm25_kitchen_all_rep_data_time_hourly_pdf,
-voc_bedroom_heat_rep_data_time_hourly_pdf,
-  voc_living_heat_rep_data_time_hourly_pdf,
-  voc_kitchen_heat_rep_data_time_hourly_pdf,
-  voc_bedroom_shoulder_rep_data_time_hourly_pdf,
-  voc_living_shoulder_rep_data_time_hourly_pdf,
-  voc_kitchen_shoulder_rep_data_time_hourly_pdf,
-  voc_bedroom_ac_rep_data_time_hourly_pdf,
-  voc_living_ac_rep_data_time_hourly_pdf,
-  voc_kitchen_ac_rep_data_time_hourly_pdf
-  # voc_bedroom_all_rep_data_time_hourly_pdf,
-  # voc_living_all_rep_data_time_hourly_pdf,
-  # voc_kitchen_all_rep_data_time_hourly_pdf
+
+co2_bedroom_heat_rep_data_time_hourly_pdf,
+  co2_living_heat_rep_data_time_hourly_pdf,
+  co2_kitchen_heat_rep_data_time_hourly_pdf,
+  co2_bedroom_shoulder_rep_data_time_hourly_pdf,
+  co2_living_shoulder_rep_data_time_hourly_pdf,
+  co2_kitchen_shoulder_rep_data_time_hourly_pdf,
+  co2_bedroom_ac_rep_data_time_hourly_pdf,
+  co2_living_ac_rep_data_time_hourly_pdf,
+  co2_kitchen_ac_rep_data_time_hourly_pdf
+  # co2_bedroom_all_rep_data_time_hourly_pdf,
+  # co2_living_all_rep_data_time_hourly_pdf,
+  # co2_kitchen_all_rep_data_time_hourly_pdf
 )
 
 
@@ -1010,6 +999,10 @@ entropy_time_hourly_pdf_df_pooled <- bind_rows(
 #   entropy_time_hourly_pdf_df
 # )
 # write csv files------------------------
+
+
+
+
 # if not pooled ---------------------
 write_rds(entropy_time_hourly_pdf_df, file =
             paste0('./csv_created/representativeness_data/rep_data_time_hourly_pdf',
