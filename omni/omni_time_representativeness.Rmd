@@ -770,13 +770,15 @@ sample_results
     ) %>%
       bind_rows()
     
+    
       # make dfs--------------------
 all_time_choice <- TRUE
     overlap_choice <- FALSE
 # clust <- c('all','heat', 'shoulder', 'ac') # can do multiple
 clust <- clusters_all
 
-met <- 'pm25'
+met <- 'co2'
+
 loc <- 'living'
 lapply(clust, function(cluster_type) {
   
