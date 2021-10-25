@@ -673,7 +673,6 @@ co2_diff_lim <- c(-600,1250)
 temp_diff_lim <- c(-5,3.5)
 humid_diff_lim <- c(-9,9)
 lux_diff_lim <- c(-500,750)
-pm25_diff_lim <- c(-10,10)
 noise_diff_lim <- c(-9,9)
 
 ## for zoom:
@@ -725,6 +724,7 @@ room_colors <- c(cbbPalette['green'],
 
 room_breaks <- locations_indoor
 
+room_labels <- c('Living Room', 'Bedroom', 'Kitchen')
 
 # define colors for energy clusters
 energy_colors <- c(cbbPalette['light_blue'],
@@ -1465,7 +1465,7 @@ plot.monthly('temp', data = a)
 
 ## pooled homes
 
-### function
+### line plot function
 
 ```{r}
 
@@ -1543,6 +1543,78 @@ a$location <- factor(a$location, levels = c('kitchen', 'living', 'bedroom',
 plot.month.pooled(a)
 
 ```
+
+
+
+
+
+### box plot
+
+```{r}
+
+a <- omni_hourly %>%
+  mutate(month = month(datetime, label = TRUE, abbr = TRUE)) %>%
+  select(-c(noise, lux, humid, score)) %>%
+  pivot_longer(c(co2:temp), names_to = 'metric', values_to = 'value')
+
+# change order of metrics for plotting
+a$metric <- factor(a$metric, levels = c('pm25', 'voc', 'co2', 'temp'))
+
+a$location <- factor(a$location, levels = c('kitchen', 'living', 'bedroom',
+                                            'garage', 'outdoor'))
+
+a$month <- factor(a$month, levels = c(month.abb[c(7:12,1:6)]))
+         # make a dummy df in which to define limits for each metric
+limit_df <- a %>%
+  group_by(metric) %>%
+  summarize(max = max(value))%>%
+  mutate(min = 0) %>%
+        pivot_longer(cols = c(max, min), names_to = 'side', values_to = 'limits')
+
+      ### plot
+     ggplot(a, aes(x = month, y = value))+
+    geom_boxplot(aes(group = month), outlier.size = 0.2)+
+        labs(
+             x = 'Month'
+        )+
+scale_x_discrete(
+                    breaks = c(month.abb[c(7:12,1:6)]),
+               labels = c(
+                 sapply(month.abb[c(7:12,1:6)],
+                                       substr, start = 1, stop = 1) %>% unname())
+               )+
+       theme_bw()+
+       # guides(col = guide_legend(ncol = 2))+ #split up legend
+          ##for extra space between facets
+    theme(
+          strip.background =element_blank(),
+      axis.text.x = element_text(size = xsmall)
+          )+
+       facet_grid(c('metric', 'location'))+
+        # make point size proportional to # of obs, with 0 obs = size 0
+      # geom_jitter()+
+        facet_grid(rows = vars(metric), cols = vars(location),
+                   scales = 'free_y',
+                   labeller = labeller.all,
+                   switch = 'y')+
+        theme(
+      strip.background = element_rect(fill = NA, color = NA),
+      strip.placement = 'outside'
+              )+
+        # use dummy df to define limits for each metric
+        # geom_blank(data = limit_df, aes(x = 'Oct', y = limits))+
+       theme(  panel.grid.minor.x = element_blank() )
+
+
+
+
+```
+
+
+
+
+
+
 
 
 ## by home
@@ -1765,10 +1837,12 @@ compare_df <- full_join(
     coord_cartesian(ylim = y_limits)+ # defined in beginngin of function
     theme(plot.title = element_text(hjust = 0.5))+
     theme(
-          #   title = element_text(size = small-2),
-          # axis.text = element_text(size = small),
-          # strip.text = element_text( size = small+2),
-          # axis.title = element_text(size = small-1)
+            title = element_text(size = small),
+          axis.text = element_text(size = small-1),
+          strip.text = element_text( size = small),
+          axis.title = element_text(size = small),
+          legend.text = element_text(size = small-1),
+          legend.title = element_text(size = small)
           )+
     geom_point(size = 1)+
           ##for extra space between facets
@@ -1779,6 +1853,7 @@ compare_df <- full_join(
      scale_color_manual(
        values = room_colors,
               breaks = room_breaks,
+       labels = room_labels,
        name = 'Room')
   # use below lines if using error ribbon
    # geom_ribbon(aes(ymax = high, ymin = low, fill = location),
@@ -1791,6 +1866,7 @@ compare_df <- full_join(
     
     # ggsave(paste0('room_compare_',metric, '_', Sys.Date(),'.pdf'), plot = a ,
     #        width = 10.5, height = 8, units = 'in')
+  
   
 }
 
@@ -1805,7 +1881,7 @@ compare_df <- full_join(
 
 ```{r plot_room_comparison_example, fig.height=4, fig.width = 6}
 a <- omni_hourly %>% filter(home == '010')
-room.compare(metric = 'pm25', data = a, simple = FALSE)
+room.compare(metric = 'pm25', data = a)
 ```
 
 ## FOr all homes and metrics
