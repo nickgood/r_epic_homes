@@ -93,7 +93,7 @@ rms_4 <- c('outdoor', 'living')
 rms_5 <- c('outdoor', 'garage')
 rms_6 <- c('outdoor', 'bedroom')
 rms_7 <- c('garage', 'living')
-rms_8 <- c('garage', 'bedroom')
+rms_8 <- c('bedroom', 'garage')
 rms_9 <- c('living', 'bedroom')
 
 ######make lists of rooms by defining which pairs to compare
@@ -102,11 +102,11 @@ rms_indoor <- lapply(c(1,3,9), function(x) get(paste0('rms_', x)))
 #comparison
 rms_driver <- lapply(c(1,4,7), function(x) get(paste0('rms_', x)))
 
-rms_garage <- lapply(c(2,5), function(x) get(paste0('rms_', x)))
+rms_garage <- lapply(c(2,8,5), function(x) get(paste0('rms_', x)))
 
 
 #### make lists of metric pairs to correlate
-    met_pairs_proxy <- list(c('co2', 'voc'), c('co2', 'lux'))
+    met_pairs_proxy <- list(c('co2', 'voc'), c('co2', 'lux'), c('co2', 'spl_a'))
     
     met_pairs_pollutants <- list(c('pm25', 'co2'), c('pm25', 'voc'))
 
@@ -135,24 +135,27 @@ inter_room_colors <- c(cbbPalette['light_blue'],
                    cbbPalette['green'],
                    cbbPalette['dark_orange'],
                    cbbPalette['yellow'],
+                   cbbPalette['purple'],
                    cbbPalette['dark_blue']
                    )%>% unname()
 
 inter_room_breaks <- c('kitchen-bedroom', 'kitchen-living',
                        'living-bedroom','garage-living', 'outdoor-living',
-                       'kitchen-garage', 'outdoor-garage')
+                       'kitchen-garage', 'bedroom-garage', 'outdoor-garage')
 
 # define colors for metric-comparisons
 inter_metric_colors <- c(cbbPalette['dark_blue'],
                    cbbPalette['light_orange'],
+                   cbbPalette['purple'],
                    cbbPalette['green'],
                    cbbPalette['dark_orange']
                    )%>% unname()
 
-inter_metric_breaks <- c('co2-voc', 'co2-lux', 'pm25-voc', 'pm25-co2')
+inter_metric_breaks <- c('co2-voc', 'co2-lux', 'co2-spl_a', 'pm25-voc', 'pm25-co2')
 
  inter_metric_labels <- c(expression('CO'[2]*'-TVOC'),
                           expression('CO'[2]*'-Light'),
+                          expression('CO'[2]*'-Noise'),
                           expression('PM'[2.5]*'-TVOC'),
                           expression('PM'[2.5]*'-CO'[2]))
 
@@ -187,8 +190,8 @@ corr_fig_width <- 10.5
 
 # data <- omni_hourly
 # hm <- '008'
-# rm_pair <- c('living', 'garage')
-# rm_pair2 <- c('living', 'kitchen')
+# rm_pair <- c('kitchen', 'garage')
+# rm_pair2 <- c('bedroom', 'garage')
 # rms_list <- list(rm_pair, rm_pair2)
 # met <- 'pm25'
 # method <- 'spearman'
@@ -267,7 +270,7 @@ corr_fig_width <- 10.5
 
  
 #  # test funct
-# test <- room.cor.hourly('008', c('living', 'garage'),
+# test <- room.cor.hourly('008', c('bedroom', 'garage'),
 #                    'pm25', 'spearman', omni_hourly)
 
  ##multiple room pairs by hour
@@ -297,7 +300,7 @@ bind_rows() %>%
  # # test function
  # test <- room.hourly.home(
  #    hm = '008',
- #    rms_list = list(c('living', 'garage')),
+ #    rms_list = list(c('bedroom', 'garage')),
  #    met = 'pm25',
  #    # met_2 = 'co2', loc_2 = 'living'
  #    )
@@ -318,7 +321,7 @@ bind_rows()
  
  # # test function
  # test <- room.hourly.all(
- #   rms_indoor[1], 'pm25'
+ #   rms_garage[2], 'pm25'
  # )
  
  # plotting fucntion------------
@@ -360,7 +363,14 @@ bind_rows()
      facet_wrap(vars(home))+
      theme(
        strip.background = element_blank(),
-       plot.title = element_text(hjust = 0.5 )
+       plot.title = element_text(hjust = 0.5 ),
+       axis.text = element_text(size = small-1),
+       axis.title = element_text(size = small+3),
+       strip.text = element_text(size = small-1),
+       title = element_text(size = small+1),
+       legend.title = element_text(size = small),
+       legend.text = element_text(size = small-1)
+
      )+
      ggtitle(metric_title)+
      #ensure order of legends
@@ -395,7 +405,7 @@ write_csv(room_correlations, './csv_created/room_correlations.csv')
 
 
 ## plot all homes
-```{r, fig.height = 5, fig.width = 11}
+```{r, fig.height = 6, fig.width = 11}
 
 room_correlations <- read_csv('./csv_created/room_correlations.csv')
 
@@ -432,6 +442,7 @@ met <- 'pm25'
  met <- 'pm25'
  
  a <- room_correlations %>% filter(loc_pair %in% c('kitchen-garage',
+                                                   'bedroom-garage',
                                                    'outdoor-garage') &
                                      metric == met)
 
@@ -443,6 +454,7 @@ met <- 'pm25'
   met <- 'voc'
  
  a <- room_correlations %>% filter(loc_pair %in% c('kitchen-garage',
+                                                   'bedroom-garage',
                                                    'outdoor-garage') &
                                      metric == met)
 
@@ -573,7 +585,7 @@ bind_rows()
  
  
  # test function
- test <- metric.hourly.all(met_pairs_pollutants, 'living')
+ # test <- metric.hourly.all(met_pairs_pollutants, 'living')
  
  
   # plotting functions---------------
@@ -614,7 +626,14 @@ bind_rows()
      facet_wrap(vars(home))+
      theme(
        strip.background = element_blank(),
-       plot.title = element_text(hjust = 0.5)
+       plot.title = element_text(hjust = 0.5 ),
+       axis.text = element_text(size = small-1),
+       axis.title = element_text(size = small+3),
+       strip.text = element_text(size = small-1),
+       title = element_text(size = small+1),
+       legend.title = element_text(size = small),
+       legend.text = element_text(size = small-1)
+
      )+
      ggtitle(room_title)+
      #ensure order of legends
@@ -647,14 +666,15 @@ write_csv(metric_correlations, './csv_created/metric_correlations.csv')
 ```
 
 ## plot all homes
-```{r, fig.height = 5, fig.width = 11}
+```{r, fig.height = 6, fig.width = 11}
  
 metric_correlations <- read_csv('./csv_created/metric_correlations.csv')
 
 loc <- 'living'
  
  a <- metric_correlations %>% filter(met_pair %in% c('co2-voc',
-                                                   'co2-lux') &
+                                                   'co2-lux',
+                                                   'co2-spl_a') &
                                      location == loc)
 
 # make plot
