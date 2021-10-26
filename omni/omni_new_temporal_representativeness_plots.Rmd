@@ -44,7 +44,7 @@ energy_cluster_df <- read_csv('../sense/csv_created_sense/energy_cluster_df.csv'
 
 ```{r import_assessment_data}
 
-assessment_data <- read_csv('../data_thesis/homes/home_assessment_data.csv')
+assessment_data <- read_csv('../../data_thesis/homes/home_assessment_data.csv')
 
 # # using googlesheets4
 # assessment_data <- read_sheet('https://docs.google.com/spreadsheets/d/12vWpqdmzIII0vEKH79xpmICUYGuzc8PjfBT2_3YjIHU/edit?usp=sharing', sheet = 'data')
@@ -314,6 +314,8 @@ ext_outlier_count_total_shape <- entropy_df_clean %>% filter(method == 'shape')%
   summarise(ext_outlier_frac = sum(ext_outlier == TRUE)/n(),
             .groups = 'drop') %>% pull(ext_outlier_frac)
 
+
+#count outliers by all groups
 outlier_count <- entropy_df_clean %>%
   group_by(method, metric, sample_length, energy_cluster, home, location) %>%
   summarize(n_samples = n(),
@@ -322,6 +324,17 @@ outlier_count <- entropy_df_clean %>%
             ext_outlier_n = sum(ext_outlier == TRUE),
             ext_outlier_frac = ext_outlier_n/n_samples,
             .groups = 'drop')
+
+#count outliers by metric
+outlier_count_metric <- entropy_df_clean %>%
+  group_by(method, metric) %>%
+  summarize(n_samples = n(),
+            outlier_n = sum(outlier == TRUE),
+            outlier_frac = outlier_n/n_samples,
+            ext_outlier_n = sum(ext_outlier == TRUE),
+            ext_outlier_frac = ext_outlier_n/n_samples,
+            .groups = 'drop')
+
 
 entropy_df_clean <- left_join(
   entropy_df_clean, outlier_count,
@@ -526,7 +539,7 @@ ggplot(a, aes(x = sample_length, group = sample_length,
 ```{r, fig.height=3, fig.width = 8}
 
 
-map(c('pm25', 'voc'), function(x_metric){
+map(c('pm25', 'voc', 'co2'), function(x_metric){
 a <- entropy_time %>% filter(sample_length %in% c(1,3,7,14) &
                                !is.na(rep) &
                                metric == x_metric)
@@ -558,7 +571,7 @@ ggplot(a)+
   geom_vline(xintercept = thresh_vector, linetype = 'dashed')+
   xlab('Time-Structured Representativeness')+
   ggtitle('Samples from all homes, rooms, and seasons pooled')+
-      labs(fill = 'Length of Sample, days')+
+      labs(fill = 'Sample Length, days')+
     theme_classic()+
     theme(
       axis.text.y = element_blank(),
@@ -657,15 +670,16 @@ grid.arrange(p1,p2,p3)
 ## Comparison of Diurnal Trends of Samples to those of Long-Term Period
 ```{r}
 # variables for testing---------------
+
 # data <- entropy_time
 # x_home <- '009'
 # x_location <- 'living'
 # x_energy_cluster <- 'heat'
-# x_metric <- 'pm25'
+# x_metric <- 'co2'
 # x_sample_lengths <- 3
-# sample_lengths <- c(3,7,15)
-
-# rm(data, x_home, x_location, x_energy_cluster, x_metric, x_sample_length,
+# sample_lengths <- c(3,7,14)
+# 
+# rm(data, x_home, x_location, x_energy_cluster, x_metric, x_sample_lengths,
 #    sample_lengths)
 
 # function-----------------
@@ -757,10 +771,17 @@ diurn.rep.plot <- function(data, x_home, x_location, x_energy_cluster, x_metric,
       # y_label = mean*3
     )
 
+  
       labels <- by(rep_values, rep_values$sample_length,
                    function(x) {
                      paste(x$sample_length, '- Rep=', signif(x$rep, 2))
                    })
+      labels <- c(labels[c(1:3)], 'Entire Period') # replace entire_period label
+      
+         if(x_metric == 'pm25') label_y <- expression(paste('Mean PM'[2.5], ', ug/m'^3))
+   if(x_metric == 'co2') label_y <- expression(paste('Mean CO'[2], ', ppm'))
+   if(x_metric == 'voc') label_y <- 'Mean TVOC, ppb'
+   if(x_metric == 'temp') label_y <- expression(paste('Mean Temperature, '^0, 'C'))
 
   ggplot(all_data, aes(x = hour, y = mean,
                        color = sample_length,
@@ -777,12 +798,22 @@ diurn.rep.plot <- function(data, x_home, x_location, x_energy_cluster, x_metric,
                    cbbPalette['purple'],
                    cbbPalette['black'])%>% unname(),
       labels= labels,
+      name = 'Sample Length, days',
       aesthetics = (c('color', 'fill'))
     )+
-    ggtitle(label = paste('Home', x_home, '--- Room=', x_location,
-                          '--- Season=', x_energy_cluster))+
-    ylab(paste('Mean', x_metric))+
-    xlab('Hour of Day')
+    scale_x_continuous(
+      breaks = c(0,6,12,18),
+      labels = c('12am', '6am', '12pm', '6pm')
+    )+
+    # ggtitle(      # label = paste('Home', x_home, '--- Room=', x_location,
+    #   '--- Season=', x_energy_cluster))+
+    ylab(label_y)+
+    xlab('Hour of Day')+
+    theme_bw()+
+    theme(
+      plot.title = element_blank(),
+      
+    )
 
 }
 
@@ -792,11 +823,11 @@ diurn.rep.plot <- function(data, x_home, x_location, x_energy_cluster, x_metric,
 
 
 * pick homes, seasons, (and rooms if not pooled)
-```{r, fig.height=3, fig.width = 7}
+```{r, fig.height=2, fig.width = 4}
 
 if(pooled_rooms == TRUE) {
   map(c('pm25', 'voc'), function(y_metric){
-  map(c('009', '012'), function(y_home){
+  map(c('009'), function(y_home){
   map(c('heat', 'shoulder', 'ac'), function(y_energy_cluster){
     diurn.rep.plot(
     data = entropy_time,
@@ -811,7 +842,7 @@ if(pooled_rooms == TRUE) {
 } else if(pooled_rooms == FALSE){
 
     map(c('pm25', 'voc'), function(y_metric){
-  map(c('009', '012'), function(y_home){
+  map(c('009'), function(y_home){
   map(c('heat', 'shoulder'), function(y_energy_cluster){
   map(c('living', 'kitchen', 'bedroom'), function(y_location){
     diurn.rep.plot(
@@ -828,6 +859,7 @@ if(pooled_rooms == TRUE) {
 }
 
 
+
 # testing----------
 
 
@@ -842,9 +874,11 @@ if(pooled_rooms == TRUE) {
 # not pooled rooms
 diurn.rep.plot(entropy_time, '009', 'living', 'heat', 'pm25')
 diurn.rep.plot(entropy_time, '009', 'living', 'heat', 'voc')
+diurn.rep.plot(entropy_time, '009', 'living', 'heat', 'co2')
 
-diurn.rep.plot(entropy_time, '009', 'living', 'heat', 'pm25', c(1,3,7))
-diurn.rep.plot(entropy_time, '009', 'living', 'heat', 'voc', c(1,3,7))
+
+# diurn.rep.plot(entropy_time, '009', 'living', 'heat', 'pm25', c(1,3,7))
+# diurn.rep.plot(entropy_time, '009', 'living', 'heat', 'voc', c(1,3,7))
 
 # diurn.rep.plot(entropy_time, '009', 'kitchen', 'heat', 'pm25')
 # diurn.rep.plot(entropy_time, '009', 'bedroom', 'heat', 'pm25')
