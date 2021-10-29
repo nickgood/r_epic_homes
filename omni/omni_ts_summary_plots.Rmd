@@ -145,9 +145,10 @@ high.conf = function(x){
 # make function to label metric names with subscripts and seasons
 labeller.all <- as_labeller(c(
   'pm25'='PM[2.5]', 'voc'="TVOC",
-  'co2' = 'CO[2]', 'temp' = 'Temperature',
-  'ac' = 'AC', 'shoulder' = 'Shoulder', 'heat' = 'Heat',
-  'kitchen' = 'Kitchen', 'living' = 'Living', 'bedroom' = 'Bedroom',
+  'co2' = 'CO[2]', 'temp' = 'Temperature', 'humid' = 'Humidity',
+  'lux' = 'Light', 'spl_a' = 'Noise',
+  'ac' = 'Cooling', 'shoulder' = 'Shoulder', 'heat' = 'Heating',
+  'kitchen' = 'Kitchen', 'living' = 'Living Room', 'bedroom' = 'Bedroom',
   'outdoor' = 'Outdoor', 'garage'= 'Garage'
   ), default = label_parsed)
   
