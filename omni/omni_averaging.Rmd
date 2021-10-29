@@ -1,0 +1,307 @@
+---
+title: "Average Value Plots"
+author: "Andrew Purgiel"
+date: "7/22/2021"
+output: html_document
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.path = 'figures/',
+  warning = FALSE,
+  message = FALSE,
+  echo = FALSE,
+  fig.width = 10, fig.height = 3,
+  cache = FALSE)
+```
+
+---
+
+```{r libraries}
+library(dplyr)
+library(purrr)
+library(tidyr)
+library(openair)
+library(ggplot2)
+library(readr)
+library(googlesheets4)
+library(lubridate)
+library(gridExtra)
+# library(tidymodels) # to discretize data for histogram
+library(arules) # to discretize data for histogram
+```
+
+```{r data_import}
+# daily date without missing dates
+omni_daily <- read_csv('./csv_created/omni_daily_data_complete.csv')
+
+# home type dataframe
+home_type_df <- read_csv('../sense/csv_created_sense/home_type_df.csv')
+
+# acf significant lag data
+lag_df <- read_csv('./csv_created/lag_summary.csv')
+
+
+
+```
+
+# only use data up to June 2021
+# and rename noise variable
+```{r censor_date}
+omni_daily <- omni_daily %>% filter(date<ymd_hms('2021-06-01 00:00:00'))
+
+
+```
+
+
+```{r functions_misc}
+
+ # misc------------------------------------------------
+
+##Define a char vector of home numbers using a number vector,
+##ex: x <- home.list(c(1:15)) for homes 1-15
+threedig <- function(x) {
+  if (nchar(x) == 1) {a <- paste0('00', x)
+  return(a)
+  }
+  
+  if (nchar(x) == 2) {a<- paste0('0', x)
+  return(a)
+  }
+  else return(a)
+}
+
+home.list <- function(x) sapply(x, threedig)
+
+
+ # function to extract a legend from one plot for use in whole plot grid
+ # reference: https://stackoverflow.com/questions/13649473/add-a-common-legend-for-combined-ggplots
+ g_legend<-function(a.gplot){
+    tmp <- ggplot_gtable(ggplot_build(a.gplot))
+    leg <- which(sapply(tmp$grobs, function(x) x$name) == "guide-box")
+    legend <- tmp$grobs[[leg]]
+    return(legend)}
+ 
+
+
+
+#Mean and sd functions to ignore NA values
+mean_NA <- function(x, na.rm = na.rm) {
+  mean(x, na.rm = TRUE)}
+
+sd_NA <- function(x, na.rm = na.rm) {
+  sd(x, na.rm = TRUE)}
+
+#Function to only display 3 significant figures (for tables)
+signif3 <- function(x){
+  signif(x, digits = 3)
+}
+
+
+
+#Function found online for geometric mean to use for plots
+#webpage: https://stackoverflow.com/questions/2602583/geometric-mean-is-there-a-built-in
+#adjusted so zeros are not ignored, just added one, to all values and subtract at end
+#adjusted "length" to ignore values that are NA
+
+
+gm = function(x, na.rm=TRUE){
+  if(any(x < 0, na.rm = TRUE)){
+    return(NaN)
+  }
+  if(any(x == 0, na.rm = TRUE)){
+    exp(sum(log(x+1), na.rm=na.rm) / length(x[!is.na(x)]))-1
+  }
+  else {
+    exp(sum(log(x[x > 0]), na.rm=na.rm) / length(x[!is.na(x)]))
+  }
+}
+
+
+
+#make low and high sd "interval" functions
+low.sd = function(x){
+  mean_NA(x)-sd_NA(x)
+}
+
+high.sd = function(x){
+  mean_NA(x)+sd_NA(x)
+}
+
+
+#create function for standard error
+std.error = function(x, na.rm=TRUE){
+  sd_NA(x)/sqrt(length(x[!is.na(x)]))
+}
+
+##make low and high 95% conf interval (default 95%)
+low.conf = function(x){
+  gm(x)-1.96*std.error(x)
+}
+
+high.conf = function(x){
+  gm(x)+1.96*std.error(x)
+}
+
+
+
+
+
+# labeller
+
+# make function to label metric names with subscripts and seasons
+labeller.all <- as_labeller(c(
+  'pm25'='PM[2.5]', 'voc'="TVOC",
+  'co2' = 'CO[2]', 'temp' = 'Temperature', 'humid' = 'Humidity',
+  'lux' = 'Light', 'spl_a' = 'Noise',
+  'ac' = 'Cooling', 'shoulder' = 'Shoulder', 'heat' = 'Heating',
+  'kitchen' = 'Kitchen', 'living' = 'Living Room', 'bedroom' = 'Bedroom',
+  'outdoor' = 'Outdoor', 'garage'= 'Garage'
+  ), default = label_parsed)
+  
+```
+
+
+
+# define variables
+```{r define_variables}
+
+
+
+
+##For plot labeling pruposes
+xsmall <- 6
+small <- 15
+medium <- 20
+large <- 26
+line_size <- 0.5
+max_point_size <- 0.75
+
+# define y-limits for metrics (for time series plots)
+pm25_lim <- c(0,60)
+voc_lim <- c(0,1500)
+co2_lim <- c(0,2500)
+temp_lim <- c(0,25)
+humid_lim <- c(0,60)
+lux_lim <- c(0,1000)
+noise_lim <- c(40,70)
+
+# define y-limits for metrics (for difference of means plots)
+pm25_diff_lim <- c(-23,20)
+voc_diff_lim <- c(-300,500)
+co2_diff_lim <- c(-600,1250)
+temp_diff_lim <- c(-5,3.5)
+humid_diff_lim <- c(-9,9)
+lux_diff_lim <- c(-500,750)
+noise_diff_lim <- c(-9,9)
+
+## for zoom:
+#   pm25_lim <- c(0,40)
+# voc_lim <- c(0,1000)
+# co2_lim <- c(0,1500)
+# temp_lim <- c(15,25)
+# humid_lim <- c(20,60)
+# lux_lim <- c(0,500)
+# spl_a_lim <- c(40,70)
+
+
+
+
+homes_all <- home.list(c(1:16))
+homes_no5 <- home.list(c(1:4, 6:16))
+homes_tier1 <- home_type_df %>% filter(home_type == 'tier1') %>% pull(home)
+homes_tier2 <- home_type_df %>% filter(home_type == 'tier2') %>% pull(home)
+homes_tier3 <- home_type_df %>% filter(home_type == 'tier3') %>% pull(home)
+
+metrics_all <- c('pm25', 'voc', 'co2', 'temp','humid', 'lux', 'spl_a')
+locations_indoor <- c('living', 'bedroom', 'kitchen')
+
+
+
+# color blind pallette
+# check http://www.cookbook-r.com/Graphs/Colors_(ggplot2)/#a-colorblind-friendly-palette
+cbbPalette <- c('black' = "#000000",
+                'light_orange' = "#E69F00",
+                'light_blue' = "#56B4E9",
+                'green' = "#009E73",
+                'yellow' = "#F0E442",
+                'dark_blue' = "#0072B2",
+                'dark_orange' = "#D55E00",
+                'purple' = "#CC79A7"
+                )
+# define colors for room-comparisons
+room_colors <- c(cbbPalette['green'],
+                   cbbPalette['purple'],
+                   cbbPalette['light_orange']
+                   )%>% unname()
+
+room_breaks <- locations_indoor
+
+room_labels <- c('Living Room', 'Bedroom', 'Kitchen')
+
+# define colors for energy clusters
+energy_colors <- c(cbbPalette['light_blue'],
+                   cbbPalette['green'],
+                   cbbPalette['dark_orange'],
+                   cbbPalette['black'])%>% unname()
+
+energy_breaks <- c('ac', 'shoulder', 'heat', 'overall')
+energy_labels <- c('Summer', 'Shoulder', 'Winter', 'Entire Period')
+```
+
+
+# make averaging function
+```{r}
+avg.data <- function(data  = omni_daily, metric){
+  days <- case_when(
+    metric == 'pm25' ~ lag_pm25,
+    metric == 'voc' ~ lag_voc,
+    metric == 'co2' ~ lag_co2,
+    metric == 'temp' ~ lag_temp,
+    metric == 'humid' ~ lag_humid,
+    metric == 'lux' ~ lag_lux,
+    metric == 'spl_a' ~ lag_spl_a
+  )
+  
+  data %>%
+    select(datetime, home, location, all_of(metric)) %>%
+          mutate(date = floor_date(datetime, unit = paste(days, 'days'))) %>%
+          group_by(home, location, date) %>%
+        # summarise_at(vars(all_of(metric)), list(mean = mean, sd = sd), na.rm = TRUE) %>%
+    summarise_at(vars(all_of(metric)), list(~mean(., na.rm = TRUE), ~sd(., na.rm = TRUE),
+                                  ~n())) %>%
+    ungroup() %>%
+    mutate(metric = metric, avg_period_days = days)
+}
+```
+
+
+
+# make time averaged data depending on metric lag
+
+```{r}
+lag_pm25 <-lag_df %>% filter(energy_cluster == 'total', metric == 'pm25') %>%
+  pull(median) %>% round()
+lag_voc <-lag_df %>% filter(energy_cluster == 'total', metric == 'voc') %>%
+  pull(median)%>% round()
+lag_co2 <- lag_df %>% filter(energy_cluster == 'total', metric == 'co2') %>%
+  pull(median)%>% round()
+lag_temp <- lag_df %>% filter(energy_cluster == 'total', metric == 'temp') %>%
+  pull(median)%>% round()
+lag_humid <- lag_df %>% filter(energy_cluster == 'total', metric == 'humid') %>%
+  pull(median)%>% round()
+lag_lux <- lag_df %>% filter(energy_cluster == 'total', metric == 'lux') %>%
+  pull(median)%>% round()
+lag_spl_a <- lag_df %>% filter(energy_cluster == 'total', metric == 'spl_a') %>%
+  pull(median)%>% round()
+
+
+map(c('ac', 'shoulder', 'heat'), function (x_cluster) {
+  
+omni_data_avg <- omni_daily %>%
+  filter(energy_cluster == x_cluster) %>%
+  complete()
+```
+
+
+
+
