@@ -1,0 +1,318 @@
+---
+title: "VOC"
+author: "Andrew Purgiel"
+date: "9/28/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(tidyverse)
+library(lubridate)
+```
+
+## R Markdown
+
+```{r import_omni_hourly_data}
+data<- read_rds('./csv_created/omni_hourly_calibrated.rds') %>% rename('datetime' = datehour)%>% 
+  #use only daa before June 2021
+  filter(datetime<ymd_hms('2021-06-01 00:00:00'))
+
+```
+
+
+```{r}
+data_long <- data %>% pivot_longer(co2:temp, names_to = 'metric')
+```
+
+
+
+
+```{r functions_misc}
+
+##Define a char vector of home numbers using a number vector,
+##ex: x <- home.list(c(1:15)) for homes 1-15
+threedig <- function(x) {
+  if (nchar(x) == 1) {a <- paste0('00', x)
+  return(a)
+  }
+  
+  if (nchar(x) == 2) {a<- paste0('0', x)
+  return(a)
+  }
+  else return(a)
+}
+
+home.list <- function(x) sapply(x, threedig)
+
+# make function to label metric names with subscripts and seasons
+labeller.all <- as_labeller(c(
+  'pm25'='PM[2.5]', 'voc'="TVOC",
+  'co2' = 'CO[2]', 'temp' = 'Temperature', 'humid' = 'Humidity',
+  'lux' = 'Light', 'spl_a' = 'Noise',
+  'ac' = 'Cooling', 'shoulder' = 'Shoulder', 'heat' = 'Heating',
+  'kitchen' = 'Kitchen', 'living' = 'Living Room', 'bedroom' = 'Bedroom',
+  'outdoor' = 'Outdoor', 'garage'= 'Garage'
+  ), default = label_parsed)
+
+```
+
+```{r define_variables}
+
+
+#define homes for analysis
+homes_all <- home.list(c(1:4, 7:16))
+
+# define indoor rooms
+locations_indoor <- c('living', 'bedroom', 'kitchen')
+
+# # define homes that have data for all indoor rooms (if needed)
+# homes_avail <- homes_all[-2]
+
+# define metrics for acf testing
+metrics_all <- c('pm25', 'voc', 'co2', 'temp', 'humid', 'lux', 'spl_a')
+
+clusters_all <- c('heat', 'shoulder', 'ac')
+
+#define sizes for plot text
+xsmall <- 2
+small <- 6
+medium <- 12
+large <- 16
+
+
+# color blind pallette
+# check http://www.cookbook-r.com/Graphs/Colors_(ggplot2)/#a-colorblind-friendly-palette
+cbbPalette <- c('black' = "#000000",
+                'light_orange' = "#E69F00",
+                'light_blue' = "#56B4E9",
+                'green' = "#009E73",
+                'yellow' = "#F0E442",
+                'dark_blue' = "#0072B2",
+                'dark_orange' = "#D55E00",
+                'purple' = "#CC79A7"
+                )
+# define colors for room-comparisons
+room_colors <- c(cbbPalette['green'],
+                   cbbPalette['purple'],
+                   cbbPalette['light_orange']
+                   )%>% unname()
+
+room_breaks <- locations_indoor
+
+room_labels <- c('Living', 'Bedroom', 'Kitchen')
+
+# define colors for energy clusters
+energy_colors <- c(cbbPalette['light_blue'],
+                   cbbPalette['green'],
+                   cbbPalette['dark_orange'],
+                   cbbPalette['black'])%>% unname()
+
+energy_breaks <- c('ac', 'shoulder', 'heat', 'overall')
+energy_labels <- c('Cooling', 'Shoulder', 'Heating', 'Entire Period')
+
+```
+
+*calc cov for each sensor by season
+```{r}
+cov_by_sensor_season <- data_long %>%
+  group_by(home, location, metric, energy_cluster) %>%
+  summarise_at(
+    vars(value),
+      list(sd = sd,
+      mean = mean),
+    na.rm = TRUE
+  ) %>%
+  mutate( cov = sd/mean) %>%
+  left_join(
+    data_long %>%
+  group_by(home, location, metric, energy_cluster) %>%
+  summarise_at(
+    vars(value),
+      funs(n_hours = n())
+  ),
+  by = c('home', 'location', 'metric', 'energy_cluster')
+  )
+
+write_csv(cov_by_sensor_season, './csv_created/cov/cov_by_sensor_season.csv')
+```
+
+* find cov by sensor for all time
+```{r}
+cov_by_sensor <- data_long %>%
+  group_by(home, location, metric) %>%
+  summarise_at(
+    vars(value),
+      list(sd = sd,
+      mean = mean),
+    na.rm = TRUE
+  ) %>%
+  mutate( cov = sd/mean) %>%
+  left_join(
+    data_long %>%
+  group_by(home, location, metric) %>%
+  summarise_at(
+    vars(value),
+      funs(n_hours = n())
+  ),
+  by = c('home', 'location', 'metric')
+  )
+
+write_csv(cov_by_sensor, './csv_created/cov/cov_by_sensor_season.csv')
+```
+
+
+
+
+
+* calc cov for each home (indoor rooms pooled, outdoor and garage not used)
+```{r}
+
+a <- data_long %>% filter(location %in% c('living', 'kitchen', 'bedroom'))
+
+cov_by_home <- a %>% group_by(home, metric) %>%
+  summarise_at(
+    vars(value),
+      list(sd = sd,
+      mean = mean),
+    na.rm = TRUE
+  ) %>%
+  mutate( cov = sd/mean) %>%
+  left_join(
+    a %>% group_by(home, metric) %>%
+  summarise_at(
+    vars(value),
+      funs(n_room_hours = n())
+  ),
+  by = c('home', 'metric')
+  )
+
+write_csv(cov_by_home, './cov_by_home.csv')
+```
+
+
+
+* boxplot of COV by room
+
+# boxplots by season, ooled homes ND ROOMS
+
+## group 2 Homes
+```{r, fig.width=6, fig.height=2}
+# only indoor, Group 2 Homes, some metrics --------
+a <- cov_by_sensor_season %>%
+  filter(location %in% locations_indoor) %>%
+  filter(metric %in% c('pm25', 'voc', 'co2', 'temp')) %>%
+  filter(energy_cluster %in% energy_breaks[c(1:3)]) %>%
+  filter(home %in% homes_tier2)
+
+# change order of metrics for plotting
+a$location <- factor(a$location, levels = c('kitchen', 'living', 'bedroom'))
+a$metric <- factor(a$metric, levels = c('pm25', 'voc', 'co2', 'temp'))
+a$energy_cluster <- factor(a$energy_cluster, levels = c('ac', 'shoulder', 'heat'))
+
+
+#     # make a dummy df in which to define limits for each metric
+# limit_df <- a %>%
+#   group_by(metric) %>%
+#   summarize(max = max(cov))%>%
+#   mutate(min = 0) %>%
+#         pivot_longer(cols = c(max, min), names_to = 'side', values_to = 'limits')
+
+
+ggplot(a,aes(x = energy_cluster, y = cov))+
+  geom_boxplot(width = 0.2, outlier.shape = NA)+
+  geom_jitter(aes(color = location), width = 0.2, size = 1)+
+        facet_wrap(vars(metric), nrow = 1,
+                   # scales = 'free_y',
+                   labeller = labeller.all)+
+  scale_x_discrete(
+    limits = energy_breaks[c(2:3)],
+    labels = energy_labels[c(2:3)]
+  )+
+  scale_color_manual(
+    breaks = room_breaks,
+    values = room_colors,
+    labels = room_labels,
+    name = 'Room'
+  )+
+  theme_bw()+
+       # guides(col = guide_legend(ncol = 2))+ #split up legend
+          ##for extra space between facets
+    theme(
+          strip.background =element_blank(),
+          panel.grid.major.x = element_blank()
+          )+
+        # use dummy df to define limits for each metric
+        geom_blank(data = limit_df, aes(x = 'kitchen', y = limits))+
+  xlab('Season')+
+  ylab('IEQ Indicator COV\nin Group 2 Homes')
+  
+
+###
+
+
+```
+
+## Group 3 Homes
+```{r, fig.width=8, fig.height=2}
+# only indoor, Group 2 Homes, some metrics --------
+a <- cov_by_sensor_season %>%
+  filter(location %in% locations_indoor) %>%
+  filter(metric %in% c('pm25', 'voc', 'co2', 'temp')) %>%
+  filter(energy_cluster %in% energy_breaks[c(1:3)]) %>%
+  filter(home %in% homes_tier3)
+
+# change order of metrics for plotting
+a$location <- factor(a$location, levels = c('kitchen', 'living', 'bedroom'))
+a$metric <- factor(a$metric, levels = c('pm25', 'voc', 'co2', 'temp'))
+a$energy_cluster <- factor(a$energy_cluster, levels = c('ac', 'shoulder', 'heat'))
+
+
+#     # make a dummy df in which to define limits for each metric
+# limit_df <- a %>%
+#   group_by(metric) %>%
+#   summarize(max = max(cov))%>%
+#   mutate(min = 0) %>%
+#         pivot_longer(cols = c(max, min), names_to = 'side', values_to = 'limits')
+
+
+ggplot(a,aes(x = energy_cluster, y = cov))+
+  geom_boxplot(width = 0.2, outlier.shape = NA)+
+  geom_jitter(aes(color = location), width = 0.2, size = 1)+
+        facet_wrap(vars(metric), nrow = 1,
+                   # scales = 'free_y',
+                   labeller = labeller.all)+
+  scale_x_discrete(
+    limits = energy_breaks[c(1:3)],
+    labels = energy_labels[c(1:3)]
+  )+
+  scale_color_manual(
+    breaks = room_breaks,
+    values = room_colors,
+    labels = room_labels,
+    name = 'Room'
+  )+
+  theme_bw()+
+       # guides(col = guide_legend(ncol = 2))+ #split up legend
+          ##for extra space between facets
+    theme(
+          strip.background =element_blank(),
+          panel.grid.major.x = element_blank()
+          )+
+        # use dummy df to define limits for each metric
+        geom_blank(data = limit_df, aes(x = 'kitchen', y = limits))+
+  xlab('Season')+
+  ylab('IEQ Indicator COV\nin Group 3 Homes')
+  
+
+###
+
+
+```
+
+
+
