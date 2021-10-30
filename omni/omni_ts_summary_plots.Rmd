@@ -148,7 +148,7 @@ labeller.all <- as_labeller(c(
   'co2' = 'CO[2]', 'temp' = 'Temperature', 'humid' = 'Humidity',
   'lux' = 'Light', 'spl_a' = 'Noise',
   'ac' = 'Cooling', 'shoulder' = 'Shoulder', 'heat' = 'Heating',
-  'kitchen' = 'Kitchen', 'living' = 'Living Room', 'bedroom' = 'Bedroom',
+  'kitchen' = 'Kitchen', 'living' = 'Living', 'bedroom' = 'Bedroom',
   'outdoor' = 'Outdoor', 'garage'= 'Garage'
   ), default = label_parsed)
   
