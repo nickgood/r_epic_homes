@@ -120,7 +120,7 @@ room_colors <- c(cbbPalette['green'],
 
 room_breaks <- locations_indoor
 
-room_labels <- c('Living Room', 'Bedroom', 'Kitchen')
+room_labels <- c('Living', 'Bedroom', 'Kitchen')
 
 # define colors for energy clusters
 energy_colors <- c(cbbPalette['light_blue'],
@@ -873,66 +873,17 @@ b <- a %>% filter(missing_pct > missing_pct_min)
 ### because missing more than `r missing_pct_min`% of days within period
 
 
-```{r lag_plots, eval = TRUE}
-
-######## one metric-----------
-met <- 'pm25'
-
-
-a <- acf_lags_filter %>% 
-  filter(metric == met)
-
-
-
-inf_count <-a %>% filter(lag_signif %>%is.infinite()) %>% nrow()
-
-
-
-
-# boxplots by location, pooled clusters 
-
-# make n labels
-n_labels <- a %>%
-  filter(energy_cluster %in% c('ac', 'shoulder', 'heat'))%>%
-  filter(lag_signif %>%is.finite()) %>%
-  group_by(location) %>%
-  summarise(
-  label_position=median(lag_signif, na.rm= TRUE)+5,
-  label_value=n(), .groups = 'drop'
-) %>%
-  mutate(label_value = paste0('n=',label_value))
-
-
-ggplot(data = a  %>% filter(energy_cluster %in% c('ac', 'shoulder', 'heat')),
-       aes(x = location, y = lag_signif))+
-  geom_boxplot(outlier.shape = NA)+
-  geom_text(data=n_labels, aes(x = location, y=label_position,
-                               label=label_value),vjust=0)+
-
-  geom_jitter(aes(
-    color=energy_cluster, 
-    # can only use the below lines if Inf values are present
-    # if(any(lag_signif== Inf)) {
-    #   shape = ifelse(is.infinite(lag_signif),
-    #                4, 16)}
-  ), height = 0)+
-  ggtitle(label = paste0(met, ', lags before acf is insignficant'))+
-  # scale_y_continuous(oob= scales::squish_infinite)+
-  scale_color_manual(name = "Season",
-                       breaks = energy_breaks,
-                       labels = energy_labels,
-                     values = energy_colors,
-                       guide = "legend")
-# scale_shape_identity(name = "Insignifiance reached within 30 days",
-#                      breaks = c(16, 4),
-#                      labels = c("Yes", "No"),
-#                      guide = "legend")
-
-
+```{r lag_plots, fig.height = 3, fig.width = 8, eval = TRUE}
 
 ####### compare all metrics, pooled cluster periods-------
 a <- acf_lags_filter %>% 
-  filter(energy_cluster %in% c('ac', 'shoulder', 'heat'))
+  filter(energy_cluster %in% c('ac', 'shoulder', 'heat'))%>%
+  filter(metric %in% c('pm25', 'voc', 'co2', 'temp'))
+
+# change order for plotting
+a$location <- factor(a$location, levels = c('kitchen', 'living', 'bedroom'))
+a$metric <- factor(a$metric, levels = c('pm25', 'voc', 'co2', 'temp'))
+a$energy_cluster <- factor(a$energy_cluster, levels = c('ac', 'shoulder', 'heat'))
 
 inf_count <-a %>% filter(lag_signif %>%is.infinite()) %>% nrow()
 
@@ -957,7 +908,7 @@ ggplot(data = a ,
   #                  '16')
    ),
   height = 0)+
-  facet_wrap(vars(metric), labeller = labeller.all)+
+  facet_wrap(vars(metric), labeller = labeller.all, nrow  = 1)+
   # scale_y_continuous(oob= scales::squish_infinite)+
   scale_x_discrete(
     limits = room_breaks,
@@ -971,11 +922,12 @@ ggplot(data = a ,
   geom_text(data=n_labels, aes(x = location, y=19,
                                label=label_value),vjust=0)+
   coord_cartesian(ylim= c(0,30))+
-  ylab('Lags Before Insignificance')+
+  ylab('Day Lags Before Insignificance')+
   xlab('Room')+
   theme_bw()+
   theme(
-    panel.grid.major.x = element_blank()
+    panel.grid.major.x = element_blank(),
+        strip.background = element_blank()
   )
   # scale_shape_identity(name = "Insignifiance reached within 30 days",
   #                      breaks = c(16, 4),
@@ -1007,7 +959,7 @@ ggplot(data = a ,
   #                  '16')
    ), 
   height = 0)+
-  facet_wrap(vars(metric), labeller = labeller.all)+
+  facet_wrap(vars(metric), labeller = labeller.all, nrow  = 1)+
   # scale_y_continuous(oob= scales::squish_infinite)+
     scale_x_discrete(
     limits = energy_breaks[c(1:3)],
@@ -1021,11 +973,12 @@ ggplot(data = a ,
   geom_text(data=n_labels, aes(x = energy_cluster, y=19,
                                label=label_value),vjust=0)+
     coord_cartesian(ylim= c(0,30))+
-  ylab('Lags Before Insignificance')+
+  ylab('Day Lags Before Insignificance')+
     xlab('Season')+
   theme_bw()+
   theme(
-    panel.grid.major.x = element_blank()
+    panel.grid.major.x = element_blank(),
+    strip.background = element_blank()
   )
 
 
