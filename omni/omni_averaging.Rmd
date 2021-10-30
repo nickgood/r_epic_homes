@@ -32,7 +32,7 @@ library(arules) # to discretize data for histogram
 
 ```{r data_import}
 # daily date without missing dates
-omni_daily <- read_csv('./csv_created/omni_daily_data_complete.csv')
+omni_daily <- read_rds('./csv_created/omni_daily_calibrated.rds')
 
 # home type dataframe
 home_type_df <- read_csv('../sense/csv_created_sense/home_type_df.csv')
@@ -47,7 +47,8 @@ lag_df <- read_csv('./csv_created/lag_summary.csv')
 # only use data up to June 2021
 # and rename noise variable
 ```{r censor_date}
-omni_daily <- omni_daily %>% filter(date<ymd_hms('2021-06-01 00:00:00'))
+omni_daily <- omni_daily %>% filter(dateday<ymd_hms('2021-06-01 00:00:00'))%>%
+  rename('date' = dateday)
 
 
 ```
@@ -154,7 +155,7 @@ labeller.all <- as_labeller(c(
   'co2' = 'CO[2]', 'temp' = 'Temperature', 'humid' = 'Humidity',
   'lux' = 'Light', 'spl_a' = 'Noise',
   'ac' = 'Cooling', 'shoulder' = 'Shoulder', 'heat' = 'Heating',
-  'kitchen' = 'Kitchen', 'living' = 'Living Room', 'bedroom' = 'Bedroom',
+  'kitchen' = 'Kitchen', 'living' = 'Living', 'bedroom' = 'Bedroom',
   'outdoor' = 'Outdoor', 'garage'= 'Garage'
   ), default = label_parsed)
   
@@ -236,7 +237,7 @@ room_colors <- c(cbbPalette['green'],
 
 room_breaks <- locations_indoor
 
-room_labels <- c('Living Room', 'Bedroom', 'Kitchen')
+room_labels <- c('Living', 'Bedroom', 'Kitchen')
 
 # define colors for energy clusters
 energy_colors <- c(cbbPalette['light_blue'],
@@ -246,39 +247,9 @@ energy_colors <- c(cbbPalette['light_blue'],
 
 energy_breaks <- c('ac', 'shoulder', 'heat', 'overall')
 energy_labels <- c('Summer', 'Shoulder', 'Winter', 'Entire Period')
-```
 
 
-# make averaging function
-```{r}
-avg.data <- function(data  = omni_daily, metric){
-  days <- case_when(
-    metric == 'pm25' ~ lag_pm25,
-    metric == 'voc' ~ lag_voc,
-    metric == 'co2' ~ lag_co2,
-    metric == 'temp' ~ lag_temp,
-    metric == 'humid' ~ lag_humid,
-    metric == 'lux' ~ lag_lux,
-    metric == 'spl_a' ~ lag_spl_a
-  )
-  
-  data %>%
-    select(datetime, home, location, all_of(metric)) %>%
-          mutate(date = floor_date(datetime, unit = paste(days, 'days'))) %>%
-          group_by(home, location, date) %>%
-        # summarise_at(vars(all_of(metric)), list(mean = mean, sd = sd), na.rm = TRUE) %>%
-    summarise_at(vars(all_of(metric)), list(~mean(., na.rm = TRUE), ~sd(., na.rm = TRUE),
-                                  ~n())) %>%
-    ungroup() %>%
-    mutate(metric = metric, avg_period_days = days)
-}
-```
-
-
-
-# make time averaged data depending on metric lag
-
-```{r}
+# define lag periods
 lag_pm25 <-lag_df %>% filter(energy_cluster == 'total', metric == 'pm25') %>%
   pull(median) %>% round()
 lag_voc <-lag_df %>% filter(energy_cluster == 'total', metric == 'voc') %>%
@@ -293,13 +264,104 @@ lag_lux <- lag_df %>% filter(energy_cluster == 'total', metric == 'lux') %>%
   pull(median)%>% round()
 lag_spl_a <- lag_df %>% filter(energy_cluster == 'total', metric == 'spl_a') %>%
   pull(median)%>% round()
+```
 
 
-map(c('ac', 'shoulder', 'heat'), function (x_cluster) {
+# make averaging function
+```{r}
+
+# function-----------
+avg.data <- function(data  = omni_daily, met){
+  days <- case_when(
+    met == 'pm25' ~ lag_pm25,
+    met == 'voc' ~ lag_voc,
+    met == 'co2' ~ lag_co2,
+    met == 'temp' ~ lag_temp,
+    met == 'humid' ~ lag_humid,
+    met == 'lux' ~ lag_lux,
+    met == 'spl_a' ~ lag_spl_a
+    )
   
-omni_data_avg <- omni_daily %>%
-  filter(energy_cluster == x_cluster) %>%
-  complete()
+  data %>%
+    select(date, home, location, all_of(met), energy_cluster) %>%
+          mutate(date_avg = floor_date(date, unit = paste(days, 'days'))) %>%
+       drop_na(all_of(met))%>% # drop NA values to ensure n is accurate
+          group_by(home, location, energy_cluster, date_avg) %>%
+        # summarise_at(vars(all_of(met)), list(mean = mean, sd = sd), na.rm = TRUE) %>%
+    summarise_at(vars(all_of(met)), list(~mean(., na.rm = TRUE), ~sd(., na.rm = TRUE),
+                                  ~n())) %>%
+    ungroup() %>%
+    mutate(metric = met, avg_period_days = days)
+}
+#######
+
+#test one home----------
+# test <- avg.data(met = 'pm25')
+
+
+####
+
+```
+
+
+# make data for all metrics avg'd by time lag
+```{r}
+data_avg <- 
+  map(
+    metrics_all, function(x_metric) { 
+      avg.data(data = omni_daily, met = x_metric)
+    }
+  )%>% bind_rows()
+
+```
+
+
+# boxplots by season, pooled homes
+```{r}
+# only indoor, some metrics --------
+a <- data_avg %>%
+  filter(location %in% locations_indoor) %>%
+  filter(metric %in% c('pm25', 'voc', 'co2', 'temp')) %>%
+  filter(energy_cluster %in% energy_breaks[c(1:3)])
+
+# change order of metrics for plotting
+a$location <- factor(a$location, levels = c('kitchen', 'living', 'bedroom'))
+a$metric <- factor(a$metric, levels = c('pm25', 'voc', 'co2', 'temp'))
+a$energy_cluster <- factor(a$energy_cluster, levels = c('ac', 'shoulder', 'heat'))
+
+
+    # make a dummy df in which to define limits for each metric
+limit_df <- a %>%
+  group_by(metric) %>%
+  summarize(max = max(mean))%>%
+  mutate(min = 0) %>%
+        pivot_longer(cols = c(max, min), names_to = 'side', values_to = 'limits')
+
+
+ggplot(a,aes(x = location, y = mean))+
+  geom_violin()+
+  geom_boxplot(width = 0.2, outlier.shape = NA)+
+        facet_grid(rows = vars(metric), cols = vars(energy_cluster),
+                   scales = 'free_y',
+                   labeller = labeller.all,
+                   switch = 'y')+
+  scale_x_discrete(
+    limits = room_breaks,
+    labels = room_labels
+  )+
+  theme_bw()+
+       # guides(col = guide_legend(ncol = 2))+ #split up legend
+          ##for extra space between facets
+    theme(
+          strip.background =element_blank(),
+                strip.placement = 'outside',
+          panel.grid.major.x = element_blank()
+          )+
+        # use dummy df to define limits for each metric
+        geom_blank(data = limit_df, aes(x = 'kitchen', y = limits))+
+  xlab('Sampling Location')+
+  ylab('IEQ Indicator')
+  
 ```
 
 
