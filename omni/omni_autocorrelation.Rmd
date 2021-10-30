@@ -90,7 +90,7 @@ locations_indoor <- c('living', 'bedroom', 'kitchen')
 # homes_avail <- homes_all[-2]
 
 # define metrics for acf testing
-metrics_all <- c('pm25', 'voc', 'co2', 'temp', 'humid')
+metrics_all <- c('pm25', 'voc', 'co2', 'temp', 'humid', 'lux', 'spl_a')
 
 clusters_all <- c('heat', 'shoulder', 'ac')
 
@@ -643,15 +643,17 @@ missing_pct_min <- 1/9*100
 ```{r ggacf_function2, include= FALSE}
 
 # # variables for testing-----------------
-# data <- omni_daily_data_complete
-# hm <- '009'
-# loc <- 'living'
-# metric <- 'pm25'
-# lag.max <- 14
-# cluster <- 'shoulder'
-# type <- 'correlation'
-# ci <- 0.95
-# ci.col <- 'blue'
+data <- omni_daily_data_complete
+hm <- '001'
+loc <- 'kitchen'
+met <- 'pm25'
+lag.max <- 14
+cluster <- 'heat'
+type <- 'correlation'
+ci <- 0.95
+ci.col <- 'blue'
+
+rm(data, hm, loc, met, lag.max, cluster, type, ci, ci.col)
 
 ##Define an autocorrelation plot function in ggplot------------------
 
@@ -698,7 +700,7 @@ ggacf <- function(data,  hm, loc, met, cluster,
   lag_counts <- map(lags, function(x) {
     data %>%
       filter(home == hm & location == loc)%>%
-      pull(all_of(metric)) %>%
+      pull(all_of(met)) %>%
       diff(lag = x) %>%
       is.na() %>%
       `!` %>% #count how many are not NA
@@ -724,6 +726,9 @@ ggacf <- function(data,  hm, loc, met, cluster,
            miss = missing, avail = days_avail)
 }
 
+# test <- ggacf(data = omni_daily_data_complete,
+#                   hm = '001', loc = 'bedroom',
+#                   met = 'pm25', cluster = 'heat')
     
 ```
 
@@ -884,7 +889,7 @@ inf_count <-a %>% filter(lag_signif %>%is.infinite()) %>% nrow()
 
 
 
-# boxplots by location, pooled clusters ----------
+# boxplots by location, pooled clusters 
 
 # make n labels
 n_labels <- a %>%
