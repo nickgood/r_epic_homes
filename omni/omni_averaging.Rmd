@@ -34,6 +34,8 @@ library(arules) # to discretize data for histogram
 # daily date without missing dates
 omni_daily <- read_rds('./csv_created/omni_daily_calibrated.rds')
 
+omni_hourly <- read_rds('./csv_created/omni_hourly_calibrated.rds')
+
 # home type dataframe
 home_type_df <- read_csv('../sense/csv_created_sense/home_type_df.csv')
 
@@ -50,7 +52,8 @@ lag_df <- read_csv('./csv_created/lag_summary.csv')
 omni_daily <- omni_daily %>% filter(dateday<ymd_hms('2021-06-01 00:00:00'))%>%
   rename('date' = dateday)
 
-
+omni_hourly <- omni_hourly %>% filter(datehour<ymd_hms('2021-06-01 00:00:00'))%>%
+  rename('date' = datehour)
 ```
 
 
@@ -246,7 +249,7 @@ energy_colors <- c(cbbPalette['light_blue'],
                    cbbPalette['black'])%>% unname()
 
 energy_breaks <- c('ac', 'shoulder', 'heat', 'overall')
-energy_labels <- c('Summer', 'Shoulder', 'Winter', 'Entire Period')
+energy_labels <- c('Cooling', 'Shoulder', 'Heating', 'Entire Period')
 
 
 # define lag periods
@@ -316,9 +319,11 @@ data_avg <-
 ```
 
 
-# boxplots by season, pooled homes
-```{r}
-# only indoor, some metrics --------
+# boxplots by season, by room, pooled homes
+
+## All homes
+```{r, fig.width=8, fig.height=5.5}
+# only indoor, all Homes, some metrics --------
 a <- data_avg %>%
   filter(location %in% locations_indoor) %>%
   filter(metric %in% c('pm25', 'voc', 'co2', 'temp')) %>%
@@ -360,10 +365,325 @@ ggplot(a,aes(x = location, y = mean))+
         # use dummy df to define limits for each metric
         geom_blank(data = limit_df, aes(x = 'kitchen', y = limits))+
   xlab('Sampling Location')+
-  ylab('IEQ Indicator')
+  ylab('IEQ Indicator Value')
   
+
+###
+
+
+
+
+
+
+
+```
+
+## group 2 Homes
+```{r, fig.width=5.5, fig.height=5.5}
+# only indoor, Group 2 Homes, some metrics --------
+a <- data_avg %>%
+  filter(location %in% locations_indoor) %>%
+  filter(metric %in% c('pm25', 'voc', 'co2', 'temp')) %>%
+  filter(energy_cluster %in% energy_breaks[c(1:3)]) %>%
+  filter(home %in% homes_tier2)
+
+# change order of metrics for plotting
+a$location <- factor(a$location, levels = c('kitchen', 'living', 'bedroom'))
+a$metric <- factor(a$metric, levels = c('pm25', 'voc', 'co2', 'temp'))
+a$energy_cluster <- factor(a$energy_cluster, levels = c('ac', 'shoulder', 'heat'))
+
+
+    # make a dummy df in which to define limits for each metric
+limit_df <- a %>%
+  group_by(metric) %>%
+  summarize(max = max(mean))%>%
+  mutate(min = 0) %>%
+        pivot_longer(cols = c(max, min), names_to = 'side', values_to = 'limits')
+
+
+ggplot(a,aes(x = location, y = mean))+
+  geom_violin()+
+  geom_boxplot(width = 0.2, outlier.shape = NA)+
+        facet_grid(rows = vars(metric), cols = vars(energy_cluster),
+                   scales = 'free_y',
+                   labeller = labeller.all,
+                   switch = 'y')+
+  scale_x_discrete(
+    limits = room_breaks,
+    labels = room_labels
+  )+
+  theme_bw()+
+       # guides(col = guide_legend(ncol = 2))+ #split up legend
+          ##for extra space between facets
+    theme(
+          strip.background =element_blank(),
+                strip.placement = 'outside',
+          panel.grid.major.x = element_blank()
+          )+
+        # use dummy df to define limits for each metric
+        geom_blank(data = limit_df, aes(x = 'kitchen', y = limits))+
+  xlab('Sampling Location')+
+  ylab('IEQ Indicator Value\nin Group 2 Homes')
+  
+
+###
+
+
+```
+
+## Group 3 Homes
+```{r, fig.width=8, fig.height=5.5}
+
+# only indoor, Group 3 Homes, some metrics --------
+a <- data_avg %>%
+  filter(location %in% locations_indoor) %>%
+  filter(metric %in% c('pm25', 'voc', 'co2', 'temp')) %>%
+  filter(energy_cluster %in% energy_breaks[c(1:3)]) %>%
+  filter(home %in% homes_tier3)
+
+# change order of metrics for plotting
+a$location <- factor(a$location, levels = c('kitchen', 'living', 'bedroom'))
+a$metric <- factor(a$metric, levels = c('pm25', 'voc', 'co2', 'temp'))
+a$energy_cluster <- factor(a$energy_cluster, levels = c('ac', 'shoulder', 'heat'))
+
+
+    # make a dummy df in which to define limits for each metric
+limit_df <- a %>%
+  group_by(metric) %>%
+  summarize(max = max(mean))%>%
+  mutate(min = 0) %>%
+        pivot_longer(cols = c(max, min), names_to = 'side', values_to = 'limits')
+
+
+ggplot(a,aes(x = location, y = mean))+
+  geom_violin()+
+  geom_boxplot(width = 0.2, outlier.shape = NA)+
+        facet_grid(rows = vars(metric), cols = vars(energy_cluster),
+                   scales = 'free_y',
+                   labeller = labeller.all,
+                   switch = 'y')+
+  scale_x_discrete(
+    limits = room_breaks,
+    labels = room_labels
+  )+
+  theme_bw()+
+       # guides(col = guide_legend(ncol = 2))+ #split up legend
+          ##for extra space between facets
+    theme(
+          strip.background =element_blank(),
+                strip.placement = 'outside',
+          panel.grid.major.x = element_blank()
+          )+
+        # use dummy df to define limits for each metric
+        geom_blank(data = limit_df, aes(x = 'kitchen', y = limits))+
+  xlab('Sampling Location')+
+  ylab('IEQ Indicator Value\nin Group 3 Homes')
+  
+
+###
+
+
 ```
 
 
+
+# by season, pooled rooms and homes
+
+# group 2 Homes
+```{r, fig.width=5.5, fig.height=2}
+# only indoor, Group 2 Homes, some metrics --------
+a <- data_avg %>%
+  filter(location %in% locations_indoor) %>%
+  filter(metric %in% c('pm25', 'voc', 'co2', 'temp')) %>%
+  filter(energy_cluster %in% energy_breaks[c(1:3)]) %>%
+  filter(home %in% homes_tier2)
+
+# change order of metrics for plotting
+a$location <- factor(a$location, levels = c('kitchen', 'living', 'bedroom'))
+a$metric <- factor(a$metric, levels = c('pm25', 'voc', 'co2', 'temp'))
+a$energy_cluster <- factor(a$energy_cluster, levels = c('ac', 'shoulder', 'heat'))
+
+
+    # make a dummy df in which to define limits for each metric
+limit_df <- a %>%
+  group_by(metric) %>%
+  summarize(max = max(mean))%>%
+  mutate(min = 0) %>%
+        pivot_longer(cols = c(max, min), names_to = 'side', values_to = 'limits')
+
+
+ggplot(a,aes(x = energy_cluster, y = mean))+
+  geom_violin()+
+  geom_boxplot(width = 0.2, outlier.shape = NA)+
+        facet_wrap(vars(metric), nrow = 1,   scales = 'free_y',
+                   labeller = labeller.all)+
+  scale_x_discrete(
+    limits = energy_breaks[c(2:3)],
+    labels = energy_labels[c(2:3)]
+  )+
+  theme_bw()+
+       # guides(col = guide_legend(ncol = 2))+ #split up legend
+          ##for extra space between facets
+    theme(
+          strip.background =element_blank(),
+          panel.grid.major.x = element_blank()
+          )+
+        # use dummy df to define limits for each metric
+        geom_blank(data = limit_df, aes(x = 'heat', y = limits))+
+  xlab('Season')+
+  ylab('IEQ Indicator Value\nin Group 2 Homes')
+  
+
+###
+
+
+```
+
+# Group 3 Homes
+```{r, fig.width=8, fig.height=2}
+
+# only indoor, Group 3 Homes, some metrics --------
+a <- data_avg %>%
+  filter(location %in% locations_indoor) %>%
+  filter(metric %in% c('pm25', 'voc', 'co2', 'temp')) %>%
+  filter(energy_cluster %in% energy_breaks[c(1:3)]) %>%
+  filter(home %in% homes_tier3)
+
+# change order of metrics for plotting
+a$location <- factor(a$location, levels = c('kitchen', 'living', 'bedroom'))
+a$metric <- factor(a$metric, levels = c('pm25', 'voc', 'co2', 'temp'))
+a$energy_cluster <- factor(a$energy_cluster, levels = c('ac', 'shoulder', 'heat'))
+
+
+    # make a dummy df in which to define limits for each metric
+limit_df <- a %>%
+  group_by(metric) %>%
+  summarize(max = max(mean))%>%
+  mutate(min = 0) %>%
+        pivot_longer(cols = c(max, min), names_to = 'side', values_to = 'limits')
+
+
+ggplot(a,aes(x = energy_cluster, y = mean))+
+  geom_violin()+
+  geom_boxplot(width = 0.2, outlier.shape = NA)+
+        facet_wrap(vars(metric), nrow = 1,   scales = 'free_y',
+                   labeller = labeller.all)+
+  scale_x_discrete(
+    limits = energy_breaks[c(1:3)],
+    labels = energy_labels[c(1:3)]
+  )+
+  theme_bw()+
+       # guides(col = guide_legend(ncol = 2))+ #split up legend
+          ##for extra space between facets
+    theme(
+          strip.background =element_blank(),
+          panel.grid.major.x = element_blank()
+          )+
+        # use dummy df to define limits for each metric
+        geom_blank(data = limit_df, aes(x = 'heat', y = limits))+
+  xlab('Season')+
+  ylab('IEQ Indicator Value\nin Group 3 Homes')
+  
+
+###
+
+
+```
+
+
+
+
+# Make Data for hourly by season, by room, pooled homes
+
+
+## group 2 Homes
+```{r}
+# by home --------
+a <- omni_hourly %>%
+  filter(location %in% locations_indoor) %>%
+  filter(energy_cluster %in% energy_breaks[c(1:3)]) %>%
+  filter(home %in% homes_tier2) %>%
+  pivot_longer(c(humid:temp), values_to = 'value', names_to = 'metric')%>%
+    filter(metric %in% c('pm25', 'voc', 'co2', 'temp', 'humid', 'lux', 'spl_a')) %>%
+  group_by(location, metric, energy_cluster, home) %>%
+  summarise( avg = mean(value, na.rm = TRUE),
+             sd = sd(value, na.rm = TRUE),
+             n_hours = n(),
+             .groups = 'drop')
+
+group2_home <- a %>%
+  select(energy_cluster, metric, home, everything(.)) %>%
+  arrange(energy_cluster, metric, home)
+
+
+write_csv(group2_home, './csv_created/group2_home_avg.csv')
+
+
+# summary --------
+a <- omni_hourly %>%
+  filter(location %in% locations_indoor) %>%
+  filter(energy_cluster %in% energy_breaks[c(1:3)]) %>%
+  filter(home %in% homes_tier2) %>%
+  pivot_longer(c(humid:temp), values_to = 'value', names_to = 'metric')%>%
+    filter(metric %in% c('pm25', 'voc', 'co2', 'temp', 'humid', 'lux', 'spl_a')) %>%
+  group_by(location, metric, energy_cluster) %>%
+  summarise( avg = mean(value, na.rm = TRUE),
+             sd = sd(value, na.rm = TRUE),
+             n_home_hours = n(),
+             .groups = 'drop')
+
+group2 <- a %>%
+  select(energy_cluster, metric, everything(.)) %>%
+  arrange(energy_cluster, metric)
+
+
+write_csv(group2, './csv_created/group2_avg.csv')
+
+
+```
+
+## Group 3 Homes
+```{r}
+
+# by home --------
+a <- omni_hourly %>%
+  filter(location %in% locations_indoor) %>%
+  filter(energy_cluster %in% energy_breaks[c(1:3)]) %>%
+  filter(home %in% homes_tier3) %>%
+  pivot_longer(c(humid:temp), values_to = 'value', names_to = 'metric')%>%
+    filter(metric %in% c('pm25', 'voc', 'co2', 'temp', 'humid', 'lux', 'spl_a')) %>%
+  group_by(location, metric, energy_cluster, home) %>%
+  summarise( avg = mean(value, na.rm = TRUE),
+             sd = sd(value, na.rm = TRUE),
+             n_hours = n(),
+             .groups = 'drop')
+
+group3_home <- a %>%
+  select(energy_cluster, metric, home, everything(.)) %>%
+  arrange(energy_cluster, metric, home)
+
+
+write_csv(group3_home, './csv_created/group3_home_avg.csv')
+
+
+# summary --------
+a <- omni_hourly %>%
+  filter(location %in% locations_indoor) %>%
+  filter(energy_cluster %in% energy_breaks[c(1:3)]) %>%
+  filter(home %in% homes_tier3) %>%
+  pivot_longer(c(humid:temp), values_to = 'value', names_to = 'metric')%>%
+    filter(metric %in% c('pm25', 'voc', 'co2', 'temp', 'humid', 'lux', 'spl_a')) %>%
+  group_by(location, metric, energy_cluster) %>%
+  summarise( avg = mean(value, na.rm = TRUE),
+             sd = sd(value, na.rm = TRUE),
+             n_home_hours = n(),
+             .groups = 'drop')
+
+group3 <- a %>%
+  select(energy_cluster, metric, everything(.)) %>%
+  arrange(energy_cluster, metric)
+
+
+write_csv(group3, './csv_created/group3_avg.csv')```
 
 
