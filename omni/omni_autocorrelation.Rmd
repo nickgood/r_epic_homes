@@ -640,20 +640,20 @@ missing_pct_min <- 1/9*100
 
 
 
-```{r ggacf_function2, include= FALSE}
+```{r ggacf_function, include= FALSE}
 
-# # variables for testing-----------------
-data <- omni_daily_data_complete
-hm <- '001'
-loc <- 'kitchen'
-met <- 'pm25'
-lag.max <- 14
-cluster <- 'heat'
-type <- 'correlation'
-ci <- 0.95
-ci.col <- 'blue'
-
-rm(data, hm, loc, met, lag.max, cluster, type, ci, ci.col)
+# # # variables for testing-----------------
+# data <- omni_daily_data_complete
+# hm <- '001'
+# loc <- 'kitchen'
+# met <- 'pm25'
+# lag.max <- 14
+# cluster <- 'heat'
+# type <- 'correlation'
+# ci <- 0.95
+# ci.col <- 'blue'
+# 
+# rm(data, hm, loc, met, lag.max, cluster, type, ci, ci.col)
 
 ##Define an autocorrelation plot function in ggplot------------------
 
@@ -699,7 +699,7 @@ ggacf <- function(data,  hm, loc, met, cluster,
   
   lag_counts <- map(lags, function(x) {
     data %>%
-      filter(home == hm & location == loc)%>%
+      filter(home == hm & location == loc & energy_cluster == cluster)%>%
       pull(all_of(met)) %>%
       diff(lag = x) %>%
       is.na() %>%
@@ -726,15 +726,15 @@ ggacf <- function(data,  hm, loc, met, cluster,
            miss = missing, avail = days_avail)
 }
 
-# test <- ggacf(data = omni_daily_data_complete,
-#                   hm = '001', loc = 'bedroom',
-#                   met = 'pm25', cluster = 'heat')
+test <- ggacf(data = omni_daily_data_complete,
+                  hm = '001', loc = 'bedroom',
+                  met = 'pm25', cluster = 'heat')
     
 ```
 
 
-# make data and plot
-```{r}
+# make data and csv
+```{r, eval = FALSE}
 
 # make data for all available sensors
 acf_data <- map(
@@ -763,6 +763,15 @@ acf_data <- map(
   mutate(pair_amount = ifelse(n_lag > pairs_min, 'enough', 'not_enough'))
 
 
+write_csv(acf_data, './csv_created/acf_data.csv')
+
+write_csv(acf_data, paste0('./csv_created/acf_data_', Sys.Date(), '.csv'))
+
+```
+
+
+# plot ACF for all conditions
+```{r, eval = FALSE}
 # plot for all metrics, locations, and clusters, faceted by home
  map(
    metrics_all, function(x_metric){
@@ -807,9 +816,8 @@ ggplot(a, aes(x = lag, y = acf))+
 })
       })
    })
- 
-
 ```
+
 
 # make lag df
 ```{r}
