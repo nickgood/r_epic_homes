@@ -684,6 +684,8 @@ group3 <- a %>%
   arrange(energy_cluster, metric)
 
 
-write_csv(group3, './csv_created/group3_avg.csv')```
+write_csv(group3, './csv_created/group3_avg.csv')
+
+```
 
 
