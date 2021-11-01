@@ -726,9 +726,10 @@ ggacf <- function(data,  hm, loc, met, cluster,
            miss = missing, avail = days_avail)
 }
 
-test <- ggacf(data = omni_daily_data_complete,
-                  hm = '001', loc = 'bedroom',
-                  met = 'pm25', cluster = 'heat')
+#test------------
+# test <- ggacf(data = omni_daily_data_complete,
+#                   hm = '001', loc = 'bedroom',
+#                   met = 'pm25', cluster = 'heat')
     
 ```
 
@@ -769,6 +770,11 @@ write_csv(acf_data, paste0('./csv_created/acf_data_', Sys.Date(), '.csv'))
 
 ```
 
+# import acf_data
+```{r}
+acf_data <- read_csv('./csv_created/acf_data.csv')
+```
+
 
 # plot ACF for all conditions
 ```{r, eval = FALSE}
@@ -786,7 +792,7 @@ write_csv(acf_data, paste0('./csv_created/acf_data_', Sys.Date(), '.csv'))
 a <- acf_data %>% filter(metric == x_metric, energy_cluster == x_cluster,
                          location == x_location)%>%
   mutate(pair_amount = ifelse(n_lag > pairs_min, 'enough', 'not_enough')) %>%
-  filter(lag<=14)
+  filter(lag<=30)
 
 
 ggplot(a, aes(x = lag, y = acf))+
@@ -821,6 +827,10 @@ ggplot(a, aes(x = lag, y = acf))+
 
 # make lag df
 ```{r}
+# acf_conditions <- acf_data %>%
+#   group_by(home, location, energy_cluster) %>%
+#   summarize(mean = mean())
+
 
   # find first lag point when acf goes inside confidence intervals
   acf_lags <- acf_data %>%
