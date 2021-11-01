@@ -164,8 +164,8 @@ room_colors <- c(cbbPalette['green'],
                    cbbPalette['light_orange']
                    )%>% unname()
 
-room_breaks <- locations_indoor
-room_labels <- c('Living', 'Kitchen', 'Bedroom')
+room_breaks <- c('living', 'bedroom', 'kitchen')
+room_labels <- c('Living', 'Bedroom', 'Kitchen')
 ```
 
 ```{r function_mutual_info_master}
@@ -548,7 +548,9 @@ unwanted_scaled_na <- spec_df %>%
 ### `r unwanted_scaled_na %>% nrow()` unexpected missing values in scaled spec data
 
 ## Boxplot values
-```{r plot_spec_rooms, fig.width = 7, fig.height = 3}
+```{r plot_spec_rooms, fig.width = 8, fig.height = 3}
+
+spec_df$metric <- factor(spec_df$metric, levels = c('pm25', 'voc', 'co2'))
 
 ggplot(spec_df, aes(x = location, y = specificity))+
   geom_boxplot(outlier.shape = NA)+
@@ -582,7 +584,7 @@ ggplot(spec_df, aes(x = location, y = specificity))+
 ## Rank Table of Values
 
 ### All seasons together
-```{r table_rank, fig.height = 3.5, fig.width = 8}
+```{r table_rank, fig.height = 3.5, fig.width = 8, eval = FALSE}
 
 a <- spec_df %>%
   group_by(home, energy_cluster, metric) %>%
@@ -616,7 +618,7 @@ ggplot(a, (aes(x = home, y = rank)))+
 ```
 
 ### Seasons Separate
-```{r table_rank_season, fig.height = 3.5, fig.width = 8}
+```{r table_rank_season, fig.height = 3.5, fig.width = 8, eval = FALSE}
 
 # rank.table <- function (x_energy_cluster){
 #   
@@ -683,15 +685,51 @@ rank.table('voc')
 
 
 # rank line plot
-```{r , fig.height = 3.5, fig.width = 8}
+```{r , fig.height = 1.75, fig.width = 8}
+# to order factors differently in diffrent facets
+# https://stackoverflow.com/questions/40744401/change-order-of-factors-within-ggplot-facets
+
+
+
+# order of homes for increasing pollutant value
+## ac
+pm25_ac <- c('012', '009')
+voc_ac <- c('012', '009')
+co2_ac <- c('012', '009')
+
+## shoulder
+# pm25_shoulder <- 
+# voc_shoulder <- 
+
+# without seasonal clustering
+pm25_all <- c('001', '012', '007', '010', '009', '004', '013', '011', '015')
+voc_all <- c('010', '004', '012', '001', '013', '007', '015', '011', '009')
+co2_all <- c('001', '004', '007', '009', '010', '011', '012', '013', '015')
+
+
 
 rank.line <- function (x_metric){
+  
+  if(x_metric == 'pm25') metric_title <- expression(paste('PM'[2.5]))
+   if(x_metric == 'co2') metric_title <- expression(paste('CO'[2]))
+   if(x_metric == 'voc') metric_title <- 'TVOC'
+   
+  # order metrics based on value (not season specific), depending on metric
+  home_order <- case_when(
+    x_metric == 'pm25' ~ pm25_all,
+    x_metric == 'voc' ~ voc_all,
+    x_metric == 'co2' ~ co2_all,
+  )
+  
   
 a <- spec_df %>%
   filter(metric == x_metric) %>%
   group_by(home, energy_cluster, metric) %>%
   mutate(rank = rank(specificity) %>% as.factor()) %>%
   ungroup() 
+
+a$home <- factor(a$home, levels = home_order)
+
 
 ggplot(a, (aes(x = home, y = rank, group = location)))+
   geom_line(aes(color = location), size = 1.5)+
@@ -706,16 +744,20 @@ ggplot(a, (aes(x = home, y = rank, group = location)))+
   geom_vline(
     xintercept = seq(1.5,length(a %>% pull(home)%>%as.factor%>% levels)-0.5, 1),
     color = 'grey')+
-  ggtitle(x_metric)+
+  ggtitle(metric_title )+
   theme(plot.title = element_text(hjust = 0.5))+
   scale_color_manual(
     values = room_colors,
-    breaks = room_breaks
+    breaks = room_breaks,
+    labels = room_labels,
+        name = 'Room'
+
   )
 }
 
 rank.line('pm25')
 rank.line('voc')
+rank.line('co2')
 
 ```
 
