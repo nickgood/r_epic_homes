@@ -616,7 +616,7 @@ group2_home <- a %>%
   arrange(energy_cluster, metric, home)
 
 
-write_csv(group2_home, './csv_created/group2_home_avg.csv')
+write_csv(group2_home, './csv_created/averages/group2_home_avg.csv')
 
 
 # summary --------
@@ -637,7 +637,7 @@ group2 <- a %>%
   arrange(energy_cluster, metric)
 
 
-write_csv(group2, './csv_created/group2_avg.csv')
+write_csv(group2, './csv_created/averages/group2_avg.csv')
 
 
 ```
@@ -663,7 +663,7 @@ group3_home <- a %>%
   arrange(energy_cluster, metric, home)
 
 
-write_csv(group3_home, './csv_created/group3_home_avg.csv')
+write_csv(group3_home, './csv_created/averages/group3_home_avg.csv')
 
 
 # summary --------
@@ -684,8 +684,125 @@ group3 <- a %>%
   arrange(energy_cluster, metric)
 
 
-write_csv(group3, './csv_created/group3_avg.csv')
+write_csv(group3, './csv_created/averages/group3_avg.csv')
 
 ```
 
+
+
+# Make Data for hourly  homes, pooled rooms
+
+
+## group 2 Homes (clustered)
+```{r}
+# by home --------
+a <- omni_hourly %>%
+  filter(location %in% locations_indoor) %>%
+  filter(energy_cluster %in% energy_breaks[c(1:3)]) %>%
+  filter(home %in% homes_tier2) %>%
+  pivot_longer(c(co2:temp), values_to = 'value', names_to = 'metric')%>%
+    filter(metric %in% c('pm25', 'voc', 'co2', 'temp', 'humid', 'lux', 'spl_a')) %>%
+  group_by( metric, energy_cluster, home) %>%
+  summarise( avg = mean(value, na.rm = TRUE),
+             sd = sd(value, na.rm = TRUE),
+             n_room_hours = n(),
+             .groups = 'drop')
+
+b <- a %>%
+  select(energy_cluster, metric, home, everything(.)) %>%
+  arrange(energy_cluster, metric, home)
+
+
+write_csv(b, './csv_created/averages/group2-home-pooled_rooms-avg.csv')
+
+
+# summary --------
+summary <- b %>%
+  group_by(metric, energy_cluster) %>%
+  summarise(mean_homes = mean(avg),
+            sd_homes = sd(avg),
+            n_homes = n(), .groups = 'drop') %>%
+  select(energy_cluster, everything(.))%>%
+  arrange(energy_cluster)
+
+
+
+write_csv(summary, './csv_created/averages/group2_avg_summary.csv')
+
+
+```
+
+## Group 3 Homes (clustered)
+```{r}
+# by home --------
+a <- omni_hourly %>%
+  filter(location %in% locations_indoor) %>%
+  filter(energy_cluster %in% energy_breaks[c(1:3)]) %>%
+  filter(home %in% homes_tier3) %>%
+  pivot_longer(c(co2:temp), values_to = 'value', names_to = 'metric')%>%
+    filter(metric %in% c('pm25', 'voc', 'co2', 'temp', 'humid', 'lux', 'spl_a')) %>%
+  group_by( metric, energy_cluster, home) %>%
+  summarise( avg = mean(value, na.rm = TRUE),
+             sd = sd(value, na.rm = TRUE),
+             n_room_hours = n(),
+             .groups = 'drop')
+
+b <- a %>%
+  select(energy_cluster, metric, home, everything(.)) %>%
+  arrange(energy_cluster, metric, home)
+
+
+write_csv(b, './csv_created/averages/group3-home-pooled_rooms-avg.csv')
+
+
+# summary --------
+summary <- b %>%
+  group_by(metric, energy_cluster) %>%
+  summarise(mean_homes = mean(avg),
+            sd_homes = sd(avg),
+            n_homes = n(), .groups = 'drop') %>%
+  select(energy_cluster, everything(.))%>%
+  arrange(energy_cluster)
+
+
+
+write_csv(summary, './csv_created/averages/group3_avg_summary.csv')
+```
+
+
+
+
+## all homes (unclustered)
+```{r}
+# by home --------
+a <- omni_hourly %>%
+  filter(location %in% locations_indoor) %>%
+  pivot_longer(c(co2:temp), values_to = 'value', names_to = 'metric')%>%
+    filter(metric %in% c('pm25', 'voc', 'co2', 'temp', 'humid', 'lux', 'spl_a')) %>%
+  group_by( metric, home) %>%
+  summarise( avg = mean(value, na.rm = TRUE),
+             sd = sd(value, na.rm = TRUE),
+             n_room_hours = n(),
+             .groups = 'drop')
+
+b <- a %>%
+  select( metric, home, everything(.)) %>%
+  arrange( metric, home)
+
+
+write_csv(b, './csv_created/averages/all_home-pooled_rooms-avg.csv')
+
+
+# summary --------
+summary <- b %>%
+  group_by(metric) %>%
+  summarise(mean_homes = mean(avg),
+            sd_homes = sd(avg),
+            n_homes = n(), .groups = 'drop') %>%
+  select( everything(.))
+
+
+
+write_csv(summary, './csv_created/averages/all_home_avg_summary.csv')
+```
 
