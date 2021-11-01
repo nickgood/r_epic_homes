@@ -102,8 +102,7 @@ room_colors <- c(cbbPalette['green'],
                    cbbPalette['light_orange']
                    )%>% unname()
 
-room_breaks <- locations_indoor
-
+room_breaks <- c('living', 'bedroom', 'kitchen')
 room_labels <- c('Living', 'Bedroom', 'Kitchen')
 
 # define colors for energy clusters
