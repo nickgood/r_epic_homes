@@ -110,14 +110,15 @@ na.result <- function(error, location = NA, season = NA, n_data_avail = NA) {
 )
 }
 
-# make function to label metric names with subscripts
-labeller.metrics <- as_labeller(c('pm25'='PM[2.5]', 'voc'="TVOC"),
-                           default = label_parsed)
-
-# make function to label season names
-labeller.clusters <- as_labeller(c('ac'='Summer', 'heat'="Winter",
-                                  'shoulder' ='Shoulder'),
-                           default = label_parsed)
+# make function to label metric names with subscripts and seasons
+labeller.all <- as_labeller(c(
+  'pm25'='PM[2.5]', 'voc'="TVOC",
+  'co2' = 'CO[2]', 'temp' = 'Temperature', 'humid' = 'Humidity',
+  'lux' = 'Light', 'spl_a' = 'Noise',
+  'ac' = 'Cooling', 'shoulder' = 'Shoulder', 'heat' = 'Heating',
+  'kitchen' = 'Kitchen', 'living' = 'Living', 'bedroom' = 'Bedroom',
+  'outdoor' = 'Outdoor', 'garage'= 'Garage'
+  ), default = label_parsed)
 ```
 
 ```{r define_variables}
@@ -127,7 +128,7 @@ homes_all <- home.list(1:17)
 
 clusters_all <- c('heat','shoulder', 'ac')
 locations_indoor <- c('living', 'kitchen', 'bedroom')
-metrics_all <- c('pm25', 'voc')
+metrics_all <- c('pm25', 'voc', 'co2')
 
 # sequence of representative thresholds to test
 threshold_seq <- c(0.1, 0.2, 0.3)
@@ -155,7 +156,7 @@ energy_colors <- c(cbbPalette['light_blue'],
                    cbbPalette['dark_orange'])%>% unname()
 energy_shapes <- c(15, 16, 17)
 energy_breaks <- c('ac', 'shoulder', 'heat')
-energy_labels <- c('Summer', 'Shoulder', 'Winter')
+energy_labels <- c('Cooling', 'Shoulder', 'Heating')
 
 # define colors for room-comparisons
 room_colors <- c(cbbPalette['green'],
@@ -164,6 +165,7 @@ room_colors <- c(cbbPalette['green'],
                    )%>% unname()
 
 room_breaks <- locations_indoor
+room_labels <- c('Living', 'Kitchen', 'Bedroom')
 ```
 
 ```{r function_mutual_info_master}
@@ -551,7 +553,7 @@ unwanted_scaled_na <- spec_df %>%
 ggplot(spec_df, aes(x = location, y = specificity))+
   geom_boxplot(outlier.shape = NA)+
   geom_jitter( aes(color = energy_cluster, shape = energy_cluster), width = 0.1)+
-  facet_wrap(vars(metric), labeller = labeller.metrics)+
+  facet_wrap(vars(metric), labeller = labeller.all)+
   # specify shape and color for each season
   list(
     scale_color_manual(
@@ -569,7 +571,11 @@ ggplot(spec_df, aes(x = location, y = specificity))+
   )+
   theme_classic()+
   xlab('Room')+
-  ylab('Specificity')
+  ylab('Specificity')+
+  scale_x_discrete(
+    breaks = room_breaks,
+    labels = room_labels
+  )
 ```
 
 
@@ -590,7 +596,7 @@ ggplot(a, (aes(x = home, y = rank)))+
                 group = energy_cluster),
             position =position_dodge(width = 1)
             )+
-  facet_wrap(vars(metric), labeller = labeller.metrics)+
+  facet_wrap(vars(metric), labeller = labeller.all)+
   theme_minimal()+
   theme(panel.grid = element_blank(),
         axis.text.y = element_text(hjust = 0))+
@@ -624,7 +630,7 @@ ggplot(a, (aes(x = home, y = rank)))+
 # 
 # ggplot(a, (aes(x = home, y = rank)))+
 #   geom_text(aes(label = loc_abbr))+
-#   facet_wrap(vars(metric), labeller = labeller.metrics)+
+#   facet_wrap(vars(metric), labeller = labeller.all)+
 #   theme_minimal()+
 #   theme(panel.grid = element_blank())+
 #   scale_y_discrete(breaks = c('1','2','3'),
@@ -655,7 +661,7 @@ a <- spec_df %>%
 
 ggplot(a, (aes(x = home, y = rank)))+
   geom_text(aes(label = loc_abbr))+
-  facet_wrap(vars(energy_cluster), labeller = labeller.clusters,
+  facet_wrap(vars(energy_cluster), labeller = labeller.all,
              scales = 'free_x')+
   theme_minimal()+
   theme(panel.grid = element_blank())+
@@ -689,7 +695,7 @@ a <- spec_df %>%
 
 ggplot(a, (aes(x = home, y = rank, group = location)))+
   geom_line(aes(color = location), size = 1.5)+
-  facet_wrap(vars(energy_cluster), labeller = labeller.clusters,
+  facet_wrap(vars(energy_cluster), labeller = labeller.all,
              scales = 'free_x')+
   theme_minimal()+
   theme(panel.grid = element_blank())+
