@@ -97,7 +97,6 @@ output
 write_rds(output, "../output/living_pm25.rds")
 ```
 
-
 ```{r}
 pct <- output %>%
   group_by(id_home, hod) %>%
