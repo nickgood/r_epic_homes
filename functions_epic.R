@@ -174,7 +174,7 @@ findpeaks_sense <- function(x){
 ## load 5 min omni data
 get_5min <- function(tkn, org_id, device_id, start, end, home_id = "NA", location = "NA"){
   # pause
-  Sys.sleep(6)
+  Sys.sleep(1)
   # build url
   url <- paste0("https://developer-apis.awair.is/v1/orgs/",
                 org_id,
@@ -187,9 +187,10 @@ get_5min <- function(tkn, org_id, device_id, start, end, home_id = "NA", locatio
   # get data
   data <- content(GET(url, add_headers("X-Api-Key" = tkn)))
   # write to file
-  file_name <- paste("../output/omni/omni", 
-                     org_id, device_id, home_id, location,
-                     start, end, sep = "_")
+  file_name <- paste("../output/omni_raw/", home_id, "/", 
+                     org_id, "_", device_id, "_",
+                     home_id, "_", location, "_",
+                     start, end, sep = "")
   write_rds(data, paste0(file_name, ".rds"))
   # print url
   print(url)
@@ -212,6 +213,19 @@ clean_omni_data <- function(x){
       mutate(datetime = format(as.POSIXct(strptime(timestamp,format = "%FT%H:%M:%S",tz = "GMT")),
                                tz = "US/Mountain",
                                usetz = TRUE))
-  }else{NA}
+  }else{
+    tibble(timestamp = NA_character_,
+           co2 = NA_real_,
+           voc = NA_real_,
+           temp = NA_real_,
+           lux = NA_real_,
+           humid = NA_real_,
+           pm25 = NA_real_,
+           score = NA_real_,
+           spl_a  = NA_real_,    
+           datetime = NA_character_,
+           filename = NA_character_)
+  }
+}
 }
 ##______________________________________________________________________________
