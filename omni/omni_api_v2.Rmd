@@ -1,0 +1,167 @@
+---
+title: "Omni API"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: paper
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.path = 'figures/',
+  warning = FALSE,
+  message = FALSE,
+  echo = FALSE,
+  fig.width = 10, fig.height = 3,
+  cache = FALSE)
+```
+
+---
+
+# Setup
+
+```{r}
+# libraries
+library(httr)
+library(jsonlite)
+library(dplyr)
+library(purrr)
+library(tidyr)
+library(openair)
+library(ggplot2)
+library(readr)
+library(googlesheets4)
+
+# token
+tkn <- "9m-2JA3Z3S723wJ6EJioa1UbugN2Oj1x"
+
+# org id
+org_id <- "2059"
+```
+
+---
+
+# Device Info
+
+```{r}
+# locations
+url <- "https://developer-apis.awair.is/v1/orgs/2059/locations"
+
+locations <- content(GET(url, add_headers("X-Api-Key" = tkn)))
+
+# devices
+url <- "https://developer-apis.awair.is/v1/orgs/2059/devices?filter=location_id=2805&page_size=120"
+
+devices <- content(GET(url, add_headers("X-Api-Key" = tkn)))
+
+device_tbl <- as_tibble(devices) %>%
+  unnest_wider(devices) %>%
+  rename_all(tolower)
+```
+
+---
+
+# Read OMNI log
+
+```{r}
+log <- read_sheet("1PnPjgbYWljb5oXoSCBqpJb2pi7gU0Kzre5lx4H-3i70", sheet = "omni") %>%
+  mutate(date_end = if_else(is.na(date_end), as.character(Sys.Date()), date_end)) %>%
+  na.omit() %>%
+  mutate_at(vars(starts_with("date")), as.Date) %>%
+  filter(date_end > date_start) %>%
+  mutate(start_date = map2(date_start, date_end, seq, by = "1 day")) %>%
+  unnest(start_date) %>%
+  mutate(end_date = start_date + 1) %>%
+  select(-date_start, -date_end) %>%
+  mutate_at(vars(ends_with("date")), as.character) %>%
+  mutate(id_home = str_pad(id_home, 3, "left", "0"))
+```
+ 
+# Functions 
+
+* read data file
+
+```{r}
+get_5min <- function(tkn, org_id, device_id, start, end, home_id = "NA", location = "NA"){
+# pause
+ Sys.sleep(6)
+# build url
+  url <- paste0("https://developer-apis.awair.is/v1/orgs/",
+                org_id,
+                "/devices/awair-omni/",
+                device_id,
+                "/air-data/5-min-avg?from=",
+                start,
+                "&to=",
+                end)
+# get data
+  data <- content(GET(url, add_headers("X-Api-Key" = tkn)))
+# write to file
+  file_name <- paste("../output/omni/omni", 
+                     org_id, device_id, home_id, location,
+                     start, end, sep = "_")
+  write_rds(data, paste0(file_name, ".rds"))
+# print url
+  print(url)
+# return url
+  url
+}
+```
+
+* clean data
+
+```{r}
+clean_data <- function(x){
+ if(length(x$data > 0)){
+  data_long <- as_tibble(x) %>%
+  unnest_wider(data) %>%
+  select(-indices) %>%
+  mutate(df = map(sensors, ~ .x %>% map_df(magrittr::extract, c("comp", "value")))) %>%
+  unnest(df) %>%
+  select(-sensors, -score) %>%
+  pivot_wider(names_from = "comp", values_from = "value") %>%
+  mutate(datetime = format(as.POSIXct(strptime(timestamp,format = "%FT%H:%M:%S",tz = "GMT")),
+                          tz = "US/Mountain",
+                          usetz = TRUE))
+ }else{NA}
+}
+```
+
+
+---
+
+# Read Data
+
+* e.g. all data
+
+```{r, include=FALSE}
+read_log <- log %>%
+  mutate(tkn = tkn, org_id = org_id) %>%
+  mutate(data = pmap(list(tkn, org_id, id_omni,
+                          start_date, end_date,
+                          id_home, location),
+                     get_5min))
+```
+
+* e.g. home 001 after date
+
+```{r, include=FALSE}
+read_log <- log %>%
+  filter(id_home == "001" & (as.Date(start_date) > as.Date("2021-04-07")))
+```
+
+* e.g. multiple homes
+
+```{r, include=FALSE}
+read_log <- log %>%
+  filter(grepl("002|003|005|007|009", id_home))
+```
+
+* e.g. all homes after date
+
+```{r, include=FALSE}
+read_log <- log %>%
+  filter(as.Date(start_date) >= as.Date("2021-09-19"))
+```
+
+
