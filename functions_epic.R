@@ -27,8 +27,7 @@ clean_names <- function(x){
 #_______________________________________________________________________________
 
 #_______________________________________________________________________________
-# read 5 minute data
-
+# read 5 minute omni data
 d_5min <- function(date_start, date_end,
                    tkn = "",
                    org_id = "2059",
@@ -170,5 +169,49 @@ findpeaks_sense <- function(x){
     as_tibble() %>%
     rename(peak_height = "V1", row = "V2") %>%
     select(peak_height, row)
+}
+##______________________________________________________________________________
+## load 5 min omni data
+get_5min <- function(tkn, org_id, device_id, start, end, home_id = "NA", location = "NA"){
+  # pause
+  Sys.sleep(6)
+  # build url
+  url <- paste0("https://developer-apis.awair.is/v1/orgs/",
+                org_id,
+                "/devices/awair-omni/",
+                device_id,
+                "/air-data/5-min-avg?from=",
+                start,
+                "&to=",
+                end)
+  # get data
+  data <- content(GET(url, add_headers("X-Api-Key" = tkn)))
+  # write to file
+  file_name <- paste("../output/omni/omni", 
+                     org_id, device_id, home_id, location,
+                     start, end, sep = "_")
+  write_rds(data, paste0(file_name, ".rds"))
+  # print url
+  print(url)
+  # return url
+  url
+}
+##______________________________________________________________________________
+
+##______________________________________________________________________________
+## clean omni data file
+clean_omni_data <- function(x){
+  if(length(x$data > 0)){
+    data_long <- as_tibble(x) %>%
+      unnest_wider(data) %>%
+      select(-indices) %>%
+      mutate(df = map(sensors, ~ .x %>% map_df(magrittr::extract, c("comp", "value")))) %>%
+      unnest(df) %>%
+      select(-sensors, -score) %>%
+      pivot_wider(names_from = "comp", values_from = "value") %>%
+      mutate(datetime = format(as.POSIXct(strptime(timestamp,format = "%FT%H:%M:%S",tz = "GMT")),
+                               tz = "US/Mountain",
+                               usetz = TRUE))
+  }else{NA}
 }
 ##______________________________________________________________________________
