@@ -22,7 +22,7 @@ knitr::opts_chunk$set(fig.path = 'figures/',
 
 ```{r}
 # source
-source("../funcions_epic.R")
+source("../functions_epic.R")
 
 # token
 tkn <- "9m-2JA3Z3S723wJ6EJioa1UbugN2Oj1x"
