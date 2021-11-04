@@ -150,10 +150,10 @@ get_5min <- function(tkn, org_id, device_id, start, end, home_id = "NA", locatio
   # get data
   data <- content(GET(url, add_headers("X-Api-Key" = tkn)))
   # write to file
-  file_name <- paste("../output/omni_raw/", home_id, "/", 
+  file_name <- paste("../output/omni_raw_5min/", home_id, "/", 
                      org_id, "_", device_id, "_",
                      home_id, "_", location, "_",
-                     start, end, sep = "")
+                     start, "_", end, sep = "")
   write_rds(data, paste0(file_name, ".rds"))
   # print url
   print(url)
@@ -179,10 +179,10 @@ get_15min <- function(tkn, org_id, device_id, start, end, home_id = "NA", locati
   # get data
   data <- content(GET(url, add_headers("X-Api-Key" = tkn)))
   # write to file
-  file_name <- paste("../output/omni_raw/", home_id, "/", 
+  file_name <- paste("../output/omni_raw_15min/", home_id, "/", 
                      org_id, "_", device_id, "_",
                      home_id, "_", location, "_",
-                     start, end, sep = "")
+                     start, "_", end, sep = "")
   write_rds(data, paste0(file_name, ".rds"))
   # print url
   print(url)
