@@ -69,28 +69,6 @@ log <- read_sheet("1PnPjgbYWljb5oXoSCBqpJb2pi7gU0Kzre5lx4H-3i70", sheet = "omni"
   mutate(id_home = str_pad(id_home, 3, "left", "0"))
 ```
  
-# Functions 
-
-* clean data
-
-```{r}
-clean_data <- function(x){
- if(length(x$data > 0)){
-  data_long <- as_tibble(x) %>%
-  unnest_wider(data) %>%
-  select(-indices) %>%
-  mutate(df = map(sensors, ~ .x %>% map_df(magrittr::extract, c("comp", "value")))) %>%
-  unnest(df) %>%
-  select(-sensors, -score) %>%
-  pivot_wider(names_from = "comp", values_from = "value") %>%
-  mutate(datetime = format(as.POSIXct(strptime(timestamp,format = "%FT%H:%M:%S",tz = "GMT")),
-                          tz = "US/Mountain",
-                          usetz = TRUE))
- }else{NA}
-}
-```
-
-
 ---
 
 # Read Data
