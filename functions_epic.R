@@ -74,6 +74,7 @@ read_omni_rds_file <- function(file){
            lux = NA_real_,
            humid = NA_real_,
            pm25 = NA_real_,
+           pm10_est = NA_real_,
            score = NA_real_,
            spl_a  = NA_real_,    
            datetime = NA_character_,
