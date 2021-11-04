@@ -73,9 +73,11 @@ log <- read_sheet("1PnPjgbYWljb5oXoSCBqpJb2pi7gU0Kzre5lx4H-3i70", sheet = "omni"
 
 # Read Data
 
+* check 007 end date
+
 ```{r, include=FALSE}
 read_log <- log %>%
-  filter(id_home == "002") %>%
+  filter(grepl("001|002|003|004|005|006|007", id_home)) %>%
   mutate(tkn = tkn, org_id = org_id) %>%
   mutate(data = pmap(list(tkn, org_id, id_omni,
                           start_date, end_date,
@@ -87,7 +89,7 @@ read_log <- log %>%
 
 ```{r, include=FALSE}
 read_log <- log %>%
-  filter(id_home == "001" & (as.Date(start_date) > as.Date("2021-04-07")))
+  filter(id_home == "001|" & (as.Date(start_date) > as.Date("2021-04-07")))
 ```
 
 * e.g. multiple homes
