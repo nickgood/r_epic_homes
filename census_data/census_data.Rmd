@@ -1,0 +1,63 @@
+---
+title: "Census Data"
+author: "Andrew Purgiel"
+date: "11/3/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(arules)
+```
+
+# improt data
+```{r}
+home_tracts <- read_csv('home_tracts.csv')
+
+income_data <- read_csv('median_income_race_acs_2019.csv')%>%
+  # remove first row and extract tract number
+  slice(-1) %>% 
+  mutate(tract = gsub("^.*Tract","",NAME),
+         tract = gsub(', Larimer County, Colorado','', tract),
+         tract = as.numeric(tract)) %>%
+  select(tract, everything(.)) %>%
+  select(
+    tract,
+    med_income = S1903_C03_001E,
+    pct_white = S1903_C02_002E,
+    pct_black = S1903_C02_003E,
+    pct_indnat = S1903_C02_004E,
+    pct_asian = S1903_C02_005E,
+    pct_hawisl = S1903_C02_006E,
+    pct_other = S1903_C02_007E,
+    pct_two = S1903_C02_008E,
+    pct_hisplat = S1903_C02_009E,
+    pct_whiteonly = S1903_C02_010E) %>%
+  mutate(med_income = as.numeric(med_income))
+
+
+```
+
+# edit tract column in income data
+
+```{r}
+home_data <- home_tracts %>%
+  left_join(income_data, by = 'tract')
+
+write_csv(home_data, 'home_income_race_data.csv')
+
+```
+
+
+```{r}
+
+hist_data <- discretize(home_data$med_income, method = 'fixed',
+                        breaks = c(20000,50000,80000,110000, 140000)) %>%
+  table() %>%
+  data.frame()
+```
+
