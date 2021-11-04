@@ -21,17 +21,6 @@ knitr::opts_chunk$set(fig.path = 'figures/',
 # Setup
 
 ```{r}
-# libraries
-library(httr)
-library(jsonlite)
-library(dplyr)
-library(purrr)
-library(tidyr)
-library(openair)
-library(ggplot2)
-library(readr)
-library(googlesheets4)
-
 # token
 tkn <- "9m-2JA3Z3S723wJ6EJioa1UbugN2Oj1x"
 
