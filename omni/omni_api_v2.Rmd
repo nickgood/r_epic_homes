@@ -73,15 +73,14 @@ log <- read_sheet("1PnPjgbYWljb5oXoSCBqpJb2pi7gU0Kzre5lx4H-3i70", sheet = "omni"
 
 # Read Data
 
-* e.g. all data
-
 ```{r, include=FALSE}
 read_log <- log %>%
+  filter(id_home == "002") %>%
   mutate(tkn = tkn, org_id = org_id) %>%
   mutate(data = pmap(list(tkn, org_id, id_omni,
                           start_date, end_date,
                           id_home, location),
-                     get_5min))
+                     get_15min))
 ```
 
 * e.g. home 001 after date
