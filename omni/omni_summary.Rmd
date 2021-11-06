@@ -15,166 +15,53 @@ knitr::opts_chunk$set(fig.path = 'figures/',
   cache = FALSE)
 ```
 
+```{r}
+source("../functions_epic.R")
+```
+
 ---
 
-```{r}
-library(dplyr)
-library(purrr)
-library(tidyr)
-library(openair)
-library(ggplot2)
-library(readr)
-library(lubridate)
-library(stringr)
-```
+# Read Data
 
 ```{r}
-clean_data <- function(x){
-  #print(x)
-  f <- read_rds(x)
- if(length(f$data) > 0){
-  data_long <- as_tibble(f) %>%
-  unnest_wider(data) %>%
-  select(-indices) %>%
-  mutate(df = map(sensors, ~ .x %>% map_df(magrittr::extract, c("comp", "value")))) %>%
-  unnest(df) %>%
-  select(-sensors, -score) %>%
-  pivot_wider(names_from = "comp", values_from = "value") %>%
-  mutate(datetime = format(as.POSIXct(strptime(timestamp,format = "%FT%H:%M:%S",tz = "GMT")),
-                          tz = "US/Mountain",
-                          usetz = TRUE),
-         filename = x)
- }else{
-   tibble(timestamp = NA_character_,
-          co2 = NA_real_,
-          voc = NA_real_,
-          temp = NA_real_,
-          lux = NA_real_,
-          humid = NA_real_,
-          pm25 = NA_real_,
-          score = NA_real_,
-          spl_a  = NA_real_,    
-          datetime = NA_character_,
-          filename = NA_character_)
- }
-}
+homes <- tibble(id_home = str_pad(seq(7,7,1), 3, "left", "0")) %>%
+  mutate(files = map(id_home, get_15min_files),
+         data = map(files, read_omni_rds_files),
+         summary = map(data, summarise_omni_1hour)) %>%
+  select(-files, -data) %>%
+  unnest(summary) %>%
+  mutate(datetime = ymd_hms(datetime, tz = "US/Mountain"))
+```  
+  
+---
+
+```{r fig_omni_temp_1hour, fig.width = 6, fig.height=3}
+ggplot(homes, aes(x = datetime, y = temp, color = location)) +
+  geom_point() +
+  theme_bw() +
+  theme(legend.position = "top") +
+  scale_x_datetime(breaks = "1 month") +
+  facet_wrap(~id_home, ncol = 3, scales = "free_x") +
+  xlab("") +
+  ylim(-20, 50)
 ```
 
-# Living Room
+
+# Write to file
 
 ```{r}
-location <- "living"
-id_home <- ".*"
-pattern = paste0(".*", id_home, "_", location, ".*.rds$")
-files <- list.files("../output/omni", pattern = pattern, full.names = TRUE)
-files <- grep("\\([0-9]\\).rds", files, value = TRUE, invert = TRUE)
+write_rds(homes, "../output/omni/omni_1hour.rds")
 ```
 
-```{r}
-data <- map(files, clean_data) %>%
-  bind_rows() %>%
-  mutate_at(vars(contains("time")), ymd_hms) %>%
-  filter(!is.na(pm25))
+---
+
+# Plot
+
+```{r omni_hourly, fig.width= 10, fig.height = 20}
+ggplot(output, aes(x = datetime, y = temp, color = location)) +
+  geom_line() +
+  geom_point() +
+  theme_bw() +
+  facet_wrap(~id_home, ncol = 2)
 ```
 
-```{r}
-output <- data %>%
-  select(datetime, pm25, filename) %>%
-  mutate(datetime = force_tz(datetime, "US/Mountain"),
-         filename = basename(filename),
-         month = month(datetime),
-         hod = hour(datetime),
-         mod = minute(datetime),
-         id_home = sub("^.*_.*_.*_(.*)_.*_.*_.*.rds$", "\\1", filename),
-         id_home = str_pad(id_home, 3, "left", "0")) %>%
-  select(-filename) %>%
-  distinct()
-
-output
-```
-
-```{r}
-write_rds(output, "../output/living_pm25.rds")
-```
-
-```{r}
-pct <- output %>%
-  group_by(id_home, hod) %>%
-  summarise(n = n(),
-            p002 = 100* sum(pm25 < 2) / n(),
-            p005 = 100* sum(pm25 < 5) / n(),
-            p012 = 100* sum(pm25 < 12) / n(),
-            p050 = 100* sum(pm25 < 50) / n(),
-            p100 = 100* sum(pm25 < 100) / n(),
-            p500 = 100* sum(pm25 < 500) / n(),
-            .groups = "drop") %>%
-  group_by(hod) %>%
-  summarise_all(mean, .groups = "drop")
-```
-
-# All Homes
-
-```{r}
-cols <- c("<500" = "red", "<100" = "orange", "<50" = "yellow", "<12" = "green", "<5" = "blue", "<2" = "purple")
-
-ggplot(pct, aes(x=hod*60*60)) + 
-  geom_area(aes(y=p500, fill= "<500")) +
-  geom_area(aes(y=p100, fill= "<100")) + 
-  geom_area(aes(y=p050, fill="<50")) + 
-  geom_area(aes(y=p012, fill="<12")) + 
-  geom_area(aes(y=p005, fill="<5")) +
-  geom_area(aes(y=p002, fill="<2")) +
-  ylab("% of values within concentration range") +
-  theme_minimal() +
-  ggtitle("Indoor fine particle Concentrations - All Homes") +
-  xlab("Hour of day") +
-  scale_x_time(breaks = seq(0,24*60*60,3*60*60), limits = c(0,23*60*60), 
-               minor_breaks = seq(0, 24*60*60, 1*60*60), expand = expansion(mult = 0, add = 0)) +
-  scale_fill_manual(values = cols,
-                    name = expression(mu*g/m^3),
-                    breaks = c("<500", "<100", "<50", "<12", "<5", "<2"),
-                    labels = c("<500", "<100", "<50", "<12", "<5", "<2"),
-                    guide = "legend")
-```
-
-
-```{r}
-pct <- output %>%
-  group_by(id_home, month, hod) %>%
-  summarise(n = n(),
-            p002 = 100* sum(pm25 < 2) / n(),
-            p005 = 100* sum(pm25 < 5) / n(),
-            p012 = 100* sum(pm25 < 12) / n(),
-            p050 = 100* sum(pm25 < 50) / n(),
-            p100 = 100* sum(pm25 < 100) / n(),
-            p500 = 100* sum(pm25 < 500) / n(),
-            .groups = "drop") %>%
-  group_by(month, hod,) %>%
-  summarise_all(mean, .groups = "drop")
-```
-
-```{r, fig.width=12, fig.height=12}
-cols <- c("<500" = "red", "<100" = "orange", "<50" = "yellow", "<12" = "green", "<5" = "blue", "<2" = "purple")
-
-ggplot(pct %>% mutate(month = month(month, label = TRUE)), aes(x=hod*60*60)) + 
-  geom_area(aes(y=p500, fill= "<500")) +
-  geom_area(aes(y=p100, fill= "<100")) + 
-  geom_area(aes(y=p050, fill="<50")) + 
-  geom_area(aes(y=p012, fill="<12")) + 
-  geom_area(aes(y=p005, fill="<5")) +
-  geom_area(aes(y=p002, fill="<2")) +
-  ylab("% of values within concentration range") +
-  theme_minimal() +
-  ggtitle("Indoor fine particle concentrations by month - All Homes") +
-  xlab("Hour of day") +
-  scale_x_time(breaks = seq(0,24*60*60,3*60*60), limits = c(0,23*60*60), 
-               minor_breaks = seq(0, 24*60*60, 1*60*60), expand = expansion(mult = 0, add = 0)) +
-  scale_fill_manual(values = cols,
-                    name = expression(mu*g/m^3),
-                    breaks = c("<500", "<100", "<50", "<12", "<5", "<2"),
-                    labels = c("<500", "<100", "<50", "<12", "<5", "<2"),
-                    guide = "legend") +
-  facet_wrap(~month, ncol = 3) +
-  theme(axis.text = element_text(size = 14),
-        legend.text = element_text(size = 16))
-```
