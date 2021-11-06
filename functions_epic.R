@@ -14,6 +14,7 @@ library(hrbrthemes)
 library(kableExtra)
 library(pracma)
 library(padr)
+library(magrittr)
 
 #_______________________________________________________________________________
 # clean names
@@ -62,9 +63,6 @@ read_omni_rds_file <- function(file){
       unnest(df) %>%
       select(-sensors, -score) %>%
       pivot_wider(names_from = "comp", values_from = "value") %>%
-      mutate(datetime = format(as.POSIXct(strptime(timestamp,format = "%FT%H:%M:%S",tz = "GMT")),
-                               tz = "US/Mountain",
-                               usetz = TRUE)) %>%
       mutate(filename = file)
   }else{
     tibble(timestamp = NA_character_,
@@ -76,8 +74,7 @@ read_omni_rds_file <- function(file){
            pm25 = NA_real_,
            pm10_est = NA_real_,
            score = NA_real_,
-           spl_a  = NA_real_,    
-           datetime = NA_character_,
+           spl_a  = NA_real_,
            filename = file)
   }
 }
@@ -166,7 +163,7 @@ get_5min <- function(tkn, org_id, device_id, start, end, home_id = "NA", locatio
 ## load 15 min omni data
 get_15min <- function(tkn, org_id, device_id, start, end, home_id = "NA", location = "NA"){
   # pause
-  Sys.sleep(1)
+  Sys.sleep(10)
   # build url
   url <- paste0("https://developer-apis.awair.is/v1/orgs/",
                 org_id,
@@ -188,6 +185,7 @@ get_15min <- function(tkn, org_id, device_id, start, end, home_id = "NA", locati
   print(url)
   # return url
   url
+  #
 }
 ##______________________________________________________________________________
 
@@ -218,5 +216,39 @@ clean_omni_data <- function(x){
            datetime = NA_character_,
            filename = NA_character_)
   }
+}
+##______________________________________________________________________________
+
+##______________________________________________________________________________
+## get 15 min files
+get_15min_files <- function(id_home){
+  list.files(paste0("../output/omni_raw_15min/", id_home), full.names = TRUE)
+}
+##______________________________________________________________________________
+## summarize omni
+summarise_omni_1hour <- function(data){
+  data %>% filter(!is.na(timestamp)) %>%
+    mutate(datetime = format(as.POSIXct(strptime(timestamp,
+                             format = "%FT%H:%M:%S.000Z",tz = "GMT")),
+                             tz = "US/Mountain",
+                             usetz = TRUE),
+           filename = basename(filename),
+           date = as.Date(datetime),
+           hour = hour(datetime),
+           location = sub("^.*_.*_.*_(.*)_.*_.*.rds$", "\\1", filename)) %>%
+    distinct() %>%
+    select(location, datetime, co2, humid, lux, pm25, pm10_est,
+           spl_a, temp, voc, date, hour, timestamp, filename) %>%
+    group_by(location, date, hour) %>%
+    summarise(datetime = min(datetime),
+              co2 = mean(co2, na.rm =TRUE), 
+              humid = mean(humid, na.rm =TRUE), 
+              lux = mean(lux, na.rm =TRUE), 
+              pm25 = mean(pm25, na.rm =TRUE), 
+              pm10_est = mean(pm10_est, na.rm =TRUE), 
+              spl_a = mean(spl_a, na.rm =TRUE),
+              temp = mean(temp, na.rm = TRUE),
+              voc = mean(voc, na.rm =TRUE), .groups = "drop") %>%
+    select(-hour)
 }
 ##______________________________________________________________________________
