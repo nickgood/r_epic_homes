@@ -73,11 +73,16 @@ log <- read_sheet("1PnPjgbYWljb5oXoSCBqpJb2pi7gU0Kzre5lx4H-3i70", sheet = "omni"
 
 # Read Data
 
-* check 007 end date
+* read 15 min data in 1 week chunks all homes
 
 ```{r, include=FALSE}
 read_log <- log %>%
-  filter(id_home == "007" & (as.Date(start_date) > as.Date("2021-05-21")) & location == "garage") %>%
+  mutate(year = year(start_date),
+         week = week(start_date)) %>%
+  group_by(id_home, location, year, week) %>%
+  summarise_all(first) %>%
+  ungroup() %>%
+  mutate(end_date = as.character(as.Date(end_date) + 6)) %>%
   mutate(tkn = tkn, org_id = org_id) %>%
   mutate(data = pmap(list(tkn, org_id, id_omni,
                           start_date, end_date,
