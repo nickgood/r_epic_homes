@@ -163,7 +163,7 @@ get_5min <- function(tkn, org_id, device_id, start, end, home_id = "NA", locatio
 ## load 15 min omni data
 get_15min <- function(tkn, org_id, device_id, start, end, home_id = "NA", location = "NA"){
   # pause
-  Sys.sleep(10)
+  Sys.sleep(6)
   # build url
   url <- paste0("https://developer-apis.awair.is/v1/orgs/",
                 org_id,
