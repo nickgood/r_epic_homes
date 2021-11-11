@@ -195,9 +195,10 @@ hourly_season <-
 ```
 
 
-```{r function_qqplot}
+```{r make_data}
+
 # test for normality for each location in one home for one metric
-qqplotter <- function(hm, met,  seas, log.trans = TRUE, resolution = 'hour', 
+qqdata.maker <- function(met, log.trans = TRUE, resolution = 'hour', 
                       censored = FALSE){
   
   data <- if(censored == FALSE) {
@@ -227,27 +228,139 @@ qqplotter <- function(hm, met,  seas, log.trans = TRUE, resolution = 'hour',
   
   # create df of one metric for indoor rooms
   data <- data %>%
-      select(home, location, all_of(met), season) %>%
-  filter(home == hm & location %in% locations_indoor) %>%
-    filter(!is.na(met)) %>%
-    mutate(value = if(log.trans == TRUE) {log(get(met))} else get(met))
+      select(home, location, 'value' = all_of(met), season) %>%
+  filter(location %in% locations_indoor) %>%
+    filter(!is.na(value)) %>%
+    mutate(value = if(log.trans == TRUE) {log(value)} else value,
+           log = if(log.trans == TRUE) {TRUE} else FALSE,
+           metric = met)
 
-# filter only data from given season
-  data <- data %>%
-    filter(season == seas)
   
-  if(nrow(data)==0) NULL else{
-  
-# Create a QQ plot of values by location
-ggqqplot(data, 'value', facet.by = 'location',
-                   title = paste('Home', hm, met, seas,
-                                 if(log.trans == TRUE) {
-                     'log-transformed'} else 'raw data')
-)}
 }
 
-# # test for one home, location, season
-# qqplotter('009', 'pm25', 'ac')
+
+# # test for one metric
+# test <- qqdata.maker('pm25')
+
+```
+
+* make data for qqplots
+```{r}
+qq_data <- bind_rows(
+  qqdata.maker('pm25'),
+  qqdata.maker('voc'),
+  qqdata.maker('co2')
+)
+```
+
+* make qqplots for all homes, rooms, season conditions
+```{r}
+ 
+qqplotter <-  function(x_season, x_location, nrows = 1){
+    map(c('pm25', 'voc', 'co2'), function(x_metric){
+   data <- filter(qq_data, metric == x_metric, location == x_location,
+                  season == x_season)
+   
+
+  #  if(x_season == 'ac') {
+  # # set title depending on metric
+  #  metric_title <- case_when(
+  #    x_metric == 'pm25' ~ expression(paste('PM'[2.5],', Cooling Season')),
+  #    x_metric == 'co2' ~ expression(paste('CO'[2],', Cooling Season')),
+  #    x_metric == 'voc' ~ expression(paste('TVOC, Cooling Season')),
+  #    x_metric == 'temp' ~ expression(paste('Temperature, Cooling Season'))
+  #  )
+  #  }
+  # 
+  #     if(x_season == 'shoulder') {
+  # # set title depending on metric
+  #  metric_title <- case_when(
+  #    x_metric == 'pm25' ~ expression(paste('PM'[2.5],', Shoulder Season')),
+  #    x_metric == 'co2' ~ expression(paste('CO'[2],', Shoulder Season')),
+  #    x_metric == 'voc' ~ expression(paste('TVOC, Shoulder Season')),
+  #    x_metric == 'temp' ~ expression(paste('Temperature, Shoulder Season'))
+  #  )
+  #  }  
+  # 
+  #     if(x_season == 'heat') {
+  # # set title depending on metric
+  #  metric_title <- case_when(
+  #    x_metric == 'pm25' ~ expression(paste('PM'[2.5],', Heating Season')),
+  #    x_metric == 'co2' ~ expression(paste('CO'[2],', Heating Season')),
+  #    x_metric == 'voc' ~ expression(paste('TVOC, Heating Season')),
+  #    x_metric == 'temp' ~ expression(paste('Temperature, Heating Season'))
+  #  )
+  #  } 
+   
+   location_label <- case_when(
+     x_location == 'bedroom' ~ 'Bedroom',
+     x_location == 'kitchen' ~ 'Kitchen',
+     x_location == 'living' ~ 'Living'
+     )
+   
+      season_label <- case_when(
+     x_season == 'ac' ~ 'Cooling Season',
+     x_season == 'shoulder' ~ 'Shoulder Season',
+     x_season == 'heat' ~ 'Heating Season'
+     )
+   
+   
+   ggqqplot(data = data, 'value', facet.by = 'home', nrow = nrows,
+                 title = paste0(location_label, ', ', season_label))
+      })
+}
+
+```
+
+```{r, fig.height = 2, fig.width = 8}
+qqplotter('ac', 'bedroom')
+
+```
+
+```{r, fig.height = 2, fig.width = 3}
+qqplotter('ac', 'kitchen')
+
+```
+
+```{r, fig.height = 2, fig.width = 6}
+qqplotter('ac', 'living')
+
+```
+
+
+
+```{r, fig.height = 3.5, fig.width = 8}
+qqplotter('shoulder', 'bedroom', nrows = 2)
+
+```
+
+```{r, fig.height = 3.5, fig.width = 6}
+qqplotter('shoulder', 'kitchen', nrows = 2)
+
+```
+
+
+```{r, fig.height = 3.5, fig.width = 8}
+qqplotter('shoulder', 'living', nrows = 2)
+
+```
+
+
+
+```{r, fig.height = 3.5, fig.width = 8}
+qqplotter('heat', 'bedroom', nrows = 2)
+
+```
+
+```{r, fig.height = 3.5, fig.width = 6}
+qqplotter('heat', 'kitchen', nrows = 2)
+
+```
+
+
+```{r, fig.height = 3.5, fig.width = 8}
+qqplotter('heat', 'living', nrows = 2)
+
 ```
 
 ## test normaility for all homes
@@ -267,115 +380,6 @@ plot.grid <- function(plots, title,
 }
 ```
 
-
-### PM 2.5
-
-```{r, fig.height=8, fig.width=10.5}
-x_metric <- 'pm25'
-
-x_season <- 'ac'
-
-plots <- map(homes_no5, function(x_home){
-        qqplotter(x_home, x_metric, x_season)
-      })
-plot.grid(plots, paste(x_metric, x_season), ncol = 3)
-  
-
-x_season <- 'shoulder'
-
-plots <- map(homes_no5, function(x_home){
-        qqplotter(x_home, x_metric, x_season)
-      })
-plot.grid(plots, paste(x_metric, x_season), ncol = 3)
-
-
-x_season <- 'heat'
-
-plots <- map(homes_no5, function(x_home){
-        qqplotter(x_home, x_metric, x_season)
-      })
-plot.grid(plots, paste(x_metric, x_season), ncol = 3)
-
-
-```
-
-### VOC
-
-```{r, fig.height=8, fig.width=10.5}
-x_metric <- 'voc'
-
-x_season <- 'ac'
-
-plots <- map(homes_no5, function(x_home){
-        qqplotter(x_home, x_metric, x_season)
-      })
-plot.grid(plots, paste(x_metric, x_season), ncol = 3)
-  
-
-x_season <- 'shoulder'
-
-plots <- map(homes_no5, function(x_home){
-        qqplotter(x_home, x_metric, x_season)
-      })
-plot.grid(plots, paste(x_metric, x_season), ncol = 3)
-
-
-x_season <- 'heat'
-
-plots <- map(homes_no5, function(x_home){
-        qqplotter(x_home, x_metric, x_season)
-      })
-plot.grid(plots, paste(x_metric, x_season), ncol = 3)
-
-
-```
-
-
-### co2
-
-```{r, fig.height=8, fig.width=10.5}
-x_metric <- 'co2'
-
-x_season <- 'ac'
-
-plots <- map(homes_no5, function(x_home){
-        qqplotter(x_home, x_metric, x_season)
-      })
-plot.grid(plots, paste(x_metric, x_season), ncol = 3)
-  
-
-x_season <- 'shoulder'
-
-plots <- map(homes_no5, function(x_home){
-        qqplotter(x_home, x_metric, x_season)
-      })
-plot.grid(plots, paste(x_metric, x_season), ncol = 3)
-
-
-x_season <- 'heat'
-
-plots <- map(homes_no5, function(x_home){
-        qqplotter(x_home, x_metric, x_season)
-      })
-plot.grid(plots, paste(x_metric, x_season), ncol = 3)
-
-
-```
-
-
-### All conditions
-```{r, eval = FALSE}
-    map(metrics_all, function(x_metric){
-       map(homes_no5, function(x_home){
- map(clusters_all, function(x_season){
-        qqplotter(x_home, x_metric, x_season)
-      })
-    }) 
-  })
-    
-
-
-```
 
 
 ## test other distributions
