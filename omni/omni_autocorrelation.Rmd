@@ -949,7 +949,7 @@ ggplot(a, aes(x = lag, y = acf))+
 
 
 # make lag df
-```{r}
+```{r, eval = FALSE}
 # acf_conditions <- acf_data %>%
 #   group_by(home, location, energy_cluster) %>%
 #   summarize(mean = mean())
@@ -1068,12 +1068,18 @@ ggplot(data = a ,
   theme_bw()+
   theme(
     panel.grid.major.x = element_blank(),
-        strip.background = element_blank()
+        strip.background = element_blank(),
+    strip.text = element_text(size = small -3),
+    axis.text.y = element_text(size = small -3),
+    axis.text.x = element_text(size = small -4),
+    axis.title = element_text(size = small -3),
+    legend.text = element_text(size = small -3),
+    legend.title = element_text(size = small -3)
+  )+
+  scale_y_continuous(
+    breaks = c(0,7,14,21,28)
   )
-  # scale_shape_identity(name = "Insignifiance reached within 30 days",
-  #                      breaks = c(16, 4),
-  #                      labels = c("Yes", "No"),
-  #                      guide = "legend")
+  
 
 ###########
 
@@ -1119,14 +1125,17 @@ ggplot(data = a ,
   theme_bw()+
   theme(
     panel.grid.major.x = element_blank(),
-    strip.background = element_blank()
+        strip.background = element_blank(),
+    strip.text = element_text(size = small -3),
+    axis.text.y = element_text(size = small -3),
+    axis.text.x = element_text(size = small -4),
+    axis.title = element_text(size = small -3),
+    legend.text = element_text(size = small -3),
+    legend.title = element_text(size = small -3)
+  )+
+  scale_y_continuous(
+    breaks = c(0,7,14,21,28)
   )
-
-
-  # scale_shape_identity(name = "Insignifiance reached within 30 days",
-  #                      breaks = c(16, 4),
-  #                      labels = c("Yes", "No"),
-  #                      guide = "legend")
 
 
 ```
@@ -1135,7 +1144,7 @@ ggplot(data = a ,
 ## but may be difference between clusters
 ## however, this could be due to heating periods beings longer, and less stationary
 
-```{r lag_table_csv, eval = TRUE}
+```{r lag_table_csv, eval = FALSE}
 # don't include Inf values in calculations
 acf_lags_finite <- acf_lags_filter %>%
     filter(!is.infinite(lag_signif))
