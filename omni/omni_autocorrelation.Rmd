@@ -94,11 +94,11 @@ metrics_all <- c('pm25', 'voc', 'co2', 'temp', 'humid', 'lux', 'spl_a')
 
 clusters_all <- c('heat', 'shoulder', 'ac')
 
-#define sizes for plot text
-xsmall <- 2
-small <- 6
-medium <- 12
-large <- 16
+##For plot labeling pruposes
+xsmall <- 6
+small <- 15
+medium <- 20
+large <- 26
 
 
 # color blind pallette
@@ -776,23 +776,36 @@ acf_data <- read_csv('./csv_created/acf_data.csv')
 
 
 # plot ACF for all conditions
-```{r, eval = FALSE}
-# plot for all metrics, locations, and clusters, faceted by home
- map(
-   metrics_all, function(x_metric){
+
+* define function
+```{r}
+acf.grid <- function( loc, clust, n_rows = 2){
+  map(
+   c('pm25', 'voc', 'co2'), function(x_metric){
     
     map(
-      locations_indoor, function(x_location){
+      loc, function(x_location){
 
             
         map(
-          clusters_all, function(x_cluster) {
+          clust, function(x_cluster) {
 
 a <- acf_data %>% filter(metric == x_metric, energy_cluster == x_cluster,
                          location == x_location)%>%
   mutate(pair_amount = ifelse(n_lag > pairs_min, 'enough', 'not_enough')) %>%
   filter(lag<=30)
 
+   location_label <- case_when(
+     loc == 'bedroom' ~ 'Bedroom',
+     loc == 'kitchen' ~ 'Kitchen',
+     loc == 'living' ~ 'Living Room'
+     )
+   
+      season_label <- case_when(
+     clust == 'ac' ~ 'Cooling Season',
+     clust == 'shoulder' ~ 'Shoulder Season',
+     clust == 'heat' ~ 'Heating Season'
+     )
 
 ggplot(a, aes(x = lag, y = acf))+
   geom_hline(yintercept=0) +
@@ -801,8 +814,8 @@ ggplot(a, aes(x = lag, y = acf))+
   scale_color_manual(
     breaks = c('enough', 'not_enough'),
     values = c('black', 'red'),
-    labels = c(paste('> ', pairs_min),
-               paste('< ', pairs_min)),
+    labels = c(paste0('n>', pairs_min),
+               paste0('n<', pairs_min)),
     name = 'Lag Pairs'
   )+
     geom_line(aes(x = lag, y = ci_high),
@@ -812,15 +825,126 @@ ggplot(a, aes(x = lag, y = acf))+
     # geom_text(aes(x = lag, y = acf+0.05, label = n_lag),
     #           size = xsmall)+ # annotate w/ n used to calculate acf for each lag
     theme_bw() +
-    xlab("Lag") +
+    xlab("Lag, days") +
     # geom_text(aes(label=paste('*missing', signif(unique(miss),3), '%')), x = 15, y = 0.6)+
-  facet_wrap(c('home'), nrow = 3, ncol = 4)+
+  facet_wrap(c('home'), nrow = n_rows)+
   ylab('ACF')+
-  ggtitle(paste(x_location, x_metric, x_cluster))
+  ggtitle(paste0( location_label, ', ', season_label))+
+  theme(
+    strip.background = element_blank(),
+    strip.text = element_text(size = small -3),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.y = element_blank(),
+    axis.text = element_text(size = small -3),
+    axis.title = element_text(size = small -3),
+    legend.text = element_text(size = small -3),
+    legend.title = element_text(size = small -3)
+  )+
+  scale_x_continuous(
+    breaks = c(0,7,14,21, 28)
+  )
 
 })
       })
    })
+}
+```
+
+
+
+```{r, fig.height = 2, fig.width = 6}
+acf.grid('living', 'ac', n_rows = 1)
+```
+
+```{r, fig.height = 3.5, fig.width = 8}
+acf.grid('living', 'shoulder')
+```
+
+```{r, fig.height = 3.5, fig.width = 8}
+acf.grid('living', 'heat')
+```
+
+
+
+
+```{r, fig.height = 2, fig.width = 4}
+acf.grid('kitchen', 'ac', n_rows = 1)
+```
+
+```{r, fig.height = 3.5, fig.width = 6}
+acf.grid('kitchen', 'shoulder')
+```
+
+```{r, fig.height = 3.5, fig.width = 8}
+acf.grid('kitchen', 'heat')
+```
+
+
+
+
+
+```{r, fig.height = 2, fig.width = 8}
+acf.grid('bedroom', 'ac', n_rows = 1)
+```
+
+```{r, fig.height = 3.5, fig.width = 8}
+acf.grid('bedroom', 'shoulder')
+```
+
+```{r, fig.height = 3.5, fig.width = 8}
+acf.grid('bedroom', 'heat')
+```
+
+
+* Example ACF plots 
+```{r}
+# Example ACF plots for high and low amounts of data points
+# Homes 4 and 7, VOC, Shoulder
+
+a <- acf_data %>% filter(metric == 'voc', energy_cluster == 'shoulder',
+                         location == 'living', home %in% c('004', '007'))%>%
+  mutate(pair_amount = ifelse(n_lag > pairs_min, 'enough', 'not_enough')) %>%
+  filter(lag<=30)
+
+
+
+ggplot(a, aes(x = lag, y = acf))+
+  geom_hline(yintercept=0) +
+    geom_segment(aes(xend=lag, yend=0,
+                     color = pair_amount))+ 
+  scale_color_manual(
+    breaks = c('enough', 'not_enough'),
+    values = c('black', 'red'),
+    labels = c(paste0('n>', pairs_min),
+               paste0('n<', pairs_min)),
+    name = 'Lag Pairs'
+  )+
+    geom_line(aes(x = lag, y = ci_high),
+              linetype = 'dashed', color = 'blue')+
+    geom_line(aes(x = lag, y = ci_low),
+              linetype = 'dashed', color = 'blue')+
+    # geom_text(aes(x = lag, y = acf+0.05, label = n_lag),
+    #           size = xsmall)+ # annotate w/ n used to calculate acf for each lag
+    theme_bw() +
+    xlab("Lag, days") +
+    # geom_text(aes(label=paste('*missing', signif(unique(miss),3), '%')), x = 15, y = 0.6)+
+  facet_wrap(c('home'))+
+  ylab('ACF')+
+  # ggtitle(paste0( location_label, ', ', season_label))+
+  theme(
+    strip.background = element_blank(),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.y = element_blank(),
+    # strip.text = element_text(size = small -3),
+    # axis.text = element_text(size = small -3),
+    # axis.title = element_text(size = small -3),
+    # legend.text = element_text(size = small -3),
+    # legend.title = element_text(size = small -3)
+  )+
+  scale_x_continuous(
+    breaks = c(0,7,14,21, 28)
+  )
+
 ```
 
 
