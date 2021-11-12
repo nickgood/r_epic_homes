@@ -295,7 +295,7 @@ qqplotter <-  function(x_season, x_location, nrows = 1){
    location_label <- case_when(
      x_location == 'bedroom' ~ 'Bedroom',
      x_location == 'kitchen' ~ 'Kitchen',
-     x_location == 'living' ~ 'Living'
+     x_location == 'living' ~ 'Living Room'
      )
    
       season_label <- case_when(
