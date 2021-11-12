@@ -386,7 +386,7 @@ plot.grid <- function(plots, title,
 
 ```{r function_dist_test}
 
-# test for normality for each location in one home for one metric
+# test for best distribution for all rooms for given home and season for one metric
 distribution.compare <- function(hm, met, seas, resolution = 'hour'){
   
   data <- if(resolution == '5min') omni_data else
@@ -460,123 +460,63 @@ distribution.compare <- function(hm, met, seas, resolution = 'hour'){
 ```
 
 
-```{r, eval=FALSE}
-res <- 'hour'
-# pm25------------
+```{r}
 
-met <- 'pm25'
-
-
- dist_compare_df <- map(clusters_all, function(x_season){
+# make data tessting best distribution for all condditions for cll metrics
+# minimum aic suggets best distribution fit
+ dist_compare_df <- 
+   map(c('pm25', 'voc', 'co2'), function(x_metric){
+   map(clusters_all, function(x_season){
  
    map(homes_no5, function (x_home){
-     distribution.compare(x_home, met, x_season)
+     distribution.compare(x_home, x_metric, x_season) %>%
+       mutate(metric = x_metric)
   }) %>% bind_rows()
-     }) %>% bind_rows() %>%
-  mutate( condition = paste(location, home, sep = '_')) %>%
+     }) %>% bind_rows() 
+     }) %>%
+       bind_rows() %>%
+  mutate( condition = paste(location, home, season, sep = '_')) %>%
   pivot_longer(cols = c(log, weib, gam), names_to = 'dist_type',
                values_to = 'aic') %>%
-  group_by(condition) %>%
+  group_by(metric, condition) %>%
   mutate(min = min(aic)) %>%
   mutate(min = ifelse(min ==aic, TRUE, FALSE)) %>%
   ungroup()
 
-# plot the aic of different distribution fits for each sensor
- ggplot(dist_compare_df, aes(x = condition, y = aic, fill = dist_type, alpha = min))+
-  geom_col(position = 'dodge')+
-  scale_alpha_manual(values = c(1, 0.2),
-                     breaks = c(TRUE, FALSE))+
-  ggtitle(paste('AIC Value, Resolution =', met, res))
 
-# calculate precentages
-
-pm_df <- dist_compare_df %>%
-  filter(min == TRUE) %>%
-  group_by(dist_type) %>%
-  summarise(n_min = n()) %>%
-  mutate(
-    metric = met,
-    pct_min = n_min/sum(n_min),
-         resolution = res)
-
-# voc------------
-
-met <- 'voc'
-
-
- dist_compare_df <- map(clusters_all, function(x_season){
- 
-   map(homes_no5, function (x_home){
-     distribution.compare(x_home, met, x_season)
-  }) %>% bind_rows()
-     }) %>% bind_rows() %>%
-  mutate( condition = paste(location, home, sep = '_')) %>%
-  pivot_longer(cols = c(log, weib, gam), names_to = 'dist_type',
-               values_to = 'aic') %>%
-  group_by(condition) %>%
-  mutate(min = min(aic)) %>%
-  mutate(min = ifelse(min ==aic, TRUE, FALSE)) %>%
-  ungroup()
-
-# plot the aic of different distribution fits for each sensor
- ggplot(dist_compare_df, aes(x = condition, y = aic, fill = dist_type, alpha = min))+
-  geom_col(position = 'dodge')+
-  scale_alpha_manual(values = c(1, 0.2),
-                     breaks = c(TRUE, FALSE))+
-  ggtitle(paste('AIC Value, Resolution =', met, res))
-
-# calculate precentages
-
-voc_df <- dist_compare_df %>%
-  filter(min == TRUE) %>%
-  group_by(dist_type) %>%
-  summarise(n_min = n()) %>%
-  mutate(
-    metric = met,
-    pct_min = n_min/sum(n_min),
-         resolution = res)
-
-
-
-
-
-# co2------------
-
-met <- 'co2'
-
-
- dist_compare_df <- map(clusters_all, function(x_season){
- 
-   map(homes_no5, function (x_home){
-     distribution.compare(x_home, met, x_season)
-  }) %>% bind_rows()
-     }) %>% bind_rows() %>%
-  mutate( condition = paste(location, home, sep = '_')) %>%
-  pivot_longer(cols = c(log, weib, gam), names_to = 'dist_type',
-               values_to = 'aic') %>%
-  group_by(condition) %>%
-  mutate(min = min(aic)) %>%
-  mutate(min = ifelse(min ==aic, TRUE, FALSE)) %>%
-  ungroup()
-
-# plot the aic of different distribution fits for each sensor
- ggplot(dist_compare_df, aes(x = condition, y = aic, fill = dist_type, alpha = min))+
-  geom_col(position = 'dodge')+
-  scale_alpha_manual(values = c(1, 0.2),
-                     breaks = c(TRUE, FALSE))+
-  ggtitle(paste('AIC Value, Resolution =', met, res))
-
-# calculate precentages
-
-co2_df <- dist_compare_df %>%
-  filter(min == TRUE) %>%
-  group_by(dist_type) %>%
-  summarise(n_min = n()) %>%
-  mutate(
-    metric = met,
-    pct_min = n_min/sum(n_min),
-         resolution = res)
-
-bind_rows(pm_df, voc_df, co2_df)
 
 ```
+
+# plot results
+```{r}
+
+# plot the aic of different distribution fits for each sensor
+ ggplot(dist_compare_df, aes(x = condition, y = aic, fill = dist_type, alpha = min))+
+  geom_col(position = 'dodge')+
+  scale_alpha_manual(values = c(1, 0.2),
+                     breaks = c(TRUE, FALSE))+
+   facet_wrap(vars(metric), ncol = 1)
+  # ggtitle(paste('AIC Value, Resolution =', met))
+
+
+```
+
+# make csv of resulting precentages
+```{r}
+# calculate percentage of conditions for which each distribution is best
+# (has minimum aic) and write csv
+
+pct_df <- dist_compare_df %>%
+  filter(min == TRUE) %>%
+  group_by(metric, dist_type) %>%
+  summarise(n_min = n()) %>%
+  mutate(
+    # metric = met,
+    pct_min = n_min/sum(n_min)
+    ) %>%
+  ungroup() %>%
+  arrange(match(metric, c('pm25', 'voc', 'co2')), desc(pct_min))
+
+write_csv(pct_df, 'distribution_aic_test.csv')
+```
+
