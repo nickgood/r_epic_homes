@@ -577,7 +577,15 @@ ggplot(spec_df, aes(x = location, y = specificity))+
   scale_x_discrete(
     breaks = room_breaks,
     labels = room_labels
-  )
+  )+
+  theme(
+      strip.text = element_text(size = small-3),
+      axis.title = element_text(size = small-3),
+      axis.text.x = element_text(size = small-4),
+      axis.text.y = element_text(size = small-4),
+      legend.text = element_text(size = small-3),
+      legend.title = element_text(size = small-3),
+      )
 ```
 
 
@@ -733,17 +741,15 @@ a$home <- factor(a$home, levels = home_order)
 
 ggplot(a, (aes(x = home, y = rank, group = location)))+
   geom_line(aes(color = location), size = 1.5)+
+  geom_point(aes(color = location), size = 2)+
   facet_wrap(vars(energy_cluster), labeller = labeller.all,
              scales = 'free_x')+
   theme_minimal()+
-  theme(panel.grid = element_blank())+
   scale_y_discrete(breaks = c('1','2','3'),
                    labels = c('Lowest', '', 'Highest'))+
   ylab('Specificity Rank')+
   xlab('Home')+
-  geom_vline(
-    xintercept = seq(1.5,length(a %>% pull(home)%>%as.factor%>% levels)-0.5, 1),
-    color = 'grey')+
+
   ggtitle(metric_title )+
   theme(plot.title = element_text(hjust = 0.5))+
   scale_color_manual(
@@ -752,7 +758,16 @@ ggplot(a, (aes(x = home, y = rank, group = location)))+
     labels = room_labels,
         name = 'Room'
 
-  )
+  )+
+  theme(
+      strip.text = element_text(size = small-3),
+      axis.title = element_text(size = small-3),
+      axis.text.x = element_text(size = small-5),
+      axis.text.y = element_text(size = small-3),
+      legend.text = element_text(size = small-4),
+      legend.title = element_text(size = small-4),
+      panel.grid.major.y = element_blank()
+      )
 }
 
 rank.line('pm25')
@@ -762,6 +777,3 @@ rank.line('co2')
 ```
 
 
-
-# Testing
-* NOTE: MAY BE OLD FUNCTION

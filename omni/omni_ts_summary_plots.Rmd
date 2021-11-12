@@ -943,10 +943,6 @@ limit_df <- data %>%
     theme_bw()+
        # guides(col = guide_legend(ncol = 2))+ #split up legend
           ##for extra space between facets
-    theme(
-          strip.background =element_blank(),
-      axis.text.x = element_text(size = xsmall)
-          )+
        facet_grid(c('metric', 'location'))+
         # make point size proportional to # of obs, with 0 obs = size 0
       geom_point(aes(y = mean.val, size = n))+
@@ -957,8 +953,12 @@ limit_df <- data %>%
                    labeller = labeller.all,
                    switch = 'y')+
         theme(
-      strip.background = element_rect(fill = NA, color = NA),
-      strip.placement = 'outside'
+      strip.background =element_blank(),
+      strip.placement = 'outside',
+      strip.text = element_text(size = small-3),
+      legend.text = element_text(size = small-3),
+      axis.title = element_text(size = small-3)
+
               )+
         # use dummy df to define limits for each metric
         geom_blank(data = limit_df, aes(x = 15, y = limits))
@@ -1031,10 +1031,6 @@ limit_df <-
     theme_bw()+
        # guides(col = guide_legend(ncol = 2))+ #split up legend
           ##for extra space between facets
-    theme(
-          strip.background =element_blank(),
-          axis.text.x = element_text(size = xsmall)
-)+
         # make point size proportional to # of obs, with 0 obs = size 0
       # geom_point(aes(size = n, fill = home))+
       #   scale_size_area(max_size = max_point_size,
@@ -1044,8 +1040,10 @@ limit_df <-
                    labeller = labeller.all,
                    switch = 'y')+
         theme(
-      strip.background = element_rect(fill = NA, color = NA),
-      strip.placement = 'outside'
+       strip.background =element_blank(),
+      strip.placement = 'outside',
+      strip.text = element_text(size = small-3),
+      axis.title = element_text(size = small-3)
               )+
         # use dummy df to define limits for each metric
         geom_blank(data = limit_df, aes(x = 15, y = limits))
@@ -1118,8 +1116,10 @@ limit_df <-
           ##for extra space between facets
     theme(
           strip.background =element_blank(),
-          axis.text.x = element_text(size = xsmall)
-)+
+      strip.text = element_text(size = small-3),
+      legend.text = element_text(size = small-3),
+      axis.title = element_text(size = small-3)
+      )+
        facet_grid(c('metric', 'location'))+
         # make point size proportional to # of obs, with 0 obs = size 0
       geom_point(aes(size = n, color = energy_cluster))+
@@ -1127,10 +1127,7 @@ limit_df <-
                         )+
         facet_wrap(vars(metric), nrow = 1, labeller = labeller.all,
                    scales = 'free_y')+
-        theme(
-      strip.background = element_rect(fill = NA, color = NA),
-      # strip.placement = 'outside'
-              )+
+
         # use dummy df to define limits for each metric
         geom_blank(data = limit_df, aes(x = 15, y = limits))+
                #ensure seaons legend on top
@@ -1250,10 +1247,7 @@ limit_df <- data %>%
     theme_bw()+
        # guides(col = guide_legend(ncol = 2))+ #split up legend
           ##for extra space between facets
-    theme(
-          strip.background =element_blank(),
-      axis.text.x = element_text(size = xsmall)
-          )+
+
        facet_grid(c('metric', 'location'))+
         # make point size proportional to # of obs, with 0 obs = size 0
       geom_point(aes(y = mean.val, size = n))+
@@ -1264,8 +1258,12 @@ limit_df <- data %>%
                    labeller = labeller.all,
                    switch = 'y')+
         theme(
-      strip.background = element_rect(fill = NA, color = NA),
-      strip.placement = 'outside'
+       strip.background =element_blank(),
+      strip.placement = 'outside',
+      strip.text = element_text(size = small-3),
+      axis.title = element_text(size = small-3),
+      axis.text.x = element_text(size = small-4),
+      legend.text = element_text(size = small-3)
               )+
         # use dummy df to define limits for each metric
         geom_blank(data = limit_df, aes(x = 'Wed', y = limits))
@@ -1275,7 +1273,7 @@ limit_df <- data %>%
 ```
 
 ### plot
-```{r}
+```{r, fig.height=4, fig.width=8}
 a <- map(c('pm25', 'voc', 'co2', 'temp'), function(x_metric){
   
     
@@ -1332,10 +1330,7 @@ limit_df <- data %>%
     theme_bw()+
        # guides(col = guide_legend(ncol = 2))+ #split up legend
           ##for extra space between facets
-    theme(
-          strip.background =element_blank(),
-      axis.text.x = element_text(size = xsmall)
-          )+
+
        facet_grid(c('metric', 'location'))+
         # make point size proportional to # of obs, with 0 obs = size 0
       # geom_point(aes(y = mean.val, size = n))+
@@ -1346,8 +1341,11 @@ limit_df <- data %>%
                    labeller = labeller.all,
                    switch = 'y')+
         theme(
-      strip.background = element_rect(fill = NA, color = NA),
-      strip.placement = 'outside'
+       strip.background =element_blank(),
+      strip.placement = 'outside',
+      strip.text = element_text(size = small-3),
+      axis.title = element_text(size = small-3),
+      axis.text.x = element_text(size = small-4),
               )+
         # use dummy df to define limits for each metric
         geom_blank(data = limit_df, aes(x = 'Wed', y = limits))
@@ -1357,7 +1355,7 @@ limit_df <- data %>%
 ```
 
 ### plot
-```{r}
+```{r, fig.height=4, fig.width=8}
 a <- map(c('pm25', 'voc', 'co2', 'temp'), function(x_metric){
   
     
@@ -1434,7 +1432,7 @@ plot.weekday.homes(a)
     theme(plot.title = element_blank(),
           title = element_text(size = medium),
           axis.text.y = element_text(size = small),
-          axis.text.x = element_text(size = small-3),
+          axis.text.x = element_text(size = small-2),
           strip.text = element_text( size = medium),
           axis.title = element_text(size = medium),
           legend.title = element_text(size = medium-3),
@@ -1500,10 +1498,6 @@ scale_x_date(
                                        substr, start = 1, stop = 1) %>% unname()))+    theme_bw()+
        # guides(col = guide_legend(ncol = 2))+ #split up legend
           ##for extra space between facets
-    theme(
-          strip.background =element_blank(),
-      axis.text.x = element_text(size = xsmall)
-          )+
        facet_grid(c('metric', 'location'))+
         # make point size proportional to # of obs, with 0 obs = size 0
       geom_point(aes(y = mean.val, size = n))+
@@ -1514,19 +1508,24 @@ scale_x_date(
                    labeller = labeller.all,
                    switch = 'y')+
         theme(
-      strip.background = element_rect(fill = NA, color = NA),
-      strip.placement = 'outside'
+      strip.placement = 'outside',
+      strip.background =element_blank(),
+      strip.text = element_text(size = small-3),
+      axis.title = element_text(size = small-3),
+      axis.text.x = element_text(size = small-5),
+      legend.text = element_text(size = small-3)
               )+
         # use dummy df to define limits for each metric
         geom_blank(data = limit_df, aes(x = as.Date('2020-10-01'), y = limits))+
        theme(  panel.grid.minor.x = element_blank() )
+     
       }
 
 
 ```
 
 ### plot
-```{r}
+```{r, fig.height=4, fig.width=8}
 a <- map(c('pm25', 'voc', 'co2', 'temp'), function(x_metric){
   
     
@@ -1655,10 +1654,6 @@ scale_x_date(
                                        substr, start = 1, stop = 1) %>% unname()))+    theme_bw()+
        # guides(col = guide_legend(ncol = 2))+ #split up legend
           ##for extra space between facets
-    theme(
-          strip.background =element_blank(),
-      axis.text.x = element_text(size = xsmall)
-          )+
        facet_grid(c('metric', 'location'))+
         # make point size proportional to # of obs, with 0 obs = size 0
       # geom_point(aes(y = mean.val, size = n))+
@@ -1668,10 +1663,13 @@ scale_x_date(
                    scales = 'free_y',
                    labeller = labeller.all,
                    switch = 'y')+
-        theme(
-      strip.background = element_rect(fill = NA, color = NA),
-      strip.placement = 'outside'
-              )+
+theme(
+      strip.placement = 'outside',
+      strip.background =element_blank(),
+      strip.text = element_text(size = small-3),
+      axis.title = element_text(size = small-3),
+      axis.text.x = element_text(size = small-5)
+      )+
         # use dummy df to define limits for each metric
         geom_blank(data = limit_df, aes(x = as.Date('2020-10-01'), y = limits))+
        # set minimum to avoid cutting off min temps
@@ -1683,7 +1681,7 @@ scale_x_date(
 ```
 
 ### plot
-```{r}
+```{r, fig.height=4, fig.width=8}
 a <- map(c('pm25', 'voc', 'co2', 'temp'), function(x_metric){
   
     
