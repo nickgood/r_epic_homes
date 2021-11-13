@@ -215,6 +215,10 @@ a$location <- factor(a$location, levels = c('kitchen', 'living', 'bedroom'))
 a$metric <- factor(a$metric, levels = c('pm25', 'voc', 'co2', 'temp'))
 a$energy_cluster <- factor(a$energy_cluster, levels = c('ac', 'shoulder', 'heat'))
 
+# make dataframe for counting n
+b <- a %>%
+  group_by(metric, energy_cluster) %>%
+  summarise(n_home_rooms = n(), .groups = 'drop')
 
 #     # make a dummy df in which to define limits for each metric
 # limit_df <- a %>%
@@ -250,7 +254,8 @@ ggplot(a,aes(x = energy_cluster, y = cov))+
         # use dummy df to define limits for each metric
         # geom_blank(data = limit_df, aes(x = 'kitchen', y = limits))+
   xlab('Season')+
-  ylab('IEQ Indicator COV\nin Group 2 Homes')
+  ylab('IEQ Indicator COV\nin Group 2 Homes')+
+  geom_text(data = b, aes(x = energy_cluster, label = paste('n =', n_home_rooms)), y = 4)
   
 
 ###
@@ -272,6 +277,10 @@ a$location <- factor(a$location, levels = c('kitchen', 'living', 'bedroom'))
 a$metric <- factor(a$metric, levels = c('pm25', 'voc', 'co2', 'temp'))
 a$energy_cluster <- factor(a$energy_cluster, levels = c('ac', 'shoulder', 'heat'))
 
+# make dataframe for counting n
+b <- a %>%
+  group_by(metric, energy_cluster) %>%
+  summarise(n_home_rooms = n(), .groups = 'drop')
 
 #     # make a dummy df in which to define limits for each metric
 # limit_df <- a %>%
@@ -313,7 +322,9 @@ ggplot(a,aes(x = energy_cluster, y = cov))+
         # use dummy df to define limits for each metric
         # geom_blank(data = limit_df, aes(x = 'kitchen', y = limits))+
   xlab('Season')+
-  ylab('IEQ Indicator COV\nin Group 3 Homes')
+  ylab('IEQ Indicator COV\nin Group 3 Homes')+
+    geom_text(data = b, aes(x = energy_cluster, label = paste('n =', n_home_rooms)), y = 4)
+
   
 
 ###
