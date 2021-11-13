@@ -78,11 +78,11 @@ metrics_all <- c('pm25', 'voc', 'co2', 'temp', 'humid', 'lux', 'spl_a')
 
 clusters_all <- c('heat', 'shoulder', 'ac')
 
-#define sizes for plot text
-xsmall <- 2
-small <- 6
-medium <- 12
-large <- 16
+##For plot labeling pruposes
+xsmall <- 6
+small <- 15
+medium <- 20
+large <- 26
 
 
 # color blind pallette
@@ -300,10 +300,16 @@ ggplot(a,aes(x = energy_cluster, y = cov))+
   theme_bw()+
        # guides(col = guide_legend(ncol = 2))+ #split up legend
           ##for extra space between facets
-    theme(
-          strip.background =element_blank(),
-          panel.grid.major.x = element_blank()
-          )+
+  theme(
+    strip.background =element_blank(),
+    panel.grid.major.x = element_blank(),
+    strip.text = element_text(size = small -3),
+    axis.text.y = element_text(size = small -3),
+    axis.text.x = element_text(size = small -4.5),
+    axis.title = element_text(size = small -3),
+    legend.text = element_text(size = small-3),
+    legend.title = element_text(size = small-3)
+    )+
         # use dummy df to define limits for each metric
         # geom_blank(data = limit_df, aes(x = 'kitchen', y = limits))+
   xlab('Season')+

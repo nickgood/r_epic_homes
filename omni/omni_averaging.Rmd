@@ -169,16 +169,11 @@ labeller.all <- as_labeller(c(
 # define variables
 ```{r define_variables}
 
-
-
-
 ##For plot labeling pruposes
 xsmall <- 6
 small <- 15
 medium <- 20
 large <- 26
-line_size <- 0.5
-max_point_size <- 0.75
 
 # define y-limits for metrics (for time series plots)
 pm25_lim <- c(0,60)
@@ -565,7 +560,7 @@ limit_df <- a %>%
 
 ggplot(a,aes(x = energy_cluster, y = mean))+
   geom_violin()+
-  geom_boxplot(width = 0.2, outlier.shape = NA)+
+  geom_boxplot(width = 0.08, outlier.shape = NA)+
         facet_wrap(vars(metric), nrow = 1,   scales = 'free_y',
                    labeller = labeller.all)+
   scale_x_discrete(
@@ -573,14 +568,18 @@ ggplot(a,aes(x = energy_cluster, y = mean))+
     labels = energy_labels[c(1:3)]
   )+
   theme_bw()+
-       # guides(col = guide_legend(ncol = 2))+ #split up legend
-          ##for extra space between facets
-    theme(
-          strip.background =element_blank(),
-          panel.grid.major.x = element_blank()
-          )+
-        # use dummy df to define limits for each metric
-        geom_blank(data = limit_df, aes(x = 'heat', y = limits))+
+  # guides(col = guide_legend(ncol = 2))+ #split up legend
+  ##for extra space between facets
+  theme(
+    strip.background =element_blank(),
+    panel.grid.major.x = element_blank(),
+    strip.text = element_text(size = small -3),
+    axis.text.y = element_text(size = small -3),
+    axis.text.x = element_text(size = small -4),
+    axis.title = element_text(size = small -3)
+    )+
+  # use dummy df to define limits for each metric
+  geom_blank(data = limit_df, aes(x = 'heat', y = limits))+
   xlab('Season')+
   ylab('IEQ Indicator Value\nin Group 3 Homes')
   
