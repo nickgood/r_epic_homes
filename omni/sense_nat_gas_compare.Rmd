@@ -1,0 +1,367 @@
+---
+title: "Time on and COnsumption for All Devices"
+output: html_document
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.path = 'figures/',
+  warning = FALSE,
+  message = FALSE,
+  echo = FALSE,
+  fig.width = 10, fig.height = 8,
+  cache = FALSE)
+
+```
+
+```{r source_functions_libraries, eval = TRUE}
+# reads source
+source("../functions_epic.R")
+
+
+```
+
+* define functions
+```{r}
+##Define a char vector of home numbers using a number vector,
+##ex: x <- home.list(c(1:15)) for homes 1-15
+threedig <- function(x) {
+  if (nchar(x) == 1) {a <- paste0('00', x)
+  return(a)
+  }
+  
+  if (nchar(x) == 2) {a<- paste0('0', x)
+  return(a)
+  }
+  else return(a)
+}
+
+home.list <- function(x) sapply(x, threedig)
+```
+
+```{r define_variables}
+resolution <- 'hour'
+
+```
+
+
+* import sense data
+```{r, eval = FALSE}
+data <- read_rds("../output_thesis/sense/sense_hourly_thesis.rds")
+```
+
+* import xcel data
+```{r, eval = FALSE}
+nat_gas_data <- read_csv("../output_thesis/nat_gas_usage.csv") %>%
+  mutate( bill_date = as_date(bill_date, format = '%m/%d/%Y') ) %>%
+  arrange(bill_date) %>%
+  mutate(
+    avg_daily_usage = usage/days,
+    # subtract "base natural gas usage from total to estimate gas used for heating
+    avg_daily_heating = avg_daily_usage - min(avg_daily_usage, na.rm = T),
+    heating_gas_usage = avg_daily_heating*days,
+    bill_period = row_number(),
+    end_period = as.POSIXct(bill_date),
+    end_period = with_tz(end_period, 'US/Mountain'),
+    end_period = as.POSIXct(end_period)+dhours(6),
+    start_period = end_period-ddays(days)-1,
+    bill_date = as.character(bill_date)
+
+  )
+
+
+```
+
+
+* add bill period to data
+```{r, eval = FALSE}
+
+# make an empty column to fill with bill period
+data$bill_date <- NA
+data$heating_gas_usage <- NA
+data$bill_period_days <- NA
+
+
+for(i in 1:length(homes_gas)) { 
+  # for each home
+  # identify the df matrix index of each cluster cluster_type
+  bill_period_indeces <- which(nat_gas_data$home == homes_gas[i])
+
+    for(j in 1:length(bill_period_indeces)) {
+    # for each bill period in each home in the nat gas dataframe
+      # indentify the values in the data that are match the home
+      # and are within the dates specified by the bill
+    data$bill_date[
+      which(
+        as.numeric(data$job_id) == homes_gas[i] &
+              between(data$datetime,
+                      nat_gas_data[bill_period_indeces[j],
+                                      'start_period'][[1]],
+                      nat_gas_data[bill_period_indeces[j],
+                                      'end_period'][[1]])
+      )
+      # add the identified bill period of each value
+      # in the new column in the data
+    ] <- nat_gas_data[bill_period_indeces[j], 'bill_date'][[1]]
+    
+    
+    # same for gas used for heating in given bill period
+        data$heating_gas_usage[
+      which(
+        as.numeric(data$job_id) == homes_gas[i] &
+              between(data$datetime,
+                      nat_gas_data[bill_period_indeces[j],
+                                      'start_period'][[1]],
+                      nat_gas_data[bill_period_indeces[j],
+                                      'end_period'][[1]])
+      )
+    ] <- nat_gas_data[bill_period_indeces[j], 'heating_gas_usage'][[1]]
+        
+        
+    # and number of days in given bill period
+        data$bill_period_days[
+      which(
+        as.numeric(data$job_id) == homes_gas[i] &
+              between(data$datetime,
+                      nat_gas_data[bill_period_indeces[j],
+                                      'start_period'][[1]],
+                      nat_gas_data[bill_period_indeces[j],
+                                      'end_period'][[1]])
+      )
+    ] <- nat_gas_data[bill_period_indeces[j], 'days'][[1]]    
+  }
+}
+
+write_rds(data, './csv_created/sense_gas_comparison_hourly.rds')
+
+```
+
+# Bill Period Device Overviews  
+* import sense data with gas usage column
+
+```{r}
+data <- read_rds('./csv_created/sense_gas_comparison_hourly.rds')
+```
+
+* import xcel data
+```{r}
+nat_gas_data <- read_csv("../output_thesis/nat_gas_usage.csv") %>%
+  mutate( bill_date = as_date(bill_date, format = '%m/%d/%Y') ) %>%
+  arrange(bill_date) %>%
+  group_by(home) %>%
+  mutate(
+    avg_daily_usage = usage/days,
+    # subtract "base natural gas usage from total to estimate gas used for heating
+    avg_daily_heating = avg_daily_usage - min(avg_daily_usage, na.rm = T),
+    heating_gas_usage = avg_daily_heating*days,
+    bill_period = row_number(),
+    end_period = as.POSIXct(bill_date),
+    end_period = with_tz(end_period, 'US/Mountain'),
+    end_period = as.POSIXct(end_period)+dhours(6),
+    start_period = end_period-ddays(days)-1,
+    bill_date = as.character(bill_date),
+    home = home.list(home)
+
+  ) %>%
+  ungroup()
+
+
+```
+
+* define variables
+```{r}
+#specify all homes that have natural gas data
+homes_gas <- levels(as.factor(nat_gas_data$home))
+
+#specify all homes that have sense data
+homes_sense <- levels(as.factor(data$job_id))
+
+#specify all homes that have sense and gas data
+homes_avail <- homes_gas[homes_gas %in% homes_sense]
+```
+
+
+```{r function_billing, include = FALSE}
+
+# function to test daily usage per device by home
+
+bill.compare <- function(home_id # home id, in form: '003'
+                       ) {
+  if(resolution == 'hour'){
+unit_per_day <-  24 # amoutn of units in each day
+units <- 'hours'
+}else if(resolution == 'minute'){
+unit_per_day <-  60*24 # amoutn of units in each day
+units <- 'mins'
+}
+  
+data %>%
+  filter(job_id == home_id) %>%
+  mutate(
+             sense_device_name = if_else(is.na(sense_device_name),
+                                     device_id, sense_device_name)
+             ) %>%
+  group_by(sense_device_name, bill_date) %>%
+  summarise(
+    on_per_period = n(),# amount of time units device was on during specified period
+    consumption = sum(consumption_kwh, na.rm = TRUE),
+    bill_period_days = mean(bill_period_days),
+    # heating_gas_usage = mean(heating_gas_usage),
+    .groups = "drop") %>%
+  mutate(
+    # amount of time units available during period
+    unit_per_period = bill_period_days*unit_per_day,
+    pct = on_per_period * 100 / unit_per_period,
+         pct = if_else(pct == Inf, 0, pct),
+    home = home_id)
+}
+
+```
+
+* match billing period info to all homes with sense data and their device usage summaries
+* for devices identified as primary heat
+```{r }
+
+# # # for one home
+# test <- bill.compare('011')
+
+# apply above function to all homes
+compare_data_wide <- map(homes_avail, bill.compare) %>%
+  bind_rows() %>%
+    rename(device = sense_device_name) %>%
+  
+  # ensure for each home, no devices are missing bill periods
+  # f the sense was gathering data at that time
+  # complete(home, nesting(device, bill_date, heating_gas_usage),
+  #          fill = list(pct = 0, consumption = 0)) %>%
+  group_by(home) %>%
+  complete(device, bill_date,
+           fill = list(pct = 0, consumption = 0)) %>%
+  ungroup() %>%
+  filter(
+    (home == '002' & device == 'furnace') |
+    (home == '006' & device == 'heat 1') |
+    (home == '008' & device == 'heat 2') |
+    (home == '009' & device == 'furnace') |
+    (home == '010' & device == 'heat 2') |
+    (home == '011' & device == 'heat 6') 
+  ) %>%
+  filter(!is.na(bill_date)) %>%
+  mutate(
+    month = as.character(month(as.Date(bill_date), label = T, abbr = T)),
+    # edit special case home 6 has two bills in march
+    month = case_when(
+      home == '006' & bill_date == '2021-02-01' ~ 'Jan',
+    home == '006' & bill_date == '2021-03-03' ~ 'Feb',
+    TRUE ~ month
+    )
+  ) %>%
+  # add in other data from xcel
+  left_join(nat_gas_data, by = c("home", "bill_date")) %>%
+  
+  
+  group_by(home) %>%
+  mutate(
+    norm_pct = pct/max(pct, na.rm = T),
+    norm_consumption = consumption/max(consumption, na.rm = T),
+    norm_gas = heating_gas_usage/max(heating_gas_usage, na.rm = T)
+    ) %>%
+  ungroup()
+
+
+
+compare_data <- compare_data_wide %>%
+  pivot_longer(cols = c(pct, consumption, heating_gas_usage,
+                        norm_pct, norm_consumption, norm_gas),
+               names_to = 'parameter', values_to = 'value')
+
+
+```
+
+* plot comparison of heating device data and natural gas usage
+
+** with two axes
+```{r}
+
+a <- compare_data %>% filter(parameter %in% c('pct', 'heating_gas_usage'))
+
+max_pct <- a %>%
+  filter(parameter == 'pct') %>%
+  select(value) %>%
+  max()
+
+max_heating <- a %>%
+  filter(parameter == 'heating_gas_usage') %>%
+  select(value) %>%
+  max()
+
+conversion <- max_heating/max_pct
+
+a <- a %>%
+  mutate( value = case_when(
+    parameter == 'pct' ~ value*conversion,
+    parameter == 'heating_gas_usage' ~ value
+  ))
+
+ggplot(a) +
+  geom_col(aes(y = value, fill = parameter, x = month), position = 'dodge')+
+  scale_y_continuous(sec.axis = sec_axis(trans = ~ . / conversion,
+                                         name = 'Percentage of Time On'))+
+  facet_wrap(vars(home), scales = 'free')
+```
+
+** normalized to allow clarity
+```{r, fig.width=8, fig.height = 4}
+
+a <- compare_data %>% filter(parameter %in% c('norm_pct', 'norm_gas'))
+
+month_seq <- month.abb[c(7:12, 1:6)]
+
+a$month <- factor(a$month, levels = month_seq)
+
+
+ggplot(a) +
+  geom_col(aes(y = value, fill = parameter, x = month), position = 'dodge')+
+  facet_wrap(vars(home))+
+  scale_x_discrete(
+    breaks = month_seq,
+    labels = sapply(month_seq, substr, start = 1, stop = 1) %>% unname()
+  )+
+  scale_fill_discrete(
+    breaks = c('norm_gas', 'norm_pct'),
+    labels = c('Heating Gas Usage', 'Heating Device Time-On'),
+    name = 'Parameter'
+  )+
+  theme_classic()+
+  ylab('Normalized Value')+
+  xlab('Month')
+```
+
+
+* bar and point plot
+```{r}
+
+a <- compare_data_wide
+
+month_seq <- month.abb[c(7:12, 1:6)]
+
+a$month <- factor(a$month, levels = month_seq)
+
+
+ggplot(a) +
+  geom_col(aes(y = norm_pct, x = month, fill = 'Heating Device Time-On'))+
+  geom_point(aes(y = norm_gas, x = month, color = 'Gas Used for Heating')
+             )+
+  facet_wrap(vars(home))+
+  scale_x_discrete(
+    breaks = month_seq,
+    labels = sapply(month_seq, substr, start = 1, stop = 1) %>% unname()
+  )+
+    # the labels must match what you specified above
+  scale_fill_manual(name = '', values = c("Heating Device Time-On" = "black")) +
+  scale_color_manual(name = "", values = c("Gas Used for Heating" = "red")) +
+  theme_classic()+
+  ylab('Normalized Value')+
+  xlab('Month')
+
+```
+
