@@ -177,6 +177,18 @@ homes_sense <- levels(as.factor(data$job_id))
 
 #specify all homes that have sense and gas data
 homes_avail <- homes_gas[homes_gas %in% homes_sense]
+
+# color blind pallette
+# check http://www.cookbook-r.com/Graphs/Colors_(ggplot2)/#a-colorblind-friendly-palette
+cbbPalette <- c('black' = "#000000",
+                'light_orange' = "#E69F00",
+                'light_blue' = "#56B4E9",
+                'green' = "#009E73",
+                'yellow' = "#F0E442",
+                'dark_blue' = "#0072B2",
+                'dark_orange' = "#D55E00",
+                'purple' = "#CC79A7"
+                )
 ```
 
 
@@ -257,7 +269,24 @@ compare_data_wide <- map(homes_avail, bill.compare) %>%
   ) %>%
   # add in other data from xcel
   left_join(nat_gas_data, by = c("home", "bill_date")) %>%
-  
+    filter(end_period < as.Date('2021-06-01')) %>%
+  # filter out instances where start/end dates don't extend to
+  # start/end billing periods
+  left_join(
+     data %>%
+      rename(home = job_id) %>%
+      filter( home %in% homes_avail) %>%
+      group_by(home) %>%
+      summarize(
+        start_date = min(datetime),
+        end_date = max(datetime),
+        .groups = 'drop'
+  ), by = 'home'
+  ) %>%
+  filter(
+    start_period>=start_date,
+    end_period <= end_date
+  ) %>%
   
   group_by(home) %>%
   mutate(
@@ -274,6 +303,40 @@ compare_data <- compare_data_wide %>%
                         norm_pct, norm_consumption, norm_gas),
                names_to = 'parameter', values_to = 'value')
 
+
+```
+
+
+
+* omit gas data if no sense data was available for home for all or most of billing period
+```{r}
+data_dates <- data %>%
+  rename(home = job_id) %>%
+  filter(home %in% homes_avail,
+         datetime < as.Date('2021-06-01')) %>%
+  group_by(home) %>%
+  summarise(date = unique(datetime), .groups = 'drop') %>%
+  mutate(value = 1)
+
+
+date_list <- map( c('2020-07-01', '2020-08-01', '2020-09-01', '2020-10-01',
+                   '2020-11-01', '2020-12-01', '2021-01-01', '2021-02-01',
+                   '2021-03-01', '2021-04-01', '2021-05-01', '2021-06-01'),
+                  as.Date
+     )
+
+ggplot(data_dates)+
+  geom_point(aes(x = as.Date(date), y= value))+
+  facet_wrap(vars(home))+
+  # scale_x_date(
+  #   date_breaks = '1 month',
+  #   date_labels = '%b'
+  # )
+  scale_x_date(
+    breaks =  do.call('c', date_list),
+    labels = c('J', 'A', 'S', 'O', 'N', 'D', 'J', 'F', 'M', 'A', 'M', 'J')
+  )
+  
 
 ```
 
@@ -349,8 +412,7 @@ a$month <- factor(a$month, levels = month_seq)
 
 ggplot(a) +
   geom_col(aes(y = norm_pct, x = month, fill = 'Heating Device Time-On'))+
-  geom_point(aes(y = norm_gas, x = month, color = 'Gas Used for Heating')
-             )+
+  geom_point(aes(y = norm_gas, x = month, color = 'Gas Used for Heating') )+
   facet_wrap(vars(home))+
   scale_x_discrete(
     breaks = month_seq,
@@ -358,7 +420,8 @@ ggplot(a) +
   )+
     # the labels must match what you specified above
   scale_fill_manual(name = '', values = c("Heating Device Time-On" = "black")) +
-  scale_color_manual(name = "", values = c("Gas Used for Heating" = "red")) +
+  scale_color_manual(name = "",
+                     values = c("Gas Used for Heating" = cbbPalette['light_orange'] %>% unname())) +
   theme_classic()+
   ylab('Normalized Value')+
   xlab('Month')
