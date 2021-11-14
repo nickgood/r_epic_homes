@@ -74,6 +74,7 @@ clean_data <- function(x){
 }
 
 
+
 ```
 
 ```{r define_variables}
@@ -82,6 +83,36 @@ homes_no5 <- c(
   map(c(1:4,6:9), function(x) paste0('00', x)),
   map(c(10:16), function(x) paste0('0', x))
   )%>% unlist()
+
+
+##For plot labeling pruposes
+xsmall <- 6
+small <- 15
+medium <- 20
+large <- 26
+
+# color blind pallette
+# check http://www.cookbook-r.com/Graphs/Colors_(ggplot2)/#a-colorblind-friendly-palette
+cbbPalette <- c('black' = "#000000",
+                'light_orange' = "#E69F00",
+                'light_blue' = "#56B4E9",
+                'green' = "#009E73",
+                'yellow' = "#F0E442",
+                'dark_blue' = "#0072B2",
+                'dark_orange' = "#D55E00",
+                'purple' = "#CC79A7"
+                )
+# define colors for room-comparisons
+location_colors <- c(cbbPalette['green'],
+                   cbbPalette['purple'],
+                   cbbPalette['light_orange'],
+                   cbbPalette['dark_blue'],
+                   cbbPalette['dark_orange']
+                   )%>% unname()
+
+location_breaks <- c('living', 'bedroom', 'kitchen', 'garage', 'outdoor')
+
+location_labels <- c('Living Room', 'Bedroom', 'Kitchen', 'Garage', 'Outdoor')
 
 ```
 
@@ -542,7 +573,7 @@ ggplot(grav_cf_df, aes(y = grav_cf))+
 ```
 
 * after omitting negatives...
-```{r, fig.height=3, fig.width=3}
+```{r, fig.height=3, fig.width=1.5}
 
 grav_omit <- grav_cf_df %>% filter(!is.na(grav_cf) & grav_cf < 0) %>%nrow()
 grav_all <- grav_cf_df %>% filter(!is.na(grav_cf)) %>%nrow()
@@ -551,17 +582,27 @@ grav_all <- grav_cf_df %>% filter(!is.na(grav_cf)) %>%nrow()
 grav_cf_df_clean <- grav_cf_df %>%
   filter(!is.na(grav_cf) & grav_cf >0)
 
+
 # check spread of correction factor values
 ggplot(grav_cf_df_clean, aes( x = 1, y = grav_cf))+
-  geom_boxplot(outlier.shape = NA)+
-  geom_jitter( width = 0.15, )+
+  geom_boxplot( outlier.shape = NA)+
+  geom_jitter( aes( color = location), width = 0.15)+
   theme_classic()+
   theme(
     axis.text.x = element_blank(),
     axis.title.x = element_blank(),
     axis.ticks.x = element_blank()
   )+
-  ylab('Gravimetric Correction Factor')
+  ylab('Gravimetric Correction Factor')+
+  scale_color_manual(
+    breaks = location_breaks,
+    values = location_colors,
+    labels = location_labels,
+    name = 'Monitoring Location'
+  )+
+  theme(
+    legend.position = 'none'
+  )
   
 
 ```
@@ -579,7 +620,7 @@ broom::tidy(model, conf.int = TRUE) %>%
 ```
 
 
-```{r fig_omni_vs_filter, fig.width=4.5, fig.height=4.5}
+```{r fig_omni_vs_filter, fig.width=6, fig.height=4.5}
 
 # make predictions based on model
 predicted_df <- data.frame(twa_pred = predict(model, grav_cf_df_clean),
@@ -592,13 +633,27 @@ ggplot(grav_cf_df_clean, aes(x = conc_correct, y = twa)) +
   #geom_smooth(method = "lm", formula = "y ~ x", se = FALSE) +
   theme_bw() +
   geom_abline(slope = 1, intercept = 0, linetype = 'dashed') +
-  ylab("Omni (ug/m^3)") + xlab("Filter (ug/m^3)")+
   geom_line(data = predicted_df, aes( y = twa_pred
                                       # linetype = 'model'
                                       ),
             linetype = 'solid')+
   scale_y_continuous(expand = c(0,0), limits = c(0,110))+
-  scale_x_continuous(expand = c(0,0), limits = c(0,110))
+  scale_x_continuous(expand = c(0,0), limits = c(0,110))+
+    scale_color_manual(
+    breaks = location_breaks,
+    values = location_colors,
+    labels = location_labels,
+    name = 'Monitoring Location'
+  )+
+  ylab(expression(paste('Real-Time PM'[2.5], ', ug/m'^3)))+
+  xlab(expression(paste('Gravimetric PM'[2.5], ', ug/m'^3)))+
+          theme(
+      axis.title = element_text(size = small-3),
+      axis.text = element_text(size = small-3),
+      legend.text = element_text(size = small-3),
+      legend.title = element_text(size = small-3),
+              )
+
 # scale_linetype_manual(
   #   values = c('dashed', 'solid'),
   #   # breaks = c('dashed', 'solid'),
