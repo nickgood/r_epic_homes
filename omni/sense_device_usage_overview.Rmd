@@ -20,7 +20,6 @@ source("../functions_epic.R")
 library('cluster')
 library('factoextra')
 
-
 ```
 
 ```{r define_variables}
@@ -29,7 +28,7 @@ resolution <- 'hour'
 ```
 
 
-```{r data_import, eval = TRUE}
+```{r data_import_old_and_new, eval = FALSE}
 data <- if(resolution == 'hour'){
   read_rds("../output_thesis/sense/sense_hourly.rds")} else if(resolution == 'minute'){
   read_rds("../output_thesis/sense/sense_all.rds")}
@@ -54,7 +53,7 @@ dates <- data_old %>%
 ```
 
 
-```{r merge_data_files}
+```{r merge_data_files, eval = FALSE}
 
 
 data <- data %>%
@@ -75,6 +74,9 @@ write_rds(data, paste0('../output_thesis/sense/sense_hourly_thesis_',
 
 ```
 
+```{r}
+data <- read_rds("../output_thesis/sense/sense_hourly_thesis.rds")
+```
 
 # Daily Device Overviews  
 
