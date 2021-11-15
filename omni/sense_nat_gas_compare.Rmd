@@ -424,7 +424,7 @@ ggplot(a) +
                      values = c("Gas Used for Heating" = cbbPalette['light_orange'] %>% unname())) +
   theme_classic()+
   ylab('Normalized Value')+
-  xlab('Month')
+  xlab('Billing Period Month')
 
 ```
 
