@@ -229,6 +229,39 @@ data %>%
 
 ```
 
+
+* check when sense data was available for each home
+```{r}
+data_dates <- data %>%
+  rename(home = job_id) %>%
+  filter(home %in% homes_avail,
+         datetime < as.Date('2021-06-01')) %>%
+  group_by(home) %>%
+  summarise(date = unique(datetime), .groups = 'drop') %>%
+  mutate(value = 1)
+
+
+date_list <- map( c('2020-07-01', '2020-08-01', '2020-09-01', '2020-10-01',
+                   '2020-11-01', '2020-12-01', '2021-01-01', '2021-02-01',
+                   '2021-03-01', '2021-04-01', '2021-05-01', '2021-06-01'),
+                  as.Date
+     )
+
+ggplot(data_dates)+
+  geom_point(aes(x = as.Date(date), y= value))+
+  facet_wrap(vars(home))+
+  # scale_x_date(
+  #   date_breaks = '1 month',
+  #   date_labels = '%b'
+  # )
+  scale_x_date(
+    breaks =  do.call('c', date_list),
+    labels = c('J', 'A', 'S', 'O', 'N', 'D', 'J', 'F', 'M', 'A', 'M', 'J')
+  )
+  
+
+```
+
 * match billing period info to all homes with sense data and their device usage summaries
 * for devices identified as primary heat
 ```{r }
@@ -308,37 +341,6 @@ compare_data <- compare_data_wide %>%
 
 
 
-* omit gas data if no sense data was available for home for all or most of billing period
-```{r}
-data_dates <- data %>%
-  rename(home = job_id) %>%
-  filter(home %in% homes_avail,
-         datetime < as.Date('2021-06-01')) %>%
-  group_by(home) %>%
-  summarise(date = unique(datetime), .groups = 'drop') %>%
-  mutate(value = 1)
-
-
-date_list <- map( c('2020-07-01', '2020-08-01', '2020-09-01', '2020-10-01',
-                   '2020-11-01', '2020-12-01', '2021-01-01', '2021-02-01',
-                   '2021-03-01', '2021-04-01', '2021-05-01', '2021-06-01'),
-                  as.Date
-     )
-
-ggplot(data_dates)+
-  geom_point(aes(x = as.Date(date), y= value))+
-  facet_wrap(vars(home))+
-  # scale_x_date(
-  #   date_breaks = '1 month',
-  #   date_labels = '%b'
-  # )
-  scale_x_date(
-    breaks =  do.call('c', date_list),
-    labels = c('J', 'A', 'S', 'O', 'N', 'D', 'J', 'F', 'M', 'A', 'M', 'J')
-  )
-  
-
-```
 
 * plot comparison of heating device data and natural gas usage
 
@@ -425,6 +427,13 @@ ggplot(a) +
   theme_classic()+
   ylab('Normalized Value')+
   xlab('Billing Period Month')
+
+```
+
+* run correlations between nromalized values of heating electric usage from sense
+* and nat gas usage
+```{r}
+cor(compare_data_wide$norm_pct, compare_data_wide$norm_gas, method = 'spearman')
 
 ```
 
