@@ -17,16 +17,14 @@ knitr::opts_chunk$set(fig.path = 'figures/',
 source("../functions_epic.R")
 ```
 
----
-
-# Read metadata
-
 ```{r}
-f <- list.files("../../data/sense/metadata", ".csv$", full.names = TRUE)
-
-meta <- read_csv(f, col_types = cols()) %>%
-  rename_all(clean_names) %>%
-  filter(!is.na(job_id))
+log <- read_sheet("1PnPjgbYWljb5oXoSCBqpJb2pi7gU0Kzre5lx4H-3i70", "sense", col_types = "cccccc") %>%
+  mutate_at(vars(matches("^date")), as.Date) %>%
+  mutate(date_removed = if_else(is.na(date_removed), Sys.Date(), date_removed)) %>%
+  pivot_longer(c("date_installed", "date_removed"), names_to = "var", values_to = "date") %>%
+  select(id_home, serial_number, date) %>%
+  group_by(id_home) %>% pad() %>%
+  tidyr::fill(serial_number)
 ```
 
 ---
@@ -54,8 +52,8 @@ data <- raw_data %>%
   mutate(datetime = with_tz(datetime_utc, "US/Mountain")) %>%
   select(datetime, serial_number, device_id, sense_device_name, device_type,
          consumption_kwh, avg_wattage) %>%
-  left_join(meta %>% select("monitor_serial_number", "job_id"),
-            by = c("serial_number" = "monitor_serial_number")) %>%
+  mutate(date = as.Date(datetime)) %>%
+  left_join(log, by = c("serial_number", "date")) %>%
   mutate_if(is.character, tolower) %>%
   filter(!is.na(job_id)) %>%
   distinct()
