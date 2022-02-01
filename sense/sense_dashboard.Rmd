@@ -55,24 +55,8 @@ data <- raw_data %>%
   mutate(date = as.Date(datetime)) %>%
   left_join(log, by = c("serial_number", "date")) %>%
   mutate_if(is.character, tolower) %>%
-  filter(!is.na(job_id)) %>%
+  filter(!is.na(id_home)) %>%
   distinct()
-```
-
----
-
-# Consumption
-
-```{r, fig.width= 8, fig.height=20}
-p_data <- data %>%
-  filter(sense_device_name == "consumption")
-
-ggplot(p_data, aes(x = datetime, y = consumption_kwh)) +
-  geom_line() +
-  theme_bw() +
-  facet_wrap(~job_id, nrow = length(unique(p_data$job_id))) +
-  xlab("") + ylab("kWh") +
-  ggtitle("Household Energy Consumption")
 ```
 
 ---
@@ -85,7 +69,7 @@ data_hourly <- data %>%
          month = month(datetime),
          day = day(datetime),
          hod = hour(datetime)) %>%
-  group_by(job_id, year, month, day, hod, 
+  group_by(id_home, year, month, day, hod, 
            serial_number, device_id, sense_device_name, device_type) %>%
   summarise(datetime = first(datetime),
             consumption_kwh = sum(consumption_kwh, na.rm = TRUE),
@@ -93,6 +77,23 @@ data_hourly <- data %>%
             max_wattage = max(avg_wattage, na.rm = TRUE)),
             .groups = "drop") %>%
   mutate(datetime = floor_date(datetime, unit = "hours"))
+```
+
+---
+
+# Consumption
+
+```{r, fig.width= 8, fig.height=25}
+p_data <- data_hourly %>%
+  filter(sense_device_name == "consumption")
+
+ggplot(p_data, aes(x = datetime, y = consumption_kwh)) +
+  geom_line() +
+  theme_bw() +
+  facet_wrap(~id_home, nrow = length(unique(p_data$id_home))) +
+  xlab("") + ylab("kWh") +
+  ggtitle("Household Energy Consumption") +
+  scale_x_datetime(breaks = "1 month")
 ```
 
 ---
