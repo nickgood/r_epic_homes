@@ -992,8 +992,9 @@ acf_lags <- read_csv('./csv_created/acf_lags.csv')
 
 ```{r lag_df_omissions}
 
-# and omit samples that have less than ___ available days
-# and omit samples with a missing pct greater than ____
+#  omit samples that have less than available days specified above (days_avail_min)
+# and omit samples with a missing pct greater than % specified above
+# (missing_pct_min)
 
 
 acf_lags_filter <- acf_lags %>%
