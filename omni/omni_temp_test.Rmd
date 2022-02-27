@@ -1,0 +1,76 @@
+---
+title: "Temp Tester"
+author: "Andrew Purgiel"
+date: "2/19/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r source_functions_libraries, eval = TRUE}
+# reads source
+source("../functions_epic.R")
+
+
+```
+
+
+* define functions
+```{r}
+##Define a char vector of home numbers using a number vector,
+##ex: x <- home.list(c(1:15)) for homes 1-15
+threedig <- function(x) {
+  if (nchar(x) == 1) {a <- paste0('00', x)
+  return(a)
+  }
+  
+  if (nchar(x) == 2) {a<- paste0('0', x)
+  return(a)
+  }
+  else return(a)
+}
+
+home.list <- function(x) sapply(x, threedig)
+```
+
+
+```{r cars}
+test <- read_rds('./csv_created/omni_calibrated.rds')  %>%
+  mutate(reading = case_when( temp> 50 ~ 'bad',
+                            temp< -50 ~ 'bad',
+                            TRUE ~ 'good'))
+
+
+lapply( c('bedroom', 'living', 'kitchen', 'garage', 'outdoor'),
+        function(x_location) {
+          lapply( c(home.list(1:15)),
+                  function(x_home) {
+                    test %>%
+                      filter( location == x_location, home == x_home) %>%
+                      ggplot(aes(x = datetime, y = temp))+
+                      geom_point(aes(color = reading))+
+                      ggtitle(paste(x_home, x_location))+
+                      scale_color_manual(
+                        values = c('red', 'black'),
+                        breaks = c('bad', 'good')
+                      )+
+                      theme(legend.position = 'none')
+                  })
+        })
+
+# test %>%
+#       filter( location == 'outdoor', home == '004') %>%
+#       ggplot(aes(x = datetime, y = temp))+
+#       geom_point(aes(color = reading))+
+#                 ggtitle(paste('one'))+
+#   scale_color_manual(
+#     values = c('red', 'black'),
+#     breaks = c('bad', 'good')
+#   )+
+#   theme(legend.position = 'none')
+
+```
+
