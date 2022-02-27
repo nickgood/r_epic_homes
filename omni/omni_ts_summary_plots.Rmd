@@ -734,7 +734,7 @@ energy_colors <- c(cbbPalette['light_blue'],
                    cbbPalette['black'])%>% unname()
 
 energy_breaks <- c('ac', 'shoulder', 'heat', 'overall')
-energy_labels <- c('Summer', 'Shoulder', 'Winter', 'Entire Period')
+energy_labels <- c('Cooling', 'Shoulder', 'Heating', 'Entire Period')
 ```
 
 
@@ -1105,7 +1105,7 @@ limit_df <-
              x = 'Hour of Day',
           color= 'Season',
           fill = 'Season',
-          size = 'Home-Hours of Data')+
+          size = 'Sensor-Hours of Data')+
        
     scale_x_continuous(limits = c(0,24),
                        breaks = c(0,6,12,18),
