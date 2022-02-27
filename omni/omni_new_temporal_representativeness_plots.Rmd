@@ -889,6 +889,9 @@ diurn.rep.plot <- function(data, x_home, x_location, x_energy_cluster, x_metric,
    if(x_metric == 'voc') label_y <- 'Mean TVOC, ppb'
    if(x_metric == 'temp') label_y <- expression(paste('Mean Temperature, '^0, 'C'))
 
+      # ensure entire_period is always black line
+# https://stackoverflow.com/questions/42891307/how-can-i-maintain-a-color-scheme-across-ggplots-while-dropping-unused-levels-i
+      
   ggplot(all_data, aes(x = hour, y = mean,
                        color = sample_length,
                        fill = sample_length))+
