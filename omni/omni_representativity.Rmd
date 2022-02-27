@@ -168,6 +168,13 @@ room_colors <- c(cbbPalette['green'],
 room_breaks <- c('living', 'bedroom', 'kitchen')
 room_labels <- c('Living', 'Bedroom', 'Kitchen')
 
+
+##For plot labeling pruposes
+xsmall <- 6
+small <- 15
+medium <- 20
+large <- 26
+
 ```
 
 ```{r function_info_gain_master}
@@ -722,7 +729,7 @@ rank.table('voc')
 # without seasonal clustering
 pm25_all <- c('001', '012', '007', '010', '009', '004', '013', '011', '015')
 voc_all <- c('010', '004', '012', '001', '013', '007', '015', '011', '009')
-co2_all <- c('001', '004', '007', '009', '010', '011', '012', '013', '015')
+co2_all <- c('012', '007', '004', '013', '010', '001', '015', '011', '009')
 
 
 rank.line <- function (x_metric){
