@@ -875,12 +875,14 @@ diurn.rep.plot <- function(data, x_home, x_location, x_energy_cluster, x_metric,
       # y_label = mean*3
     )
 
+  # ensure same amount of labels as sampling lengths
+  n_lengths <- length( sample_lengths)
   
       labels <- by(rep_values, rep_values$sample_length,
                    function(x) {
                      paste(x$sample_length, '- Rep=', signif(x$rep, 2))
                    })
-      labels <- c(labels[c(1:3)], 'Entire Period') # replace entire_period label
+      labels <- c(labels[c(1:n_lengths)], 'Entire Period') # replace entire_period label
       
          if(x_metric == 'pm25') label_y <- expression(paste('Mean PM'[2.5], ', ug/m'^3))
    if(x_metric == 'co2') label_y <- expression(paste('Mean CO'[2], ', ppm'))
@@ -964,17 +966,13 @@ if(pooled_rooms == TRUE) {
 
 
 
-# testing----------
-
-
-
 # test specific cases
 
 # # pooled rooms
 # diurn.rep.plot(entropy_time, '009', 'pooled', 'heat', 'pm25')
 # diurn.rep.plot(entropy_time, '012', 'pooled', 'heat', 'pm25')
-# 
-# 
+#
+#
 # not pooled rooms
 diurn.rep.plot(entropy_time, '009', 'living', 'heat', 'pm25')
 diurn.rep.plot(entropy_time, '009', 'living', 'heat', 'voc')
@@ -986,10 +984,22 @@ diurn.rep.plot(entropy_time, '009', 'living', 'heat', 'co2')
 
 # diurn.rep.plot(entropy_time, '009', 'kitchen', 'heat', 'pm25')
 # diurn.rep.plot(entropy_time, '009', 'bedroom', 'heat', 'pm25')
-# 
+#
 # diurn.rep.plot(entropy_time, '012', 'living', 'heat', 'pm25')
 # diurn.rep.plot(entropy_time, '012', 'kitchen', 'heat', 'pm25')
 # diurn.rep.plot(entropy_time, '012', 'bedroom', 'heat', 'pm25')
+
+
+```
+
+
+* pick homes, seasons, (and rooms if not pooled) but choose less sample lengths
+```{r, fig.height=2, fig.width = 4}
+
+
+
+diurn.rep.plot(entropy_time, '009', 'living', 'heat', 'pm25',
+               sample_lengths = c(1))
 
 
 ```
