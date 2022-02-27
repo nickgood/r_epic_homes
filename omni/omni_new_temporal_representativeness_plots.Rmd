@@ -994,6 +994,7 @@ diurn.rep.plot(entropy_time, '009', 'living', 'heat', 'co2')
 
 
 * pick homes, seasons, (and rooms if not pooled) and choose less sample lengths
+
 ```{r, fig.height=2, fig.width = 4}
 
 
@@ -1006,6 +1007,7 @@ diurn.rep.plot(entropy_time, '009', 'living', 'heat', 'pm25',
 
 diurn.rep.plot(entropy_time, '009', 'living', 'heat', 'pm25',
                sample_lengths = c(3,7,14))
+
 
 ```
 
