@@ -950,10 +950,68 @@ ggplot(a, aes(x = lag, y = acf))+
 
 # make lag df
 ```{r, eval = FALSE}
-# acf_conditions <- acf_data %>%
-#   group_by(home, location, energy_cluster) %>%
-#   summarize(mean = mean())
 
+##### Count Omissions
+
+# isolate 3 metrics considered in thesis
+acf_ieq <- acf_data %>%
+  filter(metric %in% c('pm25', 'voc', 'temp'))
+
+
+  # make dataframe with counts of different types of "missingness"
+# for each condition for all metrics
+  acf_lags2 <- acf_ieq %>%
+        group_by(home, location, energy_cluster, metric) %>%
+    summarise(
+              days_avail = unique(avail),
+              missing_pct = unique(miss),
+              .groups = 'drop')%>% 
+    left_join(
+      acf_ieq %>%
+      filter(acf <= ci_high
+           & acf >= ci_low
+    ) %>%
+        group_by(home, location, energy_cluster, metric) %>%
+    summarise(lag_signif = min(lag),
+              .groups = 'drop'),
+    by = c("home", "location", "energy_cluster", "metric")
+  )
+
+  # count amount of homes for each indicator for each condition
+n_homes <- acf_lags2 %>% count(metric, location, energy_cluster)
+
+# count amount of condtions for each metric
+n_conditions<- acf_lags2 %>%
+  count(metric)
+
+
+# omit smaples that had less than the minimum days available
+# and count remaining samples by metric
+acf_day_omit <- acf_lags2 %>%
+  filter(days_avail >= days_avail_min)
+
+n_day_omit <- acf_day_omit %>%
+  count(metric)
+
+
+# omit smaples that were missing more than 11.1% of days in sampling period
+# and count remaining samples by metric
+acf_pct_omit <- acf_day_omit %>%
+  filter(missing_pct <= missing_pct_min)
+
+n_pct_omit <- acf_pct_omit %>%
+  count(metric)
+
+# omit smaples that did not achieve insignificant ACF by 30 days
+# and count remaining samples by metric
+acf_sig_omit <- acf_pct_omit %>%
+  filter(!is.na(lag_signif))
+
+n_sig_omit <- acf_sig_omit %>%
+  count(metric)
+
+
+#### Make CSV
 
   # find first lag point when acf goes inside confidence intervals
   acf_lags <- acf_data %>%
@@ -992,8 +1050,9 @@ acf_lags <- read_csv('./csv_created/acf_lags.csv')
 
 ```{r lag_df_omissions}
 
-# and omit samples that have less than ___ available days
-# and omit samples with a missing pct greater than ____
+#  omit samples that have less than available days specified above (days_avail_min)
+# and omit samples with a missing pct greater than % specified above
+# (missing_pct_min)
 
 
 acf_lags_filter <- acf_lags %>%
@@ -1002,16 +1061,9 @@ acf_lags_filter <- acf_lags %>%
 
 n_metrics_lags <- acf_lags %>% pull(metric) %>% as.factor() %>% levels() %>% length()
 
-a <- acf_lags %>% filter(days_avail < days_avail_min)
-b <- a %>% filter(missing_pct > missing_pct_min) 
 
 ```
 
-### omitted `r a %>% nrow()/n_metrics_lags` monitoring periods for each metric
-### because less than `r days_avail_min` available days  
-
-### omitted `r b %>% nrow()/n_metrics_lags` additional monitoring periods for each metric
-### because missing more than `r missing_pct_min`% of days within period
 
 
 ```{r lag_plots, fig.height = 3, fig.width = 8, eval = TRUE}
