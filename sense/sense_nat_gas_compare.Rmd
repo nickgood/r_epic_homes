@@ -139,7 +139,7 @@ write_rds(data, './csv_created/sense_gas_comparison_hourly.rds')
 * import sense data with gas usage column
 
 ```{r}
-data <- read_rds('./csv_created/sense_gas_comparison_hourly.rds')
+data <- read_rds('./csv_created_sense/sense_gas_comparison_hourly.rds')
 ```
 
 * import xcel data

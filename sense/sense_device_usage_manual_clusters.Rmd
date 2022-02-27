@@ -78,7 +78,7 @@ energy_colors <- c(cbbPalette['light_blue'],
                    cbbPalette['dark_orange'])%>% unname()
 
 energy_breaks <- c('ac', 'shoulder', 'heat')
-energy_labels <- c('Summer', 'Shoulder', 'Winter')
+energy_labels <- c('Coolng', 'Shoulder', 'Heating')
 
 resolution <- 'hour'
 ```
