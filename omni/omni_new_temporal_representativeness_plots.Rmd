@@ -788,7 +788,7 @@ grid.arrange(p1,p2,p3)
 
 # function-----------------
 diurn.rep.plot <- function(data, x_home, x_location, x_energy_cluster, x_metric,
-         sample_lengths = c(3,7,14)){
+         sample_lengths = c(3,7,14), y_limits = NULL){
   
   data_condition <- data %>%
     filter(home == x_home, location == x_location,
@@ -914,6 +914,10 @@ diurn.rep.plot <- function(data, x_home, x_location, x_energy_cluster, x_metric,
       breaks = c(0,6,12,18),
       labels = c('12am', '6am', '12pm', '6pm')
     )+
+    #set limits manually
+    scale_y_continuous(
+      limits = y_limits
+    )+
     # ggtitle(      # label = paste('Home', x_home, '--- Room=', x_location,
     #   '--- Season=', x_energy_cluster))+
     ylab(label_y)+
@@ -1003,13 +1007,13 @@ diurn.rep.plot(entropy_time, '009', 'living', 'heat', 'co2')
 
 
 diurn.rep.plot(entropy_time, '009', 'living', 'heat', 'pm25',
-               sample_lengths = c(3))
+               sample_lengths = c(1), y_limits = c(0,100))
 
 diurn.rep.plot(entropy_time, '009', 'living', 'heat', 'pm25',
-               sample_lengths = c(3,7))
+               sample_lengths = c(1,3), y_limits = c(0,100))
 
 diurn.rep.plot(entropy_time, '009', 'living', 'heat', 'pm25',
-               sample_lengths = c(3,7,14))
+               sample_lengths = c(1,3,7), y_limits = c(0,100))
 
 
 ```
