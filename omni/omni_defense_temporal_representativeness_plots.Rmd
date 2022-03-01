@@ -1,0 +1,764 @@
+---
+title: "Temporal Representativeness Plots"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: paper
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.path = 'figures/',
+  warning = FALSE,
+  message = FALSE,
+  echo = FALSE,
+  fig.width = 10, fig.height = 3,
+  cache = FALSE)
+```
+
+```{r libraries, include=FALSE}
+library(dplyr)
+library(purrr)
+library(tidyr)
+library(openair)
+library(ggplot2)
+library(readr)
+library(googlesheets4)
+library(lubridate)
+library(gridExtra)
+library(ggpubr) # for tesing log-normality
+# library(cubature) # for alternative method of integrating kld function
+# library(entropy) # for KLD function
+# library(fitdistrplus) # for fitting distribution to data NOTE, MASS::select CONFLICTS WITH dplyr::select
+
+```
+
+
+
+```{r import_energy_cluster_homes}
+# import energy cluster dataframe for all homes
+energy_cluster_df <- read_csv('../sense/csv_created_sense/energy_cluster_df.csv')
+```
+
+
+
+```{r import_assessment_data}
+
+assessment_data <- read_csv('../../data_thesis/homes/home_assessment_data.csv')
+
+# # using googlesheets4
+# assessment_data <- read_sheet('https://docs.google.com/spreadsheets/d/12vWpqdmzIII0vEKH79xpmICUYGuzc8PjfBT2_3YjIHU/edit?usp=sharing', sheet = 'data')
+```
+
+
+```{r functions_misc}
+
+#Function to only display 3 significant figures (for tables)
+signif3 <- function(x){
+  signif(x, digits = 3)
+}
+
+##Define a char vector of home numbers using a number vector,
+##ex: x <- home.list(c(1:15)) for homes 1-15
+threedig <- function(x) {
+  if (nchar(x) == 1) {a <- paste0('00', x)
+  return(a)
+  }
+  
+  if (nchar(x) == 2) {a<- paste0('0', x)
+  return(a)
+  }
+  else return(a)
+}
+
+home.list <- function(x) sapply(x, threedig)
+
+# make function to label metric names with subscripts
+labeller.metrics <- as_labeller(c('pm25'='PM[2.5]', 'voc'="TVOC",
+                                  'co2' = 'CO[2]', 'temp' = 'Temperature'),
+                           default = label_parsed)
+
+# make function to label metric names with subscripts and seasons
+labeller.metrics.seasons <- as_labeller(c(
+  'pm25'='PM[2.5]', 'voc'="TVOC",
+  'co2' = 'CO[2]', 'temp' = 'Temperature',
+  'ac' = 'Cooling', 'shoulder' = 'Shoulder', 'heat' = 'Heating'
+  ), default = label_parsed)
+
+```
+
+
+
+```{r define_variables}
+# fraction of sample needed to use sample of certain length
+frac_samp_required <- 0
+
+# method of scaling relative entropy to scaled entropy
+# 'universal' or 'conditional'
+long_term_period <- 'year'
+overlap <- FALSE
+month_cluster <- FALSE
+omit_outliers <- 'extreme'
+pooled_rooms <- FALSE
+clusters_all <- c('heat','shoulder', 'ac')
+
+# list of all home numbers
+homes_all <- home.list(1:16)
+homes_tier3 <- home.list(c(1,2,7,9,12))
+homes_tier2 <- home.list(c(4,10,11,13,15))
+homes_no5 <- home.list(c(1:4,6:16))
+
+
+locations_indoor <- c('living', 'kitchen', 'bedroom')
+metrics_all <- c('pm25', 'voc')
+# sequence of representative thresholds to test
+thresh_vector <- c(0.8, 0.9)
+
+# sequence of days to test thresholds for entropy values
+sample_days <- c(1,3,5,7,14)
+
+
+# color blind pallette
+# check http://www.cookbook-r.com/Graphs/Colors_(ggplot2)/#a-colorblind-friendly-palette
+cbbPalette <- c('black' = "#000000",
+                'light_orange' = "#E69F00",
+                'light_blue' = "#56B4E9",
+                'green' = "#009E73",
+                'yellow' = "#F0E442",
+                'dark_blue' = "#0072B2",
+                'dark_orange' = "#D55E00",
+                'purple' = "#CC79A7"
+                )
+# define colors for energy clusters
+energy_colors <- c(cbbPalette['light_blue'],
+                   cbbPalette['green'],
+                   cbbPalette['dark_orange'],
+                   cbbPalette['black'])%>% unname()
+
+energy_breaks <- c('ac', 'shoulder', 'heat', 'all')
+energy_labels <- c('AC', 'Shoulder', 'Heat', 'Entire Period')
+
+# define colors for sampling length
+length_colors <- c(cbbPalette['black'],
+                   cbbPalette['purple'],
+                   cbbPalette['light_blue'],
+                   cbbPalette['yellow'])%>% unname()
+
+# define colors for thresholds
+threshold_colors <- c(cbbPalette['dark_blue'],
+                   cbbPalette['green'],
+                   cbbPalette['dark_orange'])%>% unname()
+
+# attempt 2
+threshold_colors <- c(cbbPalette['dark_blue'],
+                   cbbPalette['purple'],
+                   cbbPalette['light_orange'])%>% unname()
+
+# for labeling purposes
+xsmall <- 2
+smaller <- 4
+small <- 6
+medium <- 16
+large <- 24
+
+```
+
+```{r import_pdf_data}
+
+
+# read in csv files
+entropy_df <- 
+  
+  if(long_term_period == 'year' & overlap == FALSE & month_cluster == FALSE
+           & pooled_rooms == TRUE ){
+    
+    bind_rows(
+      # read_rds(file = './csv_created/representativeness_data/rep_data_shape_hourly_pdf_pooled_no_overlap.rds')
+      data.frame(median_sample=NA, median_entire=NA,
+                 mean_sample = NA, mean_entire = NA,
+                 iqr_sample = NA, iqr_entire = NA,
+                 variance_sample=NA, variance_entire = NA),
+
+    )%>%
+      filter(period_compare == long_term_period)
+    
+    
+  } else if(long_term_period == 'year' & overlap == FALSE & month_cluster == FALSE
+           & pooled_rooms == FALSE ){
+    
+    bind_rows(
+      # read_rds(file = './csv_created/representativeness_data/rep_data_shape_hourly_pdf_no_overlap.rds')
+      data.frame(median_sample=NA, median_entire=NA,
+                 mean_sample = NA, mean_entire = NA,
+                 iqr_sample = NA, iqr_entire = NA,
+                 variance_sample=NA, variance_entire = NA),
+      read_rds(file = './csv_created/representativeness_data/rep_data_time_hourly_pdf_no_overlap.rds')
+    )%>%
+      filter(period_compare == long_term_period)
+    
+  }
+  
+```
+
+```{r cleaning_omissions}
+# count omissions --------------
+
+n_homes_enrolled <- 17 # n of homes enrolled
+n_indoor_sensors <- 16*3+2 # Home 002 never had kitchen installed
+n_all_data_omitted <- 3 # Home 005 had less than 2 weeks of data
+n_homes_data <-16 # n of homes with data used at least partially
+n_indoor_sensors_data <- 15*3+2 # n of indoor sensors with data used at least partially
+n_sensors_ac <- 5*3+2 # n of sensors in homes with ac detected
+n_sensors_ac_ignore <- 3 # Home 011 ac usage ignored because only detected 5 days 
+
+
+
+
+# clean dataframes ------------------------
+
+
+# test <- kld_max_df_clean %>%
+#   group_by(home, location, energy_cluster) %>%
+#   summarise(n = n(), .groups = 'drop')
+
+# kld values
+# remove na kld values from runs with insufficient data
+entropy_df_clean <- entropy_df%>% 
+  filter(
+    energy_cluster %in% clusters_all,
+    !is.na(kld), # with insufficient data in cluster/year/no cluster
+  n_samp_avail >= frac_samp_required) %>% # with less than certain percentage of available samples
+    mutate(
+      median_diff_pct = (median_sample - median_entire)/median_entire*100,
+      # mean_diff_pct = (mean_sample - mean_entire)/mean_entire*100,
+      # median_ratio = median_sample/median_entire,
+      # variance_ratio = variance_sample/variance_entire,
+      # iqr_diff_pct = (iqr_sample-iqr_entire)/iqr_entire*100,
+      # variance_diff_pct = (variance_sample-variance_entire)/variance_entire*100,
+      max_hour_diff = (max_hour_sample - max_hour_entire),
+      max_diff_pct = (max_sample - max_entire)/max_entire*100
+      # max_ratio = max_sample/max_entire,
+      
+           ) %>%
+    group_by(method, metric, sample_length) %>%
+  #mark extreme outliers
+  mutate(
+            outlier = 
+                     case_when(  kld > median(kld)+
+                    1.5*IQR(kld)~ TRUE,
+                    TRUE ~FALSE),
+            ext_outlier = 
+                     case_when(  kld > median(kld)+
+                    3*IQR(kld)~ TRUE,
+                    TRUE ~FALSE),
+
+    ) %>% ungroup()
+
+# count the fraction of extreme outliers overall and for each condition
+
+outlier_count_total_time <- entropy_df_clean %>% filter(method == 'time')%>%
+  summarise(outlier_frac = sum(outlier == TRUE)/n(),
+            .groups = 'drop') %>% pull(outlier_frac)
+
+outlier_count_total_shape <- entropy_df_clean %>% filter(method == 'shape')%>%
+  summarise(outlier_frac = sum(outlier == TRUE)/n(),
+            .groups = 'drop') %>% pull(outlier_frac)
+
+ext_outlier_count_total_time <- entropy_df_clean %>% filter(method == 'time')%>%
+  summarise(ext_outlier_frac = sum(ext_outlier == TRUE)/n(),
+            .groups = 'drop') %>% pull(ext_outlier_frac)
+
+ext_outlier_count_total_shape <- entropy_df_clean %>% filter(method == 'shape')%>%
+  summarise(ext_outlier_frac = sum(ext_outlier == TRUE)/n(),
+            .groups = 'drop') %>% pull(ext_outlier_frac)
+
+
+#count outliers by all groups
+outlier_count <- entropy_df_clean %>%
+  group_by(method, metric, sample_length, energy_cluster, home, location) %>%
+  summarize(n_samples = n(),
+            outlier_n = sum(outlier == TRUE),
+            outlier_frac = outlier_n/n_samples,
+            ext_outlier_n = sum(ext_outlier == TRUE),
+            ext_outlier_frac = ext_outlier_n/n_samples,
+            .groups = 'drop')
+
+#count outliers by metric
+outlier_count_metric <- entropy_df_clean %>%
+  group_by(method, metric) %>%
+  summarize(n_samples = n(),
+            outlier_n = sum(outlier == TRUE),
+            outlier_frac = outlier_n/n_samples,
+            ext_outlier_n = sum(ext_outlier == TRUE),
+            ext_outlier_frac = ext_outlier_n/n_samples,
+            .groups = 'drop')
+
+
+entropy_df_clean <- left_join(
+  entropy_df_clean, outlier_count,
+  by = c('method', 'metric', 'sample_length', 'energy_cluster', 'home', 'location'))
+
+# omit extreme outliers from data if omit_outliers is TRUE
+entropy_df_clean <- if(omit_outliers == FALSE) {entropy_df_clean
+  }else if (omit_outliers == 'normal'){
+  filter(entropy_df_clean, outlier == FALSE)
+  }else if(omit_outliers == 'extreme'){
+  filter(entropy_df_clean, ext_outlier == FALSE)
+  }
+
+# find max value for each method and metric for scaling
+kld_max_values <- entropy_df_clean %>%
+  group_by(method, metric)%>%
+  summarize(kld_max = max(kld), .groups = 'drop')
+
+
+entropy_df_clean <- entropy_df_clean %>%
+  left_join(kld_max_values, by = c('method','metric'))%>%
+  mutate(rep = 1-kld/kld_max)
+
+entropy_time <- entropy_df_clean %>% filter(method == 'time')
+entropy_shape <- entropy_df_clean %>% filter(method == 'shape')
+
+```
+
+* `r signif(outlier_count_total_time*100, 2)`% of sample Time kld values are high outliers within given method, metric, and sample length
+
+* `r signif(ext_outlier_count_total_time*100, 2)`% of sample Time kld values are extreme high outliers within given method, metric, and sample length
+
+* `r signif(outlier_count_total_shape*100, 2)`% of sample Shape kld values are high outliers within given method, metric, and sample length
+
+* `r signif(ext_outlier_count_total_shape*100, 2)`% of sample Shape kld values are extreme high outliers within given method, metric, and sample length
+
+* omitting high outliers does lead to ceratin sensors being underrepresented (but mostly when they had a small sample size)
+
+# Time-Structured Represenetativeness
+
+## Rep Summary Plots
+
+
+
+### One Home
+
+* find home with most data
+```{r}
+data_summary <- 
+  entropy_time %>%
+  filter(home %in% homes_tier3) %>%
+  group_by(home, location, energy_cluster) %>%
+  summarize(n_samples = n(), .groups = 'drop')
+
+```
+
+** for heating season
+```{r}
+# top homes for heat season
+a <- data_summary %>% filter(energy_cluster == 'heat')
+
+a[ order(a$n_samples, decreasing = TRUE),] %>%
+  head(15)
+```
+
+** for shoulder season
+```{r}
+# top homes for shoulder season
+a <- data_summary %>% filter(energy_cluster == 'shoulder')
+
+a[ order(a$n_samples, decreasing = TRUE),] %>%
+  head(15)
+```
+
+** for ac season
+```{r}
+# top homes for ac season
+a <- data_summary %>% filter(energy_cluster == 'ac')
+
+a[ order(a$n_samples, decreasing = TRUE),] %>%
+  head(15)
+```
+
+
+* use Homes 9 and 12 as exampes because they have the most data in most seasons for ost rooms
+
+## Rep Density Plots
+
+
+### faceted by season
+
+*Group 3 homes only
+
+* only show sample length
+
+```{r, fig.height=8, fig.width = 4}
+
+# see post on methodology 
+# https://stackoverflow.com/questions/14840542/place-a-legend-for-each-facet-wrap-grid-in-ggplot2
+
+
+map(c(
+  'pm25'
+      # 'voc',
+      # 'co2'
+  ), function(x_metric){
+  
+a <- entropy_time %>% filter(sample_length %in% c(1,3) &
+                               !is.na(rep) &
+                               metric == x_metric & 
+                               home %in% homes_tier3)
+
+# make a column with the label, so this can be used for the legend
+a <- a %>%
+  group_by(energy_cluster, sample_length) %>%
+    mutate(n = n(),
+         above1 = signif( sum(rep>thresh_vector[1])/n*100, 2),
+         # above2 = signif( sum(rep>thresh_vector[2])/n*100, 2),
+
+         label = paste0( sample_length)
+)
+
+
+a <- split(a,f = a$energy_cluster)
+
+# reorder factors so the legend is ordered by day 1,3,7,14
+# use the inverse of length function, as samples of legnth 1 will have the
+# most values (greatest legnth)
+
+a[['ac']]$label <- reorder(a[['ac']]$label,
+                           X = as.character(a[['ac']]$label),
+                           FUN = function(x) -length(x))
+
+a[['shoulder']]$label <- reorder(a[['shoulder']]$label,
+                                 X = as.character(a[['shoulder']]$label),
+                           FUN = function(x) -length(x))
+
+a[['heat']]$label <- reorder(a[['heat']]$label,
+                             X = as.character(a[['heat']]$label),
+                           FUN = function(x) -length(x))
+
+
+
+
+p1 <- ggplot(a[['ac']])+
+  geom_density(aes(x = rep, fill = as.factor(label)), alpha = 0.3)+
+  # geom_text(aes(label = (ext_outlier_n*100) %>% signif(2)),
+  #           y = 0.75, size = xsmall)+
+  facet_wrap(vars(energy_cluster))+
+  xlab('Representativeness')+
+  ggtitle(paste0(x_metric, ': Samples from GROUP 3 homes and rooms pooled'))+
+      # labs(fill = 'Length of Sample, days')+
+      labs(fill = 'Sample Length, days')+
+    theme_classic()+
+    theme(
+      axis.text.y = element_blank(),
+      axis.ticks.y = element_blank(),
+      plot.title = element_blank(),
+      strip.text = element_text(size = medium),
+      axis.text = element_text(size = medium),
+      axis.title = element_text(size = large),
+      legend.text = element_text(size = large),
+      legend.title = element_text(size = large),
+      legend.position = c(0.4, 0.7),
+      legend.background = element_blank()
+
+    )+
+    scale_fill_manual( values = length_colors
+                       )+
+  ylab('Density')+
+  coord_cartesian(xlim = c(0,1))+
+  facet_wrap(~energy_cluster, ncol=1, labeller = labeller.metrics.seasons)
+
+
+p2 <- p1 %+% a[['shoulder']]
+p3 <- p1 %+% a[['heat']]
+
+
+grid.arrange(p1,p2,p3)
+
+})
+ 
+```
+
+
+* add in threshold line
+
+```{r, fig.height=8, fig.width = 4}
+
+# see post on methodology 
+# https://stackoverflow.com/questions/14840542/place-a-legend-for-each-facet-wrap-grid-in-ggplot2
+
+
+map(c(
+  'pm25'
+      # 'voc',
+      # 'co2'
+  ), function(x_metric){
+  
+a <- entropy_time %>% filter(sample_length %in% c(1,3) &
+                               !is.na(rep) &
+                               metric == x_metric & 
+                               home %in% homes_tier3)
+
+# make a column with the label, so this can be used for the legend
+a <- a %>%
+  group_by(energy_cluster, sample_length) %>%
+    mutate(n = n(),
+         above1 = signif( sum(rep>thresh_vector[1])/n*100, 2),
+         # above2 = signif( sum(rep>thresh_vector[2])/n*100, 2),
+
+         # label = paste0(
+         #                above1, "%")
+         
+                  label = paste0( sample_length)
+
+)
+
+
+a <- split(a,f = a$energy_cluster)
+
+# reorder factors so the legend is ordered by day 1,3,7,14
+# use the inverse of length function, as samples of legnth 1 will have the
+# most values (greatest legnth)
+
+a[['ac']]$label <- reorder(a[['ac']]$label,
+                           X = as.character(a[['ac']]$label),
+                           FUN = function(x) -length(x))
+
+a[['shoulder']]$label <- reorder(a[['shoulder']]$label,
+                                 X = as.character(a[['shoulder']]$label),
+                           FUN = function(x) -length(x))
+
+a[['heat']]$label <- reorder(a[['heat']]$label,
+                             X = as.character(a[['heat']]$label),
+                           FUN = function(x) -length(x))
+
+
+
+
+p1 <- ggplot(a[['ac']])+
+  geom_density(aes(x = rep, fill = as.factor(label)), alpha = 0.3)+
+  # geom_text(aes(label = (ext_outlier_n*100) %>% signif(2)),
+  #           y = 0.75, size = xsmall)+
+  facet_wrap(vars(energy_cluster))+
+  geom_vline(xintercept = thresh_vector[1], linetype = 'dashed', size = 1)+
+  xlab('Representativeness')+
+  ggtitle(paste0(x_metric, ': Samples from GROUP 3 homes and rooms pooled'))+
+      # labs(fill = 'Length of Sample, days')+
+      labs(fill = 'Sample Length, days')+
+    theme_classic()+
+    theme(
+      axis.text.y = element_blank(),
+      axis.ticks.y = element_blank(),
+      plot.title = element_blank(),
+      strip.text = element_text(size = medium),
+      axis.text = element_text(size = medium),
+      axis.title = element_text(size = large),
+      legend.text = element_text(size = large),
+      legend.title = element_text(size = large),
+      legend.position = c(0.4, 0.7),
+      legend.background = element_blank()
+
+    )+
+    scale_fill_manual( values = length_colors
+                       )+
+  ylab('Density')+
+  coord_cartesian(xlim = c(0,1))+
+  facet_wrap(~energy_cluster, ncol=1, labeller = labeller.metrics.seasons)
+
+
+p2 <- p1 %+% a[['shoulder']]
+p3 <- p1 %+% a[['heat']]
+
+
+grid.arrange(p1,p2,p3)
+
+})
+ 
+```
+
+
+* add in % representative
+
+```{r, fig.height=8, fig.width = 4}
+
+# see post on methodology 
+# https://stackoverflow.com/questions/14840542/place-a-legend-for-each-facet-wrap-grid-in-ggplot2
+
+
+map(c(
+  'pm25'
+      # 'voc',
+      # 'co2'
+  ), function(x_metric){
+  
+a <- entropy_time %>% filter(sample_length %in% c(1,3) &
+                               !is.na(rep) &
+                               metric == x_metric & 
+                               home %in% homes_tier3)
+
+# make a column with the label, so this can be used for the legend
+a <- a %>%
+  group_by(energy_cluster, sample_length) %>%
+    mutate(n = n(),
+         above1 = signif( sum(rep>thresh_vector[1])/n*100, 2),
+         # above2 = signif( sum(rep>thresh_vector[2])/n*100, 2),
+
+                  label = paste0( sample_length, " (", above1, "%)")
+
+)
+
+
+a <- split(a,f = a$energy_cluster)
+
+# reorder factors so the legend is ordered by day 1,3,7,14
+# use the inverse of length function, as samples of legnth 1 will have the
+# most values (greatest legnth)
+
+a[['ac']]$label <- reorder(a[['ac']]$label,
+                           X = as.character(a[['ac']]$label),
+                           FUN = function(x) -length(x))
+
+a[['shoulder']]$label <- reorder(a[['shoulder']]$label,
+                                 X = as.character(a[['shoulder']]$label),
+                           FUN = function(x) -length(x))
+
+a[['heat']]$label <- reorder(a[['heat']]$label,
+                             X = as.character(a[['heat']]$label),
+                           FUN = function(x) -length(x))
+
+
+
+
+p1 <- ggplot(a[['ac']])+
+  geom_density(aes(x = rep, fill = as.factor(label)), alpha = 0.3)+
+  # geom_text(aes(label = (ext_outlier_n*100) %>% signif(2)),
+  #           y = 0.75, size = xsmall)+
+  facet_wrap(vars(energy_cluster))+
+  geom_vline(xintercept = thresh_vector[1], linetype = 'dashed', size = 1)+
+  xlab('Representativeness')+
+  ggtitle(paste0(x_metric, ': Samples from GROUP 3 homes and rooms pooled'))+
+      # labs(fill = 'Length of Sample, days')+
+      labs(fill = 'Sample Length, days')+
+    theme_classic()+
+    theme(
+      axis.text.y = element_blank(),
+      axis.ticks.y = element_blank(),
+      plot.title = element_blank(),
+      strip.text = element_text(size = medium),
+      axis.text = element_text(size = medium),
+      axis.title = element_text(size = large),
+      legend.text = element_text(size = large),
+      legend.title = element_text(size = large),
+      legend.position = c(0.4, 0.7),
+      legend.background = element_blank()
+
+    )+
+    scale_fill_manual( values = length_colors
+                       )+
+  ylab('Density')+
+  coord_cartesian(xlim = c(0,1))+
+  facet_wrap(~energy_cluster, ncol=1, labeller = labeller.metrics.seasons)
+
+
+p2 <- p1 %+% a[['shoulder']]
+p3 <- p1 %+% a[['heat']]
+
+
+grid.arrange(p1,p2,p3)
+
+})
+ 
+```
+
+
+* prepare for 3x3 grid
+
+```{r, fig.height=8, fig.width = 4}
+
+# see post on methodology 
+# https://stackoverflow.com/questions/14840542/place-a-legend-for-each-facet-wrap-grid-in-ggplot2
+
+
+map(c(
+  'pm25',
+      'voc',
+      'co2'
+  ), function(x_metric){
+  
+a <- entropy_time %>% filter(sample_length %in% c(1,3) &
+                               !is.na(rep) &
+                               metric == x_metric & 
+                               home %in% homes_tier3)
+
+# make a column with the label, so this can be used for the legend
+a <- a %>%
+  group_by(energy_cluster, sample_length) %>%
+    mutate(n = n(),
+         above1 = signif( sum(rep>thresh_vector[1])/n*100, 2),
+         # above2 = signif( sum(rep>thresh_vector[2])/n*100, 2),
+
+                  label = paste0( above1, "%")
+
+)
+
+
+a <- split(a,f = a$energy_cluster)
+
+# reorder factors so the legend is ordered by day 1,3,7,14
+# use the inverse of length function, as samples of legnth 1 will have the
+# most values (greatest legnth)
+
+a[['ac']]$label <- reorder(a[['ac']]$label,
+                           X = as.character(a[['ac']]$label),
+                           FUN = function(x) -length(x))
+
+a[['shoulder']]$label <- reorder(a[['shoulder']]$label,
+                                 X = as.character(a[['shoulder']]$label),
+                           FUN = function(x) -length(x))
+
+a[['heat']]$label <- reorder(a[['heat']]$label,
+                             X = as.character(a[['heat']]$label),
+                           FUN = function(x) -length(x))
+
+
+
+
+p1 <- ggplot(a[['ac']])+
+  geom_density(aes(x = rep, fill = as.factor(label)), alpha = 0.3)+
+  # geom_text(aes(label = (ext_outlier_n*100) %>% signif(2)),
+  #           y = 0.75, size = xsmall)+
+  facet_wrap(vars(energy_cluster))+
+  geom_vline(xintercept = thresh_vector[1], linetype = 'dashed', size = 1)+
+  xlab('Representativeness')+
+  ggtitle(paste0(x_metric, ': Samples from GROUP 3 homes and rooms pooled'))+
+      # labs(fill = 'Length of Sample, days')+
+      # labs(fill = 'Sample Length, days')+
+    theme_classic()+
+    theme(
+      axis.text.y = element_blank(),
+      axis.ticks.y = element_blank(),
+      plot.title = element_blank(),
+      strip.text = element_text(size = large+8),
+      axis.text = element_blank(),
+      axis.title = element_blank(),
+      legend.text = element_text(size = large+12),
+      legend.title = element_blank(),
+      legend.position = c(0.4, 0.7),
+      legend.background = element_blank()
+
+    )+
+    scale_fill_manual( values = length_colors
+                       )+
+  ylab('Density')+
+  coord_cartesian(xlim = c(0,1))+
+  facet_wrap(~energy_cluster, ncol=1, labeller = labeller.metrics.seasons)
+
+
+p2 <- p1 %+% a[['shoulder']]
+p3 <- p1 %+% a[['heat']]
+
+
+grid.arrange(p1,p2,p3)
+
+})
+ 
+```
+
