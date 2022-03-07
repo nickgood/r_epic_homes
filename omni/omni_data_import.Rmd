@@ -29,7 +29,6 @@ library(googlesheets4)
 library(lubridate)
 library(data.table)
 library(kableExtra)
-
 ```
 
 ```{r}
@@ -515,9 +514,27 @@ omni_data_precal <-
 filter_data <- read_rds('../output_thesis/pm25/pm25.rds')
 ```
 
+* count how many upas samples did not have enough data (not including blanks)
+```{r }
+# filter values that were not blanks, but had NA mass values
+filters_invalid <- filter_data %>%
+  filter(location != 'blank' & is.na(conc))
+
+#number of invalid samples
+nrow(filters_invalid)
+
+# number of valid samples
+filter_data %>% filter(location != 'blank') %>% nrow()
+
+#fraction of invalid
+nrow(filters_invalid) /  filter_data %>% filter(location != 'blank') %>% nrow()
+
+```
 
 # create correction factor
 
+* amount of filter-sensor pairs will be more than amount of filters
+* because living room filters were duplicated to pair to all indoor rooms
 ```{r find_correction_ratios_for_all_sensors}
 
 # add correciton factor to real-time pm2.5 data
@@ -572,12 +589,22 @@ ggplot(grav_cf_df, aes(y = grav_cf))+
 
 ```
 
+* count negative CF values from pairwise method
+```{r}
+ grav_cf_df %>% filter(!is.na(grav_cf) & grav_cf < 0) %>%nrow()
+
+```
+ 
+* out of ___ CF values
+```{r}
+ grav_cf_df %>% filter(!is.na(grav_cf)) %>%nrow()
+```
+
+
+
 * after omitting negatives...
+
 ```{r, fig.height=3, fig.width=1.5}
-
-grav_omit <- grav_cf_df %>% filter(!is.na(grav_cf) & grav_cf < 0) %>%nrow()
-grav_all <- grav_cf_df %>% filter(!is.na(grav_cf)) %>%nrow()
-
 
 grav_cf_df_clean <- grav_cf_df %>%
   filter(!is.na(grav_cf) & grav_cf >0)
@@ -608,7 +635,18 @@ ggplot(grav_cf_df_clean, aes( x = 1, y = grav_cf))+
 ```
 
 
-*look at regression of TWA to filter values
+* summary stats of pairwise CF values (without negative values)
+```{r}
+# min
+grav_cf_df_clean %>% pull(grav_cf) %>% min()
+
+# max
+grav_cf_df_clean %>% pull(grav_cf) %>% max()
+
+```
+
+
+*look at regression of TWA to filter values without omitting outliers
 
 ```{r}
 model <- lm("twa~conc_correct+0", data = grav_cf_df_clean)
@@ -616,6 +654,36 @@ model <- lm("twa~conc_correct+0", data = grav_cf_df_clean)
 # print model results
 broom::tidy(model, conf.int = TRUE) %>%
   kable(digits = c(NA, 2, 2, 2, 6 , 2, 2), caption = "OMNI vs. Filter PM2.5") %>%
+  kable_paper(bootstrap_options = "striped", full_width = F)
+```
+
+
+*omit outliers for regression again
+```{r}
+# find limits within 2 sds of mean
+mean_cf <- grav_cf_df_clean %>% pull(grav_cf) %>% mean()
+
+sd_cf <- grav_cf_df_clean %>% pull(grav_cf) %>% sd()
+
+grav_cf_df_omit <-  grav_cf_df_clean %>%
+  filter(grav_cf > mean_cf-2.5*sd_cf & grav_cf < mean_cf+2.5*sd_cf)
+
+# amount of values omitted
+(   nrow(grav_cf_df_clean) -  nrow(grav_cf_df_omit) )
+
+# fraction ""
+(   nrow(grav_cf_df_clean) -  nrow(grav_cf_df_omit) ) /   nrow(grav_cf_df_clean)
+```
+
+*look at regression of TWA to filter values after omitting outliers
+
+```{r}
+model <- lm("twa~conc_correct+0", data = grav_cf_df_omit)
+
+# print model results
+broom::tidy(model, conf.int = TRUE) %>%
+  kable(digits = c(NA, 2, 2, 2, 6 , 2, 2),
+        caption = "OMNI vs. Filter PM2.5, outliers omitted") %>%
   kable_paper(bootstrap_options = "striped", full_width = F)
 ```
 
