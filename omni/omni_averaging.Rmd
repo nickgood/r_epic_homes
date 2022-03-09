@@ -771,6 +771,7 @@ write_csv(summary, './csv_created/averages/group3_avg_summary.csv')
 
 
 ## all homes (unclustered)
+* summary stats (range, mean, sd, median)
 ```{r}
 # by home --------
 a <- omni_hourly %>%
@@ -833,5 +834,53 @@ write_csv(b, './csv_created/averages/pooled_home-pooled_rooms-avg.csv')
 # 
 # 
 # write_csv(summary, './csv_created/averages/all_home_avg_summary.csv')
+```
+
+
+* cov
+```{r}
+# by home --------
+a <- omni_hourly %>%
+  filter(location %in% locations_indoor) %>%
+  pivot_longer(c(co2:temp), values_to = 'value', names_to = 'metric')%>%
+    filter(metric %in% c('pm25', 'voc', 'co2', 'temp', 'humid', 'lux', 'spl_a')) %>%
+  group_by( metric, home) %>%
+  summarise( 
+    sd = sd(value, na.rm = TRUE),
+    mean = mean (value, na.rm = TRUE),
+    cov = sd/mean,
+             n_room_hours = n(),
+             .groups = 'drop')
+
+b <- a %>%
+  select( metric, home, everything(.)) %>%
+  arrange( metric, home)
+
+
+write_csv(b, './csv_created/cov/all_home-pooled_rooms-cov.csv')
+
+
+# pooled homes
+
+a <- omni_hourly %>%
+  filter(location %in% locations_indoor) %>%
+  pivot_longer(c(co2:temp), values_to = 'value', names_to = 'metric')%>%
+    filter(metric %in% c('pm25', 'voc', 'co2', 'temp', 'humid', 'lux', 'spl_a')) %>%
+  group_by( metric) %>%
+  summarise( 
+    sd = sd(value, na.rm = TRUE),
+    mean = mean (value, na.rm = TRUE),
+    cov = sd/mean,
+             n_room_hours = n(),
+             .groups = 'drop')
+
+b <- a %>%
+  select( metric, everything(.)) %>%
+  arrange( metric)
+
+
+write_csv(b, './csv_created/cov/pooled_home-pooled_rooms-cov.csv')
+
+
 ```
 
