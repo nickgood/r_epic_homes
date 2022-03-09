@@ -43,7 +43,6 @@ home_type_df <- read_csv('../sense/csv_created_sense/home_type_df.csv')
 lag_df <- read_csv('./csv_created/lag_summary.csv')
 
 
-
 ```
 
 # only use data up to June 2021
@@ -779,8 +778,12 @@ a <- omni_hourly %>%
   pivot_longer(c(co2:temp), values_to = 'value', names_to = 'metric')%>%
     filter(metric %in% c('pm25', 'voc', 'co2', 'temp', 'humid', 'lux', 'spl_a')) %>%
   group_by( metric, home) %>%
-  summarise( avg = mean(value, na.rm = TRUE),
+  summarise( 
+    min = min(value, na.rm = TRUE),
+    max = max (value, na.rm = TRUE),
+    avg = mean(value, na.rm = TRUE),
              sd = sd(value, na.rm = TRUE),
+    med = median(value, na.rm = TRUE),
              n_room_hours = n(),
              .groups = 'drop')
 
@@ -792,16 +795,43 @@ b <- a %>%
 write_csv(b, './csv_created/averages/all_home-pooled_rooms-avg.csv')
 
 
+# pooled homes
+
+a <- omni_hourly %>%
+  filter(location %in% locations_indoor) %>%
+  pivot_longer(c(co2:temp), values_to = 'value', names_to = 'metric')%>%
+    filter(metric %in% c('pm25', 'voc', 'co2', 'temp', 'humid', 'lux', 'spl_a')) %>%
+  group_by( metric) %>%
+  summarise( 
+    min = min(value, na.rm = TRUE),
+    max = max (value, na.rm = TRUE),
+    avg = mean(value, na.rm = TRUE),
+             sd = sd(value, na.rm = TRUE),
+    med = median(value, na.rm = TRUE),
+             n_room_hours = n(),
+             .groups = 'drop')
+
+b <- a %>%
+  select( metric, everything(.)) %>%
+  arrange( metric)
+
+
+write_csv(b, './csv_created/averages/pooled_home-pooled_rooms-avg.csv')
+
+
+
+
+
 # summary --------
-summary <- b %>%
-  group_by(metric) %>%
-  summarise(mean_homes = mean(avg),
-            sd_homes = sd(avg),
-            n_homes = n(), .groups = 'drop') %>%
-  select( everything(.))
-
-
-
-write_csv(summary, './csv_created/averages/all_home_avg_summary.csv')
+# summary <- b %>%
+#   group_by(metric) %>%
+#   summarise(mean_homes = mean(avg),
+#             sd_homes = sd(avg),
+#             n_homes = n(), .groups = 'drop') %>%
+#   select( everything(.))
+# 
+# 
+# 
+# write_csv(summary, './csv_created/averages/all_home_avg_summary.csv')
 ```
 
