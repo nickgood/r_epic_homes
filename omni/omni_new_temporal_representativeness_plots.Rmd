@@ -788,7 +788,8 @@ grid.arrange(p1,p2,p3)
 
 # function-----------------
 diurn.rep.plot <- function(data, x_home, x_location, x_energy_cluster, x_metric,
-         sample_lengths = c(3,7,14), y_limits = NULL){
+         sample_lengths = c(3,7,14), # has to be a numerical vector of length 3 or 4
+         y_limits = NULL){
   
   data_condition <- data %>%
     filter(home == x_home, location == x_location,
@@ -902,10 +903,24 @@ diurn.rep.plot <- function(data, x_home, x_location, x_energy_cluster, x_metric,
     #           x = -Inf, hjust = 0)+
     scale_fill_manual(
       breaks = c(sample_lengths %>% as.character(), 'entire_period'),
-      values = c(cbbPalette['light_blue'],
+      values = if(length(sample_lengths) == 3){
+        
+                       c(cbbPalette['light_blue'],
                    cbbPalette['light_orange'],
                    cbbPalette['purple'],
-                   cbbPalette['black'])%>% unname(),
+                   cbbPalette['black'])%>% unname()
+      } else{
+                   
+                   c(
+                     cbbPalette['green'],
+                     cbbPalette['light_blue'],
+                   cbbPalette['light_orange'],
+                   cbbPalette['purple'],
+                   cbbPalette['black'])%>% unname()
+        },
+                   
+                   
+                   
       labels= labels,
       name = 'Sample Length, days',
       aesthetics = (c('color', 'fill'))
@@ -938,38 +953,38 @@ diurn.rep.plot <- function(data, x_home, x_location, x_energy_cluster, x_metric,
 * pick homes, seasons, (and rooms if not pooled)
 ```{r, fig.height=2, fig.width = 4}
 
-if(pooled_rooms == TRUE) {
-  map(c('pm25', 'voc'), function(y_metric){
-  map(c('009'), function(y_home){
-  map(c('heat', 'shoulder', 'ac'), function(y_energy_cluster){
-    diurn.rep.plot(
-    data = entropy_time,
-    x_home = y_home, x_location = 'pooled',
-    x_energy_cluster = y_energy_cluster, x_metric = y_metric
-    )
-  })
-  })
-  })
-  
-
-} else if(pooled_rooms == FALSE){
-
-    map(c('pm25', 'voc'), function(y_metric){
-  map(c('009'), function(y_home){
-  map(c('heat', 'shoulder'), function(y_energy_cluster){
-  map(c('living', 'kitchen', 'bedroom'), function(y_location){
-    diurn.rep.plot(
-    data = entropy_time,
-    x_home = y_home, x_location = y_location,
-    x_energy_cluster = y_energy_cluster, x_metric = y_metric
-    )
-  })
-  })
-  })
-    })
-  
-
-}
+# if(pooled_rooms == TRUE) {
+#   map(c('pm25', 'voc'), function(y_metric){
+#   map(c('009'), function(y_home){
+#   map(c('heat', 'shoulder', 'ac'), function(y_energy_cluster){
+#     diurn.rep.plot(
+#     data = entropy_time,
+#     x_home = y_home, x_location = 'pooled',
+#     x_energy_cluster = y_energy_cluster, x_metric = y_metric
+#     )
+#   })
+#   })
+#   })
+#   
+# 
+# } else if(pooled_rooms == FALSE){
+# 
+#     map(c('pm25', 'voc'), function(y_metric){
+#   map(c('009'), function(y_home){
+#   map(c('heat', 'shoulder'), function(y_energy_cluster){
+#   map(c('living', 'kitchen', 'bedroom'), function(y_location){
+#     diurn.rep.plot(
+#     data = entropy_time,
+#     x_home = y_home, x_location = y_location,
+#     x_energy_cluster = y_energy_cluster, x_metric = y_metric
+#     )
+#   })
+#   })
+#   })
+#     })
+#   
+# 
+# }
 
 
 
@@ -980,11 +995,21 @@ if(pooled_rooms == TRUE) {
 # diurn.rep.plot(entropy_time, '012', 'pooled', 'heat', 'pm25')
 #
 #
+
 # not pooled rooms
+
+## Thesis Plot, in body
+
 diurn.rep.plot(entropy_time, '009', 'living', 'heat', 'pm25')
 diurn.rep.plot(entropy_time, '009', 'living', 'heat', 'voc')
 diurn.rep.plot(entropy_time, '009', 'living', 'heat', 'co2')
 
+
+## Thesis Plot, in Supp Info (need to add another color)
+
+diurn.rep.plot(entropy_time, '009', 'living', 'heat', 'pm25', c(1,3,7,14))
+diurn.rep.plot(entropy_time, '009', 'living', 'heat', 'voc', c(1,3,7,14))
+diurn.rep.plot(entropy_time, '009', 'living', 'heat', 'co2', c(1,3,7,14))
 
 # diurn.rep.plot(entropy_time, '009', 'living', 'heat', 'pm25', c(1,3,7))
 # diurn.rep.plot(entropy_time, '009', 'living', 'heat', 'voc', c(1,3,7))
