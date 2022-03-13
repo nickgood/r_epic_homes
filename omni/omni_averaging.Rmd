@@ -245,22 +245,21 @@ energy_colors <- c(cbbPalette['light_blue'],
 energy_breaks <- c('ac', 'shoulder', 'heat', 'overall')
 energy_labels <- c('Cooling', 'Shoulder', 'Heating', 'Entire Period')
 
-
 # define lag periods
 lag_pm25 <-lag_df %>% filter(energy_cluster == 'total', metric == 'pm25') %>%
-  pull(median) %>% round()
+  pull(median) %>% ceiling()
 lag_voc <-lag_df %>% filter(energy_cluster == 'total', metric == 'voc') %>%
-  pull(median)%>% round()
+  pull(median)%>% ceiling()
 lag_co2 <- lag_df %>% filter(energy_cluster == 'total', metric == 'co2') %>%
-  pull(median)%>% round()
+  pull(median)%>% ceiling()
 lag_temp <- lag_df %>% filter(energy_cluster == 'total', metric == 'temp') %>%
-  pull(median)%>% round()
+  pull(median)%>% ceiling()
 lag_humid <- lag_df %>% filter(energy_cluster == 'total', metric == 'humid') %>%
-  pull(median)%>% round()
+  pull(median)%>% ceiling()
 lag_lux <- lag_df %>% filter(energy_cluster == 'total', metric == 'lux') %>%
-  pull(median)%>% round()
+  pull(median)%>% ceiling()
 lag_spl_a <- lag_df %>% filter(energy_cluster == 'total', metric == 'spl_a') %>%
-  pull(median)%>% round()
+  pull(median)%>% ceiling()
 ```
 
 
@@ -498,6 +497,16 @@ a$metric <- factor(a$metric, levels = c('pm25', 'voc', 'co2', 'temp'))
 a$energy_cluster <- factor(a$energy_cluster, levels = c('ac', 'shoulder', 'heat'))
 
 
+# # # make n labels
+# n_labels <- a %>%
+#   group_by(energy_cluster, metric) %>%
+#   summarise(
+#     median = median(mean, na.rm = TRUE),
+#     label_position=median+2*median,
+#     label_value=n(), .groups = 'drop'
+#   ) %>%
+#   mutate(label_value = paste0('n=',label_value))
+
     # make a dummy df in which to define limits for each metric
 limit_df <- a %>%
   group_by(metric) %>%
@@ -526,6 +535,9 @@ ggplot(a,aes(x = energy_cluster, y = mean))+
         geom_blank(data = limit_df, aes(x = 'heat', y = limits))+
   xlab('Season')+
   ylab('IEQ Indicator Value\nin Group 2 Homes')
+    # geom_text(data=n_labels, aes(x = energy_cluster,
+    #                              y=label_position,
+    #                            label=label_value),vjust=0)
   
 
 ###
@@ -547,6 +559,17 @@ a <- data_avg %>%
 a$location <- factor(a$location, levels = c('kitchen', 'living', 'bedroom'))
 a$metric <- factor(a$metric, levels = c('pm25', 'voc', 'co2', 'temp'))
 a$energy_cluster <- factor(a$energy_cluster, levels = c('ac', 'shoulder', 'heat'))
+
+
+# # # make n labels
+# n_labels <- a %>%
+#   group_by(energy_cluster, metric) %>%
+#   summarise(
+#     median = median(mean, na.rm = TRUE),
+#     label_position=median+2*median,
+#     label_value=n(), .groups = 'drop'
+#   ) %>%
+#   mutate(label_value = paste0('n=',label_value))
 
 
     # make a dummy df in which to define limits for each metric
@@ -581,7 +604,10 @@ ggplot(a,aes(x = energy_cluster, y = mean))+
   geom_blank(data = limit_df, aes(x = 'heat', y = limits))+
   xlab('Season')+
   ylab('IEQ Indicator Value\nin Group 3 Homes')
-  
+    # geom_text(data=n_labels, aes(x = energy_cluster,
+    #                              y=label_position,
+    #                            label=label_value),vjust=0)
+
 
 ###
 
