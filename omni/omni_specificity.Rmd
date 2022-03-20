@@ -553,7 +553,7 @@ unwanted_scaled_na <- spec_df %>%
 
 ### `r unwanted_scaled_na %>% nrow()` unexpected missing values in scaled spec data
 
-## Boxplot values
+## Boxplot values with seasons colored
 ```{r plot_spec_rooms, fig.width = 8, fig.height = 3}
 
 spec_df$metric <- factor(spec_df$metric, levels = c('pm25', 'voc', 'co2'))
@@ -594,6 +594,52 @@ ggplot(spec_df, aes(x = location, y = specificity))+
       )
 ```
 
+
+
+## Boxplot values with seasons colored
+```{r plot_spec_rooms, fig.width = 8, fig.height = 3}
+
+spec_df$metric <- factor(spec_df$metric, levels = c('pm25', 'voc', 'co2'))
+
+ggplot(spec_df, aes(x = location, y = specificity))+
+  geom_boxplot(
+    outlier.shape = NA
+    )+
+  geom_jitter( aes(color = energy_cluster, shape = energy_cluster), 
+               width = 0.1, size = 2.5)+
+  facet_wrap(vars(metric), labeller = labeller.all)+
+ # specify shape and color for each season
+  list(
+    scale_color_manual(
+      breaks = energy_breaks,
+                     values = energy_colors,
+                     labels = energy_labels,
+                     name = 'Season'
+                     ),
+  scale_shape_manual(
+    breaks = energy_breaks,
+                     values = energy_shapes,
+                         labels = energy_labels,
+                     name = 'Season'
+    )
+  )+
+  theme_classic()+
+  xlab('Room')+
+  ylab('Specificity')+
+  scale_x_discrete(
+    breaks = room_breaks,
+    labels = room_labels
+  )+
+  theme(
+      strip.text = element_text(size = small),
+      axis.title = element_text(size = small),
+      axis.text.x = element_text(size = small-1),
+      axis.text.y = element_text(size = small-1),
+      legend.position = 'none'
+      # legend.text = element_text(size = small-3),
+      # legend.title = element_text(size = small-3),
+      )
+```
 
 ## Rank Table of Values
 
