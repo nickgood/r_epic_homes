@@ -43,7 +43,6 @@ home_type_df <- read_csv('../sense/csv_created_sense/home_type_df.csv')
 lag_df <- read_csv('./csv_created/lag_summary.csv')
 
 
-
 ```
 
 # only use data up to June 2021
@@ -246,22 +245,21 @@ energy_colors <- c(cbbPalette['light_blue'],
 energy_breaks <- c('ac', 'shoulder', 'heat', 'overall')
 energy_labels <- c('Cooling', 'Shoulder', 'Heating', 'Entire Period')
 
-
 # define lag periods
 lag_pm25 <-lag_df %>% filter(energy_cluster == 'total', metric == 'pm25') %>%
-  pull(median) %>% round()
+  pull(median) %>% ceiling()
 lag_voc <-lag_df %>% filter(energy_cluster == 'total', metric == 'voc') %>%
-  pull(median)%>% round()
+  pull(median)%>% ceiling()
 lag_co2 <- lag_df %>% filter(energy_cluster == 'total', metric == 'co2') %>%
-  pull(median)%>% round()
+  pull(median)%>% ceiling()
 lag_temp <- lag_df %>% filter(energy_cluster == 'total', metric == 'temp') %>%
-  pull(median)%>% round()
+  pull(median)%>% ceiling()
 lag_humid <- lag_df %>% filter(energy_cluster == 'total', metric == 'humid') %>%
-  pull(median)%>% round()
+  pull(median)%>% ceiling()
 lag_lux <- lag_df %>% filter(energy_cluster == 'total', metric == 'lux') %>%
-  pull(median)%>% round()
+  pull(median)%>% ceiling()
 lag_spl_a <- lag_df %>% filter(energy_cluster == 'total', metric == 'spl_a') %>%
-  pull(median)%>% round()
+  pull(median)%>% ceiling()
 ```
 
 
@@ -499,6 +497,16 @@ a$metric <- factor(a$metric, levels = c('pm25', 'voc', 'co2', 'temp'))
 a$energy_cluster <- factor(a$energy_cluster, levels = c('ac', 'shoulder', 'heat'))
 
 
+# # # make n labels
+# n_labels <- a %>%
+#   group_by(energy_cluster, metric) %>%
+#   summarise(
+#     median = median(mean, na.rm = TRUE),
+#     label_position=median+2*median,
+#     label_value=n(), .groups = 'drop'
+#   ) %>%
+#   mutate(label_value = paste0('n=',label_value))
+
     # make a dummy df in which to define limits for each metric
 limit_df <- a %>%
   group_by(metric) %>%
@@ -527,6 +535,9 @@ ggplot(a,aes(x = energy_cluster, y = mean))+
         geom_blank(data = limit_df, aes(x = 'heat', y = limits))+
   xlab('Season')+
   ylab('IEQ Indicator Value\nin Group 2 Homes')
+    # geom_text(data=n_labels, aes(x = energy_cluster,
+    #                              y=label_position,
+    #                            label=label_value),vjust=0)
   
 
 ###
@@ -548,6 +559,17 @@ a <- data_avg %>%
 a$location <- factor(a$location, levels = c('kitchen', 'living', 'bedroom'))
 a$metric <- factor(a$metric, levels = c('pm25', 'voc', 'co2', 'temp'))
 a$energy_cluster <- factor(a$energy_cluster, levels = c('ac', 'shoulder', 'heat'))
+
+
+# # # make n labels
+# n_labels <- a %>%
+#   group_by(energy_cluster, metric) %>%
+#   summarise(
+#     median = median(mean, na.rm = TRUE),
+#     label_position=median+2*median,
+#     label_value=n(), .groups = 'drop'
+#   ) %>%
+#   mutate(label_value = paste0('n=',label_value))
 
 
     # make a dummy df in which to define limits for each metric
@@ -582,7 +604,10 @@ ggplot(a,aes(x = energy_cluster, y = mean))+
   geom_blank(data = limit_df, aes(x = 'heat', y = limits))+
   xlab('Season')+
   ylab('IEQ Indicator Value\nin Group 3 Homes')
-  
+    # geom_text(data=n_labels, aes(x = energy_cluster,
+    #                              y=label_position,
+    #                            label=label_value),vjust=0)
+
 
 ###
 
@@ -772,6 +797,7 @@ write_csv(summary, './csv_created/averages/group3_avg_summary.csv')
 
 
 ## all homes (unclustered)
+* summary stats (range, mean, sd, median)
 ```{r}
 # by home --------
 a <- omni_hourly %>%
@@ -779,8 +805,12 @@ a <- omni_hourly %>%
   pivot_longer(c(co2:temp), values_to = 'value', names_to = 'metric')%>%
     filter(metric %in% c('pm25', 'voc', 'co2', 'temp', 'humid', 'lux', 'spl_a')) %>%
   group_by( metric, home) %>%
-  summarise( avg = mean(value, na.rm = TRUE),
+  summarise( 
+    min = min(value, na.rm = TRUE),
+    max = max (value, na.rm = TRUE),
+    avg = mean(value, na.rm = TRUE),
              sd = sd(value, na.rm = TRUE),
+    med = median(value, na.rm = TRUE),
              n_room_hours = n(),
              .groups = 'drop')
 
@@ -792,16 +822,120 @@ b <- a %>%
 write_csv(b, './csv_created/averages/all_home-pooled_rooms-avg.csv')
 
 
+# pooled homes
+
+a <- omni_hourly %>%
+  filter(location %in% locations_indoor) %>%
+  pivot_longer(c(co2:temp), values_to = 'value', names_to = 'metric')%>%
+    filter(metric %in% c('pm25', 'voc', 'co2', 'temp', 'humid', 'lux', 'spl_a')) %>%
+  group_by( metric) %>%
+  summarise( 
+    min = min(value, na.rm = TRUE),
+    max = max (value, na.rm = TRUE),
+    avg = mean(value, na.rm = TRUE),
+             sd = sd(value, na.rm = TRUE),
+    med = median(value, na.rm = TRUE),
+             n_room_hours = n(),
+             .groups = 'drop')
+
+b <- a %>%
+  select( metric, everything(.)) %>%
+  arrange( metric)
+
+
+write_csv(b, './csv_created/averages/pooled_home-pooled_rooms-avg.csv')
+
+
+
+
+
 # summary --------
-summary <- b %>%
-  group_by(metric) %>%
-  summarise(mean_homes = mean(avg),
-            sd_homes = sd(avg),
-            n_homes = n(), .groups = 'drop') %>%
-  select( everything(.))
+# summary <- b %>%
+#   group_by(metric) %>%
+#   summarise(mean_homes = mean(avg),
+#             sd_homes = sd(avg),
+#             n_homes = n(), .groups = 'drop') %>%
+#   select( everything(.))
+# 
+# 
+# 
+# write_csv(summary, './csv_created/averages/all_home_avg_summary.csv')
+```
+
+
+* cov
+```{r}
+# by home --------
+a <- omni_hourly %>%
+  filter(location %in% locations_indoor) %>%
+  pivot_longer(c(co2:temp), values_to = 'value', names_to = 'metric')%>%
+    filter(metric %in% c('pm25', 'voc', 'co2', 'temp', 'humid', 'lux', 'spl_a')) %>%
+  group_by( metric, home) %>%
+  summarise( 
+    sd = sd(value, na.rm = TRUE),
+    mean = mean (value, na.rm = TRUE),
+    cov = sd/mean,
+             n_room_hours = n(),
+             .groups = 'drop')
+
+b <- a %>%
+  select( metric, home, everything(.)) %>%
+  arrange( metric, home)
+
+
+# write_csv(b, './csv_created/cov/all_home-pooled_rooms-cov.csv')
+write_csv(b, paste0('./csv_created/cov/all_home-pooled_rooms-cov_', Sys.Date(),
+'.csv'))
+
+
+# pooled homes
+
+a <- omni_hourly %>%
+  filter(location %in% locations_indoor) %>%
+  pivot_longer(c(co2:temp), values_to = 'value', names_to = 'metric')%>%
+    filter(metric %in% c('pm25', 'voc', 'co2', 'temp', 'humid', 'lux', 'spl_a')) %>%
+  group_by( metric) %>%
+  summarise( 
+    sd = sd(value, na.rm = TRUE),
+    mean = mean (value, na.rm = TRUE),
+    cov = sd/mean,
+             n_room_hours = n(),
+             .groups = 'drop')
+
+b <- a %>%
+  select( metric, everything(.)) %>%
+  arrange( metric)
+
+
+# write_csv(b, './csv_created/cov/pooled_home-pooled_rooms-cov.csv')
+
+write_csv(b, paste0('./csv_created/cov/pooled_home-pooled_rooms-cov_', Sys.Date(),
+'.csv'))
+
+# by season, pooled homes
+
+a <- omni_hourly %>%
+  filter(location %in% locations_indoor) %>%
+  pivot_longer(c(co2:temp), values_to = 'value', names_to = 'metric')%>%
+    filter(metric %in% c('pm25', 'voc', 'co2', 'temp', 'humid', 'lux', 'spl_a')) %>%
+  group_by( metric, energy_cluster) %>%
+  summarise( 
+    sd = sd(value, na.rm = TRUE),
+    mean = mean (value, na.rm = TRUE),
+    cov = sd/mean,
+             n_room_hours = n(),
+             .groups = 'drop')
+
+b <- a %>%
+  select( metric, energy_cluster, everything(.)) %>%
+  arrange( metric)
+
+
+write_csv(b, './csv_created/cov/seasons-cov.csv')
+write_csv(b, paste0('./csv_created/cov/seasons-cov_',
+Sys.Date(), '.csv'))
 
 
 
-write_csv(summary, './csv_created/averages/all_home_avg_summary.csv')
 ```
 
