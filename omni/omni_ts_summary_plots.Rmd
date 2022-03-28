@@ -997,6 +997,7 @@ a <- map(c('pm25', 'voc', 'co2', 'temp'), function(x_metric){
   
   dat <- omni_hourly %>%
     filter( home %in% homes,
+            location %in% locations_indoor,
             energy_cluster %in% c('heat', 'shoulder', 'ac'))
     
   time.table(dat, 'hour', x_metric, groupers = c('energy_cluster'))
@@ -1023,6 +1024,8 @@ a <- map(c('pm25', 'voc', 'co2', 'temp'), function(x_metric){
   
   dat <- omni_hourly %>%
     filter( home %in% homes,
+            location %in% locations_indoor,
+
             energy_cluster %in% c('heat', 'shoulder', 'ac'))
     
   time.table(dat, 'hour', x_metric, groupers = c('energy_cluster'))
