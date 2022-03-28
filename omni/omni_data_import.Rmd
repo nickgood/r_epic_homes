@@ -109,9 +109,14 @@ location_colors <- c(cbbPalette['green'],
                    cbbPalette['dark_orange']
                    )%>% unname()
 
+ location_shapes <- c(16, 17, 15, 7, 13) 
+
+
 location_breaks <- c('living', 'bedroom', 'kitchen', 'garage', 'outdoor')
 
 location_labels <- c('Living Room', 'Bedroom', 'Kitchen', 'Garage', 'Outdoor')
+
+
 
 ```
 
@@ -613,7 +618,7 @@ grav_cf_df_clean <- grav_cf_df %>%
 # check spread of correction factor values
 ggplot(grav_cf_df_clean, aes( x = 1, y = grav_cf))+
   geom_boxplot( outlier.shape = NA)+
-  geom_jitter( aes( color = location), width = 0.15)+
+  geom_jitter( aes( color = location, shape = location), width = 0.15)+
   theme_classic()+
   theme(
     axis.text.x = element_blank(),
@@ -627,10 +632,16 @@ ggplot(grav_cf_df_clean, aes( x = 1, y = grav_cf))+
     labels = location_labels,
     name = 'Monitoring Location'
   )+
+    scale_shape_manual(
+    breaks = location_breaks,
+    values = location_shapes,
+    labels = location_labels,
+    name = 'Monitoring Location'
+  )+
   theme(
     legend.position = 'none'
   )
-  
+
 
 ```
 
@@ -688,15 +699,22 @@ broom::tidy(model, conf.int = TRUE) %>%
 ```
 
 
+# Plot real-time vs filter values with legend
+
 ```{r fig_omni_vs_filter, fig.width=6, fig.height=4.5}
+model_x_values <- seq(0,110,1)
+
+  # add boundarie for inset plot
+x_inset <- 21
+y_inset <-21
 
 # make predictions based on model
-predicted_df <- data.frame(twa_pred = predict(model, grav_cf_df_clean),
-                           conc_correct=grav_cf_df_clean$conc_correct)
+predicted_df <- data.frame(twa_pred = model$coefficients*model_x_values,
+                   conc_correct = model_x_values)
 
 ggplot(grav_cf_df_clean, aes(x = conc_correct, y = twa)) +
   geom_point(aes(
-    color = location
+    color = location, shape = location
     )) +
   #geom_smooth(method = "lm", formula = "y ~ x", se = FALSE) +
   theme_bw() +
@@ -705,6 +723,9 @@ ggplot(grav_cf_df_clean, aes(x = conc_correct, y = twa)) +
                                       # linetype = 'model'
                                       ),
             linetype = 'solid')+
+  # add boundarie for inset plot
+  geom_rect(xmin = 0, xmax = x_inset, ymin = 0, ymax = y_inset, fill = NA,
+            color = cbbPalette['light_blue'])+
   scale_y_continuous(expand = c(0,0), limits = c(0,110))+
   scale_x_continuous(expand = c(0,0), limits = c(0,110))+
     scale_color_manual(
@@ -713,13 +734,19 @@ ggplot(grav_cf_df_clean, aes(x = conc_correct, y = twa)) +
     labels = location_labels,
     name = 'Monitoring Location'
   )+
-  ylab(expression(paste('Real-Time PM'[2.5], ', ug/m'^3)))+
+      scale_shape_manual(
+    breaks = location_breaks,
+    values = location_shapes,
+    labels = location_labels,
+    name = 'Monitoring Location'
+  )+
+  ylab(expression(paste('IAQ Sensor TWA PM'[2.5], ', ug/m'^3)))+
   xlab(expression(paste('Gravimetric PM'[2.5], ', ug/m'^3)))+
           theme(
-      axis.title = element_text(size = small-3),
-      axis.text = element_text(size = small-3),
-      legend.text = element_text(size = small-3),
-      legend.title = element_text(size = small-3),
+      axis.title = element_text(size = small+2),
+      axis.text = element_text(size = small+2),
+      legend.text = element_text(size = small+2),
+      legend.title = element_text(size = small+2),
               )
 
 # scale_linetype_manual(
@@ -729,13 +756,59 @@ ggplot(grav_cf_df_clean, aes(x = conc_correct, y = twa)) +
   # )
 
 
-
+cbbPalette
   
 # # without filter "outliers"
 # 
 # a %>% grav_cf_df_clean %>% filter(conc_correct<50)
 # 
 # model <- lm("twa~conc_correct+0", data = a)
+
+```
+
+
+# Inset plot
+
+```{r fig_omni_vs_filter, fig.width=6, fig.height=4.5}
+
+model_x_inset <- seq(0,x_inset,1)
+
+# make predictions based on model
+predicted_inset <- data.frame(twa_pred = model$coefficients*model_x_inset,
+                   conc_correct = model_x_inset)
+ggplot(grav_cf_df_clean, aes(x = conc_correct, y = twa)) +
+  geom_point(aes(
+    color = location, shape = location
+    ),
+    size = 5) +
+  #geom_smooth(method = "lm", formula = "y ~ x", se = FALSE) +
+  theme_bw() +
+  geom_abline(slope = 1, intercept = 0, linetype = 'dashed', size = 2) +
+  geom_line(data = predicted_inset, aes( y = twa_pred
+                                      # linetype = 'model'
+                                      ),
+            linetype = 'solid', size = 2)+
+  scale_y_continuous(expand = c(0,0), limits = c(0,y_inset))+
+  scale_x_continuous(expand = c(0,0), limits = c(0,x_inset))+
+    scale_color_manual(
+    breaks = location_breaks,
+    values = location_colors,
+    labels = location_labels,
+    name = 'Monitoring Location'
+  )+
+      scale_shape_manual(
+    breaks = location_breaks,
+    values = location_shapes,
+    labels = location_labels,
+    name = 'Monitoring Location'
+  )+
+          theme(
+      axis.title = element_blank(),
+      axis.text = element_text(size = small+14),
+      legend.position = 'none'
+              )
+
+
 
 ```
 
