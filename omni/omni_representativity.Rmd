@@ -576,6 +576,8 @@ unwanted_scaled_na <- represent_df %>%
 ### `r unwanted_scaled_na %>% nrow()` unexpected missing values in representativity data
 
 ## Boxplot of Values
+
+##### with colored seasons
 ```{r plot_rep_rooms, fig.width = 8, fig.height = 3}
 
 represent_df$metric <- factor(represent_df$metric, levels = c('pm25', 'voc', 'co2'))
@@ -614,6 +616,52 @@ ggplot(represent_df, aes(x = location, y = represent))+
       axis.text.y = element_text(size = small-4),
       legend.text = element_text(size = small-3),
       legend.title = element_text(size = small-3),
+      )
+```
+
+
+##### without colored seasons
+```{r plot_rep_rooms, fig.width = 8, fig.height = 3}
+
+represent_df$metric <- factor(represent_df$metric, levels = c('pm25', 'voc', 'co2'))
+
+ggplot(represent_df, aes(x = location, y = represent))+
+  geom_boxplot(
+    outlier.shape= NA
+    )+
+  geom_jitter( aes(color = energy_cluster, shape = energy_cluster),
+               width = 0.1, size = 2.5)+
+  facet_wrap(vars(metric), labeller = labeller.all)+
+  # specify shape and color for each season
+  list(
+    scale_color_manual(
+      breaks = energy_breaks,
+                     values = energy_colors,
+                     labels = energy_labels,
+                     name = 'Season'
+                     ),
+  scale_shape_manual(
+    breaks = energy_breaks,
+                     values = energy_shapes,
+                         labels = energy_labels,
+                     name = 'Season'
+    )
+  )+
+  theme_classic()+
+  xlab('Room')+
+  ylab('Representativeness')+
+  scale_x_discrete(
+    breaks = room_breaks,
+    labels = room_labels
+  )+
+  theme(
+      strip.text = element_text(size = small),
+      axis.title = element_text(size = small),
+      axis.text.x = element_text(size = small-1),
+      axis.text.y = element_text(size = small-1),
+      legend.position = 'none'
+      # legend.text = element_text(size = small),
+      # legend.title = element_text(size = small),
       )
 ```
 
