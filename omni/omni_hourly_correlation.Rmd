@@ -105,6 +105,8 @@ rms_driver <- lapply(c(1,4,7), function(x) get(paste0('rms_', x)))
 rms_garage <- lapply(c(2,8,5), function(x) get(paste0('rms_', x)))
 
 
+
+
 #### make lists of metric pairs to correlate
     met_pairs_proxy <- list(c('co2', 'voc'), c('co2', 'lux'), c('co2', 'spl_a'))
     
@@ -403,16 +405,21 @@ room_correlations <- bind_rows(
 write_csv(room_correlations, './csv_created/room_correlations.csv')
 ```
 
-
-## plot all homes
-```{r, fig.height = 6, fig.width = 11}
+# read in data
+```{r}
 
 room_correlations <- read_csv('./csv_created/room_correlations.csv')
 
-# driver plot------------
+```
+
+
+## plot all homes
+
+## drivers plot
+```{r, fig.height = 6, fig.width = 11}
+
 met <- 'pm25'
 
-# drivers plot
  a <- room_correlations %>% filter(loc_pair %in% c('kitchen-living',
                                                    'outdoor-living',
                                                    'garage-living') &
@@ -426,7 +433,6 @@ met <- 'pm25'
  
  met <- 'voc'
 
-# drivers plot
  a <- room_correlations %>% filter(loc_pair %in% c('kitchen-living',
                                                    'outdoor-living',
                                                    'garage-living') &
@@ -437,8 +443,12 @@ met <- 'pm25'
    a, met
     )
  
- # garage plot-----------
  
+```
+
+## garage plot
+```{r, fig.height = 6, fig.width = 11}
+
  met <- 'pm25'
  
  a <- room_correlations %>% filter(loc_pair %in% c('kitchen-garage',
@@ -451,6 +461,8 @@ met <- 'pm25'
    a, met
     ) 
  
+ 
+ 
   met <- 'voc'
  
  a <- room_correlations %>% filter(loc_pair %in% c('kitchen-garage',
@@ -462,10 +474,44 @@ met <- 'pm25'
  room.hourly.plot(
    a, met
     ) 
- 
 ```
 
+
+## indoor plot
+```{r, fig.height = 6, fig.width = 11}
+
+ met <- 'pm25'
+ 
+ a <- room_correlations %>% filter(loc_pair %in% c('kitchen-living',
+                                                   'kitchen-bedroom',
+                                                   'living-bedroom') &
+                                     metric == met)
+
+# make plot
+ room.hourly.plot(
+   a, met
+    ) 
+ 
+ 
+ 
+  met <- 'voc'
+ 
+ a <- room_correlations %>% filter(loc_pair %in% c('kitchen-living',
+                                                   'kitchen-bedroom',
+                                                   'living-bedroom') &
+                                     metric == met)
+
+# make plot
+ room.hourly.plot(
+   a, met
+    ) 
+```
+
+
+
 # metric-correlations
+
+## function
 ```{r}
 # between metric correlation plots---------------
  # data-making functions-----------
