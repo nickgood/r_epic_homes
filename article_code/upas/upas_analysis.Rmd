@@ -25,15 +25,14 @@ source("../functions_epic.R")
 # Read Metadata
 
 ```{r}
-# grav_meta <- read_sheet("18_J7ZQgnuji-r6ovpTjmlvdz3xUGBYzy0u_ACadLG-c",
-#                         sheet = "metadata")
-grav_meta <- read_csv("../data_thesis/filters/gravimetric_metadata.csv")
 
-meta <- read_rds("../output_thesis/upas/upas_summary.rds")
+grav_meta <- read_csv("../data_article/filters/gravimetric_metadata.csv")
+
+meta <- read_rds("../output_article/upas/upas_summary.rds")
 
 # upas_log <- read_sheet("1PnPjgbYWljb5oXoSCBqpJb2pi7gU0Kzre5lx4H-3i70",
 #                        sheet = "upas", col_types = "c")
-upas_log <- read_csv("../data_thesis/homes/instruments_deployed_upas.csv",
+upas_log <- read_csv("../data_article/homes/instruments_deployed_upas.csv",
                      col_types = cols(.default = 'c'))
 
 
@@ -48,7 +47,7 @@ upas_log <- read_csv("../data_thesis/homes/instruments_deployed_upas.csv",
 ```{r}
 # grav <- read_sheet("18_J7ZQgnuji-r6ovpTjmlvdz3xUGBYzy0u_ACadLG-c",
 #                    sheet = "data", col_types = "c") 
-grav <- read_csv("../data_thesis/filters/gravimetric_data.csv",
+grav <- read_csv("../data_article/filters/gravimetric_data.csv",
                      col_types = cols(.default = 'c')) %>%
   filter(date > as.Date("2021-01-01")) %>%
   mutate(id_filter = str_pad(id_filter, 4, "left", "0"),
