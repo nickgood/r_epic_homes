@@ -322,20 +322,7 @@ ggplot(grav_cf_df_clean, aes(x = conc_correct, y = twa)) +
       legend.title = element_text(size = small+2),
               )
 
-# scale_linetype_manual(
-  #   values = c('dashed', 'solid'),
-  #   # breaks = c('dashed', 'solid'),
-  #   labels = c('1 to 1', 'Model')
-  # )
 
-
-cbbPalette
-  
-# # without filter "outliers"
-# 
-# a %>% grav_cf_df_clean %>% filter(conc_correct<50)
-# 
-# model <- lm("twa~conc_correct+0", data = a)
 
 ```
 
