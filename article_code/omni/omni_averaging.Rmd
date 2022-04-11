@@ -26,21 +26,21 @@ library(readr)
 library(googlesheets4)
 library(lubridate)
 library(gridExtra)
-# library(tidymodels) # to discretize data for histogram
 library(arules) # to discretize data for histogram
 ```
 
 ```{r data_import}
-# daily date without missing dates
-omni_daily <- read_rds('./csv_created/omni_daily_calibrated.rds')
+# daily data
+omni_daily <- read_rds('./csv_created_article/omni_daily_calibrated.rds')
 
-omni_hourly <- read_rds('./csv_created/omni_hourly_calibrated.rds')
+#hourly data
+omni_hourly_calibrated
 
 # home type dataframe
-home_type_df <- read_csv('../sense/csv_created_sense/home_type_df.csv')
+home_type_df <- read_csv('../sense/csv_created_sense_article/home_type_df.csv')
 
 # acf significant lag data
-lag_df <- read_csv('./csv_created/lag_summary.csv')
+lag_df <- read_csv('./csv_created_article/acf/lag_summary.csv')
 
 
 ```
@@ -74,79 +74,6 @@ threedig <- function(x) {
 }
 
 home.list <- function(x) sapply(x, threedig)
-
-
- # function to extract a legend from one plot for use in whole plot grid
- # reference: https://stackoverflow.com/questions/13649473/add-a-common-legend-for-combined-ggplots
- g_legend<-function(a.gplot){
-    tmp <- ggplot_gtable(ggplot_build(a.gplot))
-    leg <- which(sapply(tmp$grobs, function(x) x$name) == "guide-box")
-    legend <- tmp$grobs[[leg]]
-    return(legend)}
- 
-
-
-
-#Mean and sd functions to ignore NA values
-mean_NA <- function(x, na.rm = na.rm) {
-  mean(x, na.rm = TRUE)}
-
-sd_NA <- function(x, na.rm = na.rm) {
-  sd(x, na.rm = TRUE)}
-
-#Function to only display 3 significant figures (for tables)
-signif3 <- function(x){
-  signif(x, digits = 3)
-}
-
-
-
-#Function found online for geometric mean to use for plots
-#webpage: https://stackoverflow.com/questions/2602583/geometric-mean-is-there-a-built-in
-#adjusted so zeros are not ignored, just added one, to all values and subtract at end
-#adjusted "length" to ignore values that are NA
-
-
-gm = function(x, na.rm=TRUE){
-  if(any(x < 0, na.rm = TRUE)){
-    return(NaN)
-  }
-  if(any(x == 0, na.rm = TRUE)){
-    exp(sum(log(x+1), na.rm=na.rm) / length(x[!is.na(x)]))-1
-  }
-  else {
-    exp(sum(log(x[x > 0]), na.rm=na.rm) / length(x[!is.na(x)]))
-  }
-}
-
-
-
-#make low and high sd "interval" functions
-low.sd = function(x){
-  mean_NA(x)-sd_NA(x)
-}
-
-high.sd = function(x){
-  mean_NA(x)+sd_NA(x)
-}
-
-
-#create function for standard error
-std.error = function(x, na.rm=TRUE){
-  sd_NA(x)/sqrt(length(x[!is.na(x)]))
-}
-
-##make low and high 95% conf interval (default 95%)
-low.conf = function(x){
-  gm(x)-1.96*std.error(x)
-}
-
-high.conf = function(x){
-  gm(x)+1.96*std.error(x)
-}
-
-
-
 
 
 # labeller
@@ -284,8 +211,12 @@ avg.data <- function(data  = omni_daily, met){
        drop_na(all_of(met))%>% # drop NA values to ensure n is accurate
           group_by(home, location, energy_cluster, date_avg) %>%
         # summarise_at(vars(all_of(met)), list(mean = mean, sd = sd), na.rm = TRUE) %>%
-    summarise_at(vars(all_of(met)), list(~mean(., na.rm = TRUE), ~sd(., na.rm = TRUE),
-                                  ~n())) %>%
+    summarise_at(vars(all_of(met)),
+                 list(
+                   ~mean(., na.rm = TRUE),
+                      ~sd(., na.rm = TRUE),
+                                  ~n()
+                   )) %>%
     ungroup() %>%
     mutate(metric = met, avg_period_days = days)
 }
@@ -617,325 +548,4 @@ ggplot(a,aes(x = energy_cluster, y = mean))+
 
 
 
-# Make Data for hourly by season, by room, pooled homes
-
-
-## group 2 Homes
-```{r}
-# by home --------
-a <- omni_hourly %>%
-  filter(location %in% locations_indoor) %>%
-  filter(energy_cluster %in% energy_breaks[c(1:3)]) %>%
-  filter(home %in% homes_tier2) %>%
-  pivot_longer(c(humid:temp), values_to = 'value', names_to = 'metric')%>%
-    filter(metric %in% c('pm25', 'voc', 'co2', 'temp', 'humid', 'lux', 'spl_a')) %>%
-  group_by(location, metric, energy_cluster, home) %>%
-  summarise( avg = mean(value, na.rm = TRUE),
-             sd = sd(value, na.rm = TRUE),
-             n_hours = n(),
-             .groups = 'drop')
-
-group2_home <- a %>%
-  select(energy_cluster, metric, home, everything(.)) %>%
-  arrange(energy_cluster, metric, home)
-
-
-write_csv(group2_home, './csv_created/averages/group2_home_avg.csv')
-
-
-# summary --------
-a <- omni_hourly %>%
-  filter(location %in% locations_indoor) %>%
-  filter(energy_cluster %in% energy_breaks[c(1:3)]) %>%
-  filter(home %in% homes_tier2) %>%
-  pivot_longer(c(humid:temp), values_to = 'value', names_to = 'metric')%>%
-    filter(metric %in% c('pm25', 'voc', 'co2', 'temp', 'humid', 'lux', 'spl_a')) %>%
-  group_by(location, metric, energy_cluster) %>%
-  summarise( avg = mean(value, na.rm = TRUE),
-             sd = sd(value, na.rm = TRUE),
-             n_home_hours = n(),
-             .groups = 'drop')
-
-group2 <- a %>%
-  select(energy_cluster, metric, everything(.)) %>%
-  arrange(energy_cluster, metric)
-
-
-write_csv(group2, './csv_created/averages/group2_avg.csv')
-
-
-```
-
-## Group 3 Homes
-```{r}
-
-# by home --------
-a <- omni_hourly %>%
-  filter(location %in% locations_indoor) %>%
-  filter(energy_cluster %in% energy_breaks[c(1:3)]) %>%
-  filter(home %in% homes_tier3) %>%
-  pivot_longer(c(humid:temp), values_to = 'value', names_to = 'metric')%>%
-    filter(metric %in% c('pm25', 'voc', 'co2', 'temp', 'humid', 'lux', 'spl_a')) %>%
-  group_by(location, metric, energy_cluster, home) %>%
-  summarise( avg = mean(value, na.rm = TRUE),
-             sd = sd(value, na.rm = TRUE),
-             n_hours = n(),
-             .groups = 'drop')
-
-group3_home <- a %>%
-  select(energy_cluster, metric, home, everything(.)) %>%
-  arrange(energy_cluster, metric, home)
-
-
-write_csv(group3_home, './csv_created/averages/group3_home_avg.csv')
-
-
-# summary --------
-a <- omni_hourly %>%
-  filter(location %in% locations_indoor) %>%
-  filter(energy_cluster %in% energy_breaks[c(1:3)]) %>%
-  filter(home %in% homes_tier3) %>%
-  pivot_longer(c(humid:temp), values_to = 'value', names_to = 'metric')%>%
-    filter(metric %in% c('pm25', 'voc', 'co2', 'temp', 'humid', 'lux', 'spl_a')) %>%
-  group_by(location, metric, energy_cluster) %>%
-  summarise( avg = mean(value, na.rm = TRUE),
-             sd = sd(value, na.rm = TRUE),
-             n_home_hours = n(),
-             .groups = 'drop')
-
-group3 <- a %>%
-  select(energy_cluster, metric, everything(.)) %>%
-  arrange(energy_cluster, metric)
-
-
-write_csv(group3, './csv_created/averages/group3_avg.csv')
-
-```
-
-
-
-# Make Data for hourly  homes, pooled rooms
-
-
-## group 2 Homes (clustered)
-```{r}
-# by home --------
-a <- omni_hourly %>%
-  filter(location %in% locations_indoor) %>%
-  filter(energy_cluster %in% energy_breaks[c(1:3)]) %>%
-  filter(home %in% homes_tier2) %>%
-  pivot_longer(c(co2:temp), values_to = 'value', names_to = 'metric')%>%
-    filter(metric %in% c('pm25', 'voc', 'co2', 'temp', 'humid', 'lux', 'spl_a')) %>%
-  group_by( metric, energy_cluster, home) %>%
-  summarise( avg = mean(value, na.rm = TRUE),
-             sd = sd(value, na.rm = TRUE),
-             n_room_hours = n(),
-             .groups = 'drop')
-
-b <- a %>%
-  select(energy_cluster, metric, home, everything(.)) %>%
-  arrange(energy_cluster, metric, home)
-
-
-write_csv(b, './csv_created/averages/group2-home-pooled_rooms-avg.csv')
-
-
-# summary --------
-summary <- b %>%
-  group_by(metric, energy_cluster) %>%
-  summarise(mean_homes = mean(avg),
-            sd_homes = sd(avg),
-            n_homes = n(), .groups = 'drop') %>%
-  select(energy_cluster, everything(.))%>%
-  arrange(energy_cluster)
-
-
-
-write_csv(summary, './csv_created/averages/group2_avg_summary.csv')
-
-
-```
-
-## Group 3 Homes (clustered)
-```{r}
-# by home --------
-a <- omni_hourly %>%
-  filter(location %in% locations_indoor) %>%
-  filter(energy_cluster %in% energy_breaks[c(1:3)]) %>%
-  filter(home %in% homes_tier3) %>%
-  pivot_longer(c(co2:temp), values_to = 'value', names_to = 'metric')%>%
-    filter(metric %in% c('pm25', 'voc', 'co2', 'temp', 'humid', 'lux', 'spl_a')) %>%
-  group_by( metric, energy_cluster, home) %>%
-  summarise( avg = mean(value, na.rm = TRUE),
-             sd = sd(value, na.rm = TRUE),
-             n_room_hours = n(),
-             .groups = 'drop')
-
-b <- a %>%
-  select(energy_cluster, metric, home, everything(.)) %>%
-  arrange(energy_cluster, metric, home)
-
-
-write_csv(b, './csv_created/averages/group3-home-pooled_rooms-avg.csv')
-
-
-# summary --------
-summary <- b %>%
-  group_by(metric, energy_cluster) %>%
-  summarise(mean_homes = mean(avg),
-            sd_homes = sd(avg),
-            n_homes = n(), .groups = 'drop') %>%
-  select(energy_cluster, everything(.))%>%
-  arrange(energy_cluster)
-
-
-
-write_csv(summary, './csv_created/averages/group3_avg_summary.csv')
-```
-
-
-
-
-## all homes (unclustered)
-* summary stats (range, mean, sd, median)
-```{r}
-# by home --------
-a <- omni_hourly %>%
-  filter(location %in% locations_indoor) %>%
-  pivot_longer(c(co2:temp), values_to = 'value', names_to = 'metric')%>%
-    filter(metric %in% c('pm25', 'voc', 'co2', 'temp', 'humid', 'lux', 'spl_a')) %>%
-  group_by( metric, home) %>%
-  summarise( 
-    min = min(value, na.rm = TRUE),
-    max = max (value, na.rm = TRUE),
-    avg = mean(value, na.rm = TRUE),
-             sd = sd(value, na.rm = TRUE),
-    med = median(value, na.rm = TRUE),
-             n_room_hours = n(),
-             .groups = 'drop')
-
-b <- a %>%
-  select( metric, home, everything(.)) %>%
-  arrange( metric, home)
-
-
-write_csv(b, './csv_created/averages/all_home-pooled_rooms-avg.csv')
-
-
-# pooled homes
-
-a <- omni_hourly %>%
-  filter(location %in% locations_indoor) %>%
-  pivot_longer(c(co2:temp), values_to = 'value', names_to = 'metric')%>%
-    filter(metric %in% c('pm25', 'voc', 'co2', 'temp', 'humid', 'lux', 'spl_a')) %>%
-  group_by( metric) %>%
-  summarise( 
-    min = min(value, na.rm = TRUE),
-    max = max (value, na.rm = TRUE),
-    avg = mean(value, na.rm = TRUE),
-             sd = sd(value, na.rm = TRUE),
-    med = median(value, na.rm = TRUE),
-             n_room_hours = n(),
-             .groups = 'drop')
-
-b <- a %>%
-  select( metric, everything(.)) %>%
-  arrange( metric)
-
-
-write_csv(b, './csv_created/averages/pooled_home-pooled_rooms-avg.csv')
-
-
-
-
-
-# summary --------
-# summary <- b %>%
-#   group_by(metric) %>%
-#   summarise(mean_homes = mean(avg),
-#             sd_homes = sd(avg),
-#             n_homes = n(), .groups = 'drop') %>%
-#   select( everything(.))
-# 
-# 
-# 
-# write_csv(summary, './csv_created/averages/all_home_avg_summary.csv')
-```
-
-
-* cov
-```{r}
-# by home --------
-a <- omni_hourly %>%
-  filter(location %in% locations_indoor) %>%
-  pivot_longer(c(co2:temp), values_to = 'value', names_to = 'metric')%>%
-    filter(metric %in% c('pm25', 'voc', 'co2', 'temp', 'humid', 'lux', 'spl_a')) %>%
-  group_by( metric, home) %>%
-  summarise( 
-    sd = sd(value, na.rm = TRUE),
-    mean = mean (value, na.rm = TRUE),
-    cov = sd/mean,
-             n_room_hours = n(),
-             .groups = 'drop')
-
-b <- a %>%
-  select( metric, home, everything(.)) %>%
-  arrange( metric, home)
-
-
-# write_csv(b, './csv_created/cov/all_home-pooled_rooms-cov.csv')
-write_csv(b, paste0('./csv_created/cov/all_home-pooled_rooms-cov_', Sys.Date(),
-'.csv'))
-
-
-# pooled homes
-
-a <- omni_hourly %>%
-  filter(location %in% locations_indoor) %>%
-  pivot_longer(c(co2:temp), values_to = 'value', names_to = 'metric')%>%
-    filter(metric %in% c('pm25', 'voc', 'co2', 'temp', 'humid', 'lux', 'spl_a')) %>%
-  group_by( metric) %>%
-  summarise( 
-    sd = sd(value, na.rm = TRUE),
-    mean = mean (value, na.rm = TRUE),
-    cov = sd/mean,
-             n_room_hours = n(),
-             .groups = 'drop')
-
-b <- a %>%
-  select( metric, everything(.)) %>%
-  arrange( metric)
-
-
-# write_csv(b, './csv_created/cov/pooled_home-pooled_rooms-cov.csv')
-
-write_csv(b, paste0('./csv_created/cov/pooled_home-pooled_rooms-cov_', Sys.Date(),
-'.csv'))
-
-# by season, pooled homes
-
-a <- omni_hourly %>%
-  filter(location %in% locations_indoor) %>%
-  pivot_longer(c(co2:temp), values_to = 'value', names_to = 'metric')%>%
-    filter(metric %in% c('pm25', 'voc', 'co2', 'temp', 'humid', 'lux', 'spl_a')) %>%
-  group_by( metric, energy_cluster) %>%
-  summarise( 
-    sd = sd(value, na.rm = TRUE),
-    mean = mean (value, na.rm = TRUE),
-    cov = sd/mean,
-             n_room_hours = n(),
-             .groups = 'drop')
-
-b <- a %>%
-  select( metric, energy_cluster, everything(.)) %>%
-  arrange( metric)
-
-
-write_csv(b, './csv_created/cov/seasons-cov.csv')
-write_csv(b, paste0('./csv_created/cov/seasons-cov_',
-Sys.Date(), '.csv'))
-
-
-
-```
 

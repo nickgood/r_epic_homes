@@ -214,7 +214,7 @@ units <- 'hours'
 }
 
 # # test function
-test <- cluster.manual('001', c('heat 6','ac'), return_data = TRUE)
+# test <- cluster.manual('001', c('heat 6','ac'), return_data = TRUE)
 
 
 # function for homes with only heating
