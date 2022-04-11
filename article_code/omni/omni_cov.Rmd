@@ -18,9 +18,12 @@ library(lubridate)
 ## R Markdown
 
 ```{r import_omni_hourly_data}
-data<- read_rds('./csv_created/omni_hourly_calibrated.rds') %>% rename('datetime' = datehour)%>% 
+data<- read_rds('./csv_created_article/omni_hourly_calibrated.rds') %>% rename('datetime' = datehour)%>% 
   #use only daa before June 2021
   filter(datetime<ymd_hms('2021-06-01 00:00:00'))
+
+# home type dataframe
+home_type_df <- read_csv('../sense/csv_created_sense_article/home_type_df.csv')
 
 ```
 
@@ -84,6 +87,10 @@ small <- 15
 medium <- 20
 large <- 26
 
+# define home groups
+homes_tier1 <- home_type_df %>% filter(home_type == 'tier1') %>% pull(home)
+homes_tier2 <- home_type_df %>% filter(home_type == 'tier2') %>% pull(home)
+homes_tier3 <- home_type_df %>% filter(home_type == 'tier3') %>% pull(home)
 
 # color blind pallette
 # check http://www.cookbook-r.com/Graphs/Colors_(ggplot2)/#a-colorblind-friendly-palette
@@ -117,8 +124,10 @@ energy_labels <- c('Cooling', 'Shoulder', 'Heating', 'Entire Period')
 ```
 
 *calc cov for each sensor by season
+* (indoor rooms pooled, outdoor and garage not used)
 ```{r}
 cov_by_sensor_season <- data_long %>%
+  filter(location %in% c('living', 'kitchen', 'bedroom')) %>%
   group_by(home, location, metric, energy_cluster) %>%
   summarise_at(
     vars(value),
@@ -139,12 +148,14 @@ cov_by_sensor_season <- data_long %>%
   select(energy_cluster, metric, home, location, everything(.))%>%
   arrange(energy_cluster, metric, home, location)
 
-write_csv(cov_by_sensor_season, './csv_created/cov/cov_by_sensor_season.csv')
+write_csv(cov_by_sensor_season, './csv_created_article/cov/cov_by_sensor_season.csv')
 ```
 
 * find cov by sensor for all time
+* (indoor rooms pooled, outdoor and garage not used)
 ```{r}
 cov_by_sensor <- data_long %>%
+    filter(location %in% c('living', 'kitchen', 'bedroom')) %>%
   group_by(home, location, metric) %>%
   summarise_at(
     vars(value),
@@ -163,7 +174,7 @@ cov_by_sensor <- data_long %>%
   by = c('home', 'location', 'metric')
   )
 
-write_csv(cov_by_sensor, './csv_created/cov/cov_by_sensor_season.csv')
+write_csv(cov_by_sensor, './csv_created_article/cov/cov_by_sensor.csv')
 ```
 
 
@@ -173,26 +184,21 @@ write_csv(cov_by_sensor, './csv_created/cov/cov_by_sensor_season.csv')
 * calc cov for each home (indoor rooms pooled, outdoor and garage not used)
 ```{r}
 
-a <- data_long %>% filter(location %in% c('living', 'kitchen', 'bedroom'))
+cov_by_sensor <- data_long %>%
+  filter(location %in% locations_indoor) %>%
+  group_by( metric, home) %>%
+  summarise( 
+    sd = sd(value, na.rm = TRUE),
+    mean = mean (value, na.rm = TRUE),
+    cov = sd/mean,
+             n_room_hours = n(),
+             .groups = 'drop') %>%
+  select( metric, home, everything(.)) %>%
+  arrange( metric, home)
 
-cov_by_home <- a %>% group_by(home, metric) %>%
-  summarise_at(
-    vars(value),
-      list(sd = sd,
-      mean = mean),
-    na.rm = TRUE
-  ) %>%
-  mutate( cov = sd/mean) %>%
-  left_join(
-    a %>% group_by(home, metric) %>%
-  summarise_at(
-    vars(value),
-      funs(n_room_hours = n())
-  ),
-  by = c('home', 'metric')
-  )
 
-write_csv(cov_by_home, './cov_by_home.csv')
+
+write_csv(cov_by_sensor, './csv_created_article/cov/cov_by_home.csv')
 ```
 
 
@@ -325,198 +331,7 @@ ggplot(a,aes(x = energy_cluster, y = cov))+
   ylab('IEQ Indicator COV\nin Group 3 Homes')+
     geom_text(data = b, aes(x = energy_cluster, label = paste('n =', n_home_rooms)), y = 4)
 
-  
 
-###
 
 
 ```
-
-
-
-##  ALL CODE BLOEW IS OLD, BEEWWAAAARRRRE
-## CODE TO CREATE COV CSV FILES IS IN omni_averaging file
-
-<!-- *calc cov for each sensor by season -->
-<!-- * group 2 -->
-<!-- ```{r} -->
-<!-- a <- data_long %>% -->
-<!--   filter(home %in% homes_tier2) %>% -->
-<!--   group_by(home, location, metric, energy_cluster) %>% -->
-<!--   summarise_at( -->
-<!--     vars(value), -->
-<!--       list(sd = sd, -->
-<!--       mean = mean), -->
-<!--     na.rm = TRUE -->
-<!--   ) %>% -->
-<!--   mutate( cov = sd/mean) %>% -->
-<!--   left_join( -->
-<!--     data_long %>% -->
-<!--   group_by(home, location, metric, energy_cluster) %>% -->
-<!--   summarise_at( -->
-<!--     vars(value), -->
-<!--       funs(n_hours = n()) -->
-<!--   ), -->
-<!--   by = c('home', 'location', 'metric', 'energy_cluster') -->
-<!--   ) %>% -->
-<!--   select(energy_cluster, metric, home, location, everything(.))%>% -->
-<!--   arrange(energy_cluster, metric, home, location) -->
-
-<!-- write_csv(a, './csv_created/cov/group2_sensor.csv') -->
-<!-- ``` -->
-
-
-<!-- * group 3 -->
-<!-- ```{r} -->
-<!-- a <- data_long %>% -->
-<!--   filter(home %in% homes_tier3) %>% -->
-<!--   group_by(home, location, metric, energy_cluster) %>% -->
-<!--   summarise_at( -->
-<!--     vars(value), -->
-<!--       list(sd = sd, -->
-<!--       mean = mean), -->
-<!--     na.rm = TRUE -->
-<!--   ) %>% -->
-<!--   mutate( cov = sd/mean) %>% -->
-<!--   left_join( -->
-<!--     data_long %>% -->
-<!--   group_by(home, location, metric, energy_cluster) %>% -->
-<!--   summarise_at( -->
-<!--     vars(value), -->
-<!--       funs(n_hours = n()) -->
-<!--   ), -->
-<!--   by = c('home', 'location', 'metric', 'energy_cluster') -->
-<!--   ) %>% -->
-<!--   select(energy_cluster, metric, home, location, everything(.))%>% -->
-<!--   arrange(energy_cluster, metric, home, location) -->
-
-<!-- write_csv(a, './csv_created/cov/group3_sesnor.csv') -->
-<!-- ``` -->
-
-
-
-<!-- *calc cov for each home by season -->
-<!-- * group 2 -->
-<!-- ```{r} -->
-<!-- a <- data_long %>% -->
-<!--   filter(home %in% homes_tier2) %>% -->
-<!--   group_by(home, metric, energy_cluster) %>% -->
-<!--   summarise_at( -->
-<!--     vars(value), -->
-<!--       list(sd = sd, -->
-<!--       mean = mean), -->
-<!--     na.rm = TRUE -->
-<!--   ) %>% -->
-<!--   mutate( cov = sd/mean) %>% -->
-<!--   left_join( -->
-<!--     data_long %>% -->
-<!--   group_by(home, metric, energy_cluster) %>% -->
-<!--   summarise_at( -->
-<!--     vars(value), -->
-<!--       funs(n_hours = n()) -->
-<!--   ), -->
-<!--   by = c('home', 'metric', 'energy_cluster') -->
-<!--   ) %>% -->
-<!--   select(energy_cluster, metric, home, everything(.))%>% -->
-<!--   arrange(energy_cluster, metric, home) -->
-
-<!-- write_csv(a, './csv_created/cov/group2_home.csv') -->
-<!-- ``` -->
-
-
-<!-- * group 3 -->
-<!-- ```{r} -->
-<!-- a <- data_long %>% -->
-<!--   filter(home %in% homes_tier3) %>% -->
-<!--   group_by(home, metric, energy_cluster) %>% -->
-<!--   summarise_at( -->
-<!--     vars(value), -->
-<!--       list(sd = sd, -->
-<!--       mean = mean), -->
-<!--     na.rm = TRUE -->
-<!--   ) %>% -->
-<!--   mutate( cov = sd/mean) %>% -->
-<!--   left_join( -->
-<!--     data_long %>% -->
-<!--   group_by(home, metric, energy_cluster) %>% -->
-<!--   summarise_at( -->
-<!--     vars(value), -->
-<!--       funs(n_hours = n()) -->
-<!--   ), -->
-<!--   by = c('home', 'metric', 'energy_cluster') -->
-<!--   ) %>% -->
-<!--   select(energy_cluster, metric, home, everything(.))%>% -->
-<!--   arrange(energy_cluster, metric, home) -->
-
-<!-- write_csv(a, './csv_created/cov/group3_home.csv') -->
-<!-- ``` -->
-
-
-<!-- * cov for homes not separated by season -->
-
-<!-- ```{r} -->
-<!-- #pooled rooms -->
-<!-- a <- data_long %>% -->
-<!--   filter(location %in% c('bedroom', 'living', 'kitchen')) %>% -->
-<!--   group_by(home, metric) %>% -->
-<!--   summarise_at( -->
-<!--     vars(value), -->
-<!--       list(sd = sd, -->
-<!--       mean = mean), -->
-<!--     na.rm = TRUE -->
-<!--   ) %>% -->
-<!--   mutate( cov = sd/mean) %>% -->
-<!--   # left_join( -->
-<!--   #   data_long %>% -->
-<!--   # group_by(home, metric) %>% -->
-<!--   # summarise_at( -->
-<!--   #   vars(value), -->
-<!--   #     funs(n_hours = n()) -->
-<!--   # ), -->
-<!--   # by = c('home', 'metric') -->
-<!--   # ) %>% -->
-<!--   select(metric, home, everything(.))%>% -->
-<!--   arrange(metric, home) -->
-
-
-
-<!-- write_csv(a, './csv_created/cov/unclustered.csv') -->
-
-<!-- #pooled homes and rooms -->
-<!-- a <- data_long %>% -->
-<!--   filter(location %in% c('bedroom', 'living', 'kitchen')) %>% -->
-<!--   group_by(metric) %>% -->
-<!--   summarise_at( -->
-<!--     vars(value), -->
-<!--       list(sd = sd, -->
-<!--       mean = mean), -->
-<!--     na.rm = TRUE -->
-<!--   ) %>% -->
-<!--   mutate( cov = sd/mean) %>% -->
-<!--   # left_join( -->
-<!--   #   data_long %>% -->
-<!--   # group_by(home, metric) %>% -->
-<!--   # summarise_at( -->
-<!--   #   vars(value), -->
-<!--   #     funs(n_hours = n()) -->
-<!--   # ), -->
-<!--   # by = c('home', 'metric') -->
-<!--   # ) %>% -->
-<!--   select(metric, everything(.))%>% -->
-<!--   arrange(metric) -->
-
-<!-- write_csv(a, './csv_created/cov/pooled_homes-unclustered.csv') -->
-
-<!-- # # write csv for cov summary of all metrics -->
-<!-- #  -->
-<!-- # summary <- a %>% -->
-<!-- #   group_by(metric) %>% -->
-<!-- #   summarize(mean_cov = mean(cov, na.rm = TRUE), -->
-<!-- #             sd_cov = sd(cov, na.rm = TRUE), .groups = 'drop') -->
-<!-- #  -->
-<!-- # write_csv(summary, './csv_created/cov/metric_summary.csv') -->
-
-
-
-<!-- ``` -->
-

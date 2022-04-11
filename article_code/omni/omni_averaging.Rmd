@@ -34,7 +34,7 @@ library(arules) # to discretize data for histogram
 omni_daily <- read_rds('./csv_created_article/omni_daily_calibrated.rds')
 
 #hourly data
-omni_hourly_calibrated
+omni_hourly <- read_rds('./csv_created_article/omni_hourly_calibrated.rds')
 
 # home type dataframe
 home_type_df <- read_csv('../sense/csv_created_sense_article/home_type_df.csv')
@@ -548,4 +548,68 @@ ggplot(a,aes(x = energy_cluster, y = mean))+
 
 
 
+
+## all homes (unclustered)
+* summary stats (range, mean, sd, median)
+```{r}
+# by home --------
+a <- omni_hourly %>%
+  filter(location %in% locations_indoor) %>%
+  pivot_longer(c(co2:temp), values_to = 'value', names_to = 'metric')%>%
+    filter(metric %in% c('pm25', 'voc', 'co2', 'temp', 'humid', 'lux', 'spl_a')) %>%
+  group_by( metric, home) %>%
+  summarise( 
+    min = min(value, na.rm = TRUE),
+    max = max (value, na.rm = TRUE),
+    avg = mean(value, na.rm = TRUE),
+             sd = sd(value, na.rm = TRUE),
+    med = median(value, na.rm = TRUE),
+             n_room_hours = n(),
+             .groups = 'drop')
+
+b <- a %>%
+  select( metric, home, everything(.)) %>%
+  arrange( metric, home)
+
+
+write_csv(b, './csv_created_article/averages/pooled_rooms.csv')
+
+
+# pooled homes
+
+a <- omni_hourly %>%
+  filter(location %in% locations_indoor) %>%
+  pivot_longer(c(co2:temp), values_to = 'value', names_to = 'metric')%>%
+    filter(metric %in% c('pm25', 'voc', 'co2', 'temp', 'humid', 'lux', 'spl_a')) %>%
+  group_by( metric) %>%
+  summarise( 
+    min = min(value, na.rm = TRUE),
+    max = max (value, na.rm = TRUE),
+    avg = mean(value, na.rm = TRUE),
+             sd = sd(value, na.rm = TRUE),
+    med = median(value, na.rm = TRUE),
+             n_room_hours = n(),
+             .groups = 'drop')
+
+b <- a %>%
+  select( metric, everything(.)) %>%
+  arrange( metric)
+
+
+write_csv(b, './csv_created_article/averages/pooled_homes-pooled_rooms.csv')
+
+
+
+# summary --------
+# summary <- b %>%
+#   group_by(metric) %>%
+#   summarise(mean_homes = mean(avg),
+#             sd_homes = sd(avg),
+#             n_homes = n(), .groups = 'drop') %>%
+#   select( everything(.))
+# 
+# 
+# 
+# write_csv(summary, './csv_created_article/averages/avg_summary.csv')
+```
 
