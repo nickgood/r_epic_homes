@@ -89,13 +89,6 @@ labeller.all <- as_labeller(c(
   ), default = label_parsed)
 
 
-# define colors for energy clusters
-energy_colors <- c(cbbPalette['light_blue'],
-                   cbbPalette['green'],
-                   cbbPalette['dark_orange'])%>% unname()
-# energy_shapes <- c(15, 16, 17)
-energy_breaks <- c('ac', 'shoulder', 'heat')
-energy_labels <- c('Cooling', 'Shoulder', 'Heating')
   
 ```
 
@@ -180,6 +173,7 @@ energy_colors <- c(cbbPalette['light_blue'],
 
 energy_breaks <- c('ac', 'shoulder', 'heat', 'overall')
 energy_labels <- c('Cooling', 'Shoulder', 'Heating', 'Entire Period')
+
 
 # define lag periods
 lag_pm25 <-lag_df %>% filter(energy_cluster == 'total', metric == 'pm25') %>%
@@ -596,7 +590,9 @@ limit_df <- a %>%
 
 ggplot(a,aes( x = 1,  y = mean))+
   geom_boxplot( outlier.shape = NA)+
-    geom_jitter( aes( color = energy_cluster), width = 0.15)+
+    scale_x_continuous(limits = c(0,2))+
+    geom_jitter( aes( color = energy_cluster),
+                 size = 1, width = 0.15)+
         facet_wrap(vars(metric), nrow = 1,   scales = 'free_y',
                    labeller = labeller.all)+
   theme_bw()+
@@ -609,7 +605,8 @@ ggplot(a,aes( x = 1,  y = mean))+
     axis.text.y = element_text(size = small -3),
     axis.text.x = element_blank(),
     axis.ticks.x = element_blank(),
-    axis.title = element_text(size = small -3)
+    axis.title = element_text(size = small -3),
+    axis.title.x = element_blank()
     )+
   # use dummy df to define limits for each metric
   geom_blank(data = limit_df, aes(x = 1, y = limits))+
@@ -665,6 +662,7 @@ limit_df <- a %>%
 
 ggplot(a,aes( x = 1,  y = mean))+
   geom_boxplot( )+
+  scale_x_continuous(limits = c(0,2))+
         facet_wrap(vars(metric), nrow = 1,   scales = 'free_y',
                    labeller = labeller.all)+
   theme_bw()+
@@ -677,14 +675,16 @@ ggplot(a,aes( x = 1,  y = mean))+
     axis.text.y = element_text(size = small -3),
     axis.text.x = element_blank(),
     axis.ticks.x = element_blank(),
-    axis.title = element_text(size = small -3)
+    axis.title = element_text(size = small -3),
+        axis.title.x = element_blank()
+
     )+
   # use dummy df to define limits for each metric
   geom_blank(data = limit_df, aes(x = 1, y = limits))+
   ylab('IEQ Indicator Value')+
-    geom_text(data=n_labels, aes(x = 1.2,
+    geom_text(data=n_labels, aes(x = 1.1,
                                  y=label_position,
-                               label=label_value),vjust=0)
+                               label=label_value),hjust=0)
 
 
 ###
