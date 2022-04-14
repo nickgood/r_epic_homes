@@ -683,52 +683,6 @@ sample_results
 ### Hourly Data
 
 ```{r data_maker_hourly, eval = FALSE}
-# test function for multiple homes-----------------
-   test_homes <- c('007', '012')
-    test_cluster <- c('ac') # can do multiple
-    mets <- c('pm25', 'voc')
-    locs <- locations_indoor
-    
-    test<- lapply(locs, function(x_location) {
-      
-      lapply(mets, function(x_metric) {
-        
-        lapply(test_cluster, function(cluster_type) {
-          
-          lapply(test_homes, function(x_home) {
-            
-            start_date <- pick.start(x_home, cluster_type)
-            end_date <- pick.end(x_home, cluster_type)
-            sample_min <- pick.sample.min(met)
-            sample_max <- if_else(
-              as.numeric(as.Date(end_date) - as.Date(start_date))>=28,
-              28,
-              as.numeric(as.Date(end_date) - as.Date(start_date))
-            )
-            
-            entropy.table.hourly(
-              x_home, metric = x_metric,
-              date_ranges_entire = list(c(start_date,
-                                          end_date)),
-              tested_sample_sequence = c(1, 3, 7, 14),
-              location_type = x_location) %>%
-              
-              # add in column for energy_cluster
-              mutate(energy_cluster = cluster_type) 
-          }
-          ) %>%
-            bind_rows()
-        }
-        ) %>%
-          bind_rows()
-      }
-      ) %>%
-        bind_rows()
-    }
-    ) %>%
-      bind_rows()
-    
-    
       # make dfs--------------------
 # clust <- c('all','heat', 'shoulder', 'ac') # can do multiple
 clust <- clusters_all
@@ -742,12 +696,6 @@ lapply(clust, function(cluster_type) {
     
     start_date <- pick.start(x_home, cluster_type)
     end_date <- pick.end(x_home, cluster_type)
-    sample_min <- pick.sample.min(met)
-    sample_max <- if_else(
-      as.numeric(as.Date(end_date) - as.Date(start_date))>=28,
-      28,
-      as.numeric(as.Date(end_date) - as.Date(start_date))
-    )
     
     entropy.table.hourly(
       x_home, metric = met,
@@ -779,12 +727,6 @@ lapply(clust, function(cluster_type) {
     
     start_date <- pick.start(x_home, cluster_type)
     end_date <- pick.end(x_home, cluster_type)
-    sample_min <- pick.sample.min(met)
-    sample_max <- if_else(
-      as.numeric(as.Date(end_date) - as.Date(start_date))>=28,
-      28,
-      as.numeric(as.Date(end_date) - as.Date(start_date))
-    )
     
     entropy.table.hourly(
       x_home, metric = met,
@@ -817,12 +759,6 @@ lapply(clust, function(cluster_type) {
     
     start_date <- pick.start(x_home, cluster_type)
     end_date <- pick.end(x_home, cluster_type)
-    sample_min <- pick.sample.min(met)
-    sample_max <- if_else(
-      as.numeric(as.Date(end_date) - as.Date(start_date))>=28,
-      28,
-      as.numeric(as.Date(end_date) - as.Date(start_date))
-    )
     
     entropy.table.hourly(
       x_home, metric = met,
@@ -861,6 +797,7 @@ co2_bedroom_heat_rep_data_time_hourly_pdf,
 )
 
 
+# for making edits
 
 #  bind_rows(
 #   co2_living_heat_rep_data_time_hourly_pdf,
@@ -868,14 +805,12 @@ co2_bedroom_heat_rep_data_time_hourly_pdf,
 #   co2_living_ac_rep_data_time_hourly_pdf
 # ) %>%
 #   write_rds ('./csv_created_article/representativeness_data/test_after_edit.rds')
- 
-test <- read_rds('./csv_created_article/representativeness_data/test_before_edit.rds')
-
-test_after <- read_rds('./csv_created_article/representativeness_data/test_after_edit.rds')
-
-
-
-all.equal(test, test_after)
+#  
+# test <- read_rds('./csv_created_article/representativeness_data/test_before_edit.rds')
+# 
+# test_after <- read_rds('./csv_created_article/representativeness_data/test_after_edit.rds')
+# 
+# all.equal(test, test_after)
 
 # write csv files------------------------
 
