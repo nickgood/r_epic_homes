@@ -31,19 +31,14 @@ library(arules) # to discretize data for histogram
 ```
 
 ```{r data_import}
-omni_hourly <- read_rds('./csv_created/omni_hourly_calibrated.rds') %>%
-  rename(datetime = datehour)
+# hourly omni data
+omni_hourly <- read_rds('./csv_created_article/omni_hourly_calibrated.rds') %>%
+  rename(datetime = datehour) %>%
+  filter(datetime<ymd_hms('2021-06-01 00:00:00'))%>% # only use data up to June 2021
+  rename('noise' = spl_a) # and rename noise variable
 
-home_type_df <- read_csv('../sense/csv_created_sense/home_type_df.csv')
-```
-
-# only use data up to June 2021
-# and rename noise variable
-```{r censor_date}
-omni_hourly <- omni_hourly %>% filter(datetime<ymd_hms('2021-06-01 00:00:00'))%>%
-  rename('noise' = spl_a)
-
-
+# home groups
+home_type_df <- read_csv('../sense/csv_created_sense_article/home_type_df.csv')
 ```
 
 
@@ -247,35 +242,7 @@ time.table <- function(data, period, met,
     
   }
   
-  # #weekday and hour of each day
-  # if (period == 'day.hour'){
-  #   a <- a %>% 
-  #     mutate(weekday = wday(datetime, label = TRUE),
-  #            hour = hour(datetime)) %>%
-  #     group_by(weekday, hour, .dots = groupers) %>% 
-  #     summarize_if(is.numeric, list(mean.val = mean.val,
-  #                                   low.val = low.val,
-  #                                   high.val = high.val))%>%
-  #     ungroup() %>%
-  #     mutate(hour = as.numeric(hour))
-  #   
-  # }
-  
-  #month
- # if (period == 'month'){
- #    a <- a %>% 
- #      mutate(month = floor_date(datetime, unit = 'month')) %>%
- #      count(month, home) %>% # count amount of observations used for each average
- #      full_join(
- #        a %>%
- #          mutate(month = floor_date(datetime, unit = 'month')) %>%
- #          
- #      group_by(month, .dots = groupers) %>% 
- #      summarize_if(is.numeric, list(mean.val = mean.val,
- #                                    low.val = low.val,
- #                                    high.val = high.val))%>%
- #      ungroup())
- # }
+ 
   
     #weekday
   if (period == 'month'){
@@ -298,30 +265,6 @@ time.table <- function(data, period, met,
     
   }
   
-  # #month and hour of each day
-  # if (period == 'month.hour'){
-  #   a <- a %>% 
-  #     mutate(month = month(datetime, label = TRUE),
-  #            hour = hour(datetime)) %>%
-  #     group_by(month, hour, .dots = groupers) %>% 
-  #     summarize_if(is.numeric, list(mean.val = mean.val,
-  #                                   low.val = low.val,
-  #                                   high.val = high.val))%>%
-  #     ungroup() %>%
-  #     mutate(hour = as.numeric(hour))
-  #   
-  # }
-  
-  #     if (period == 'date.day'){
-  #   a <- a %>% 
-  #     mutate(datetime = floor_date(datetime, unit = 'days')) %>%
-  #     group_by(datetime, .dots = groupers) %>% 
-  #     summarize_if(is.numeric, list(mean.val = mean.val,
-  #                                   low.val = low.val,
-  #                                   high.val = high.val))%>%
-  #     ungroup() %>%
-  #     mutate()
-  # }
 
   return(a)
 
@@ -368,12 +311,15 @@ noise_diff_lim <- c(-9,9)
 # spl_a_lim <- c(40,70)
 
 
+homes_all <- home.list(c(1:4, 6:16))
 
 
-homes_no5 <- home.list(c(1:4, 6:16))
 homes_tier1 <- home_type_df %>% filter(home_type == 'tier1') %>% pull(home)
 homes_tier2 <- home_type_df %>% filter(home_type == 'tier2') %>% pull(home)
 homes_tier3 <- home_type_df %>% filter(home_type == 'tier3') %>% pull(home)
+
+#exclude homes with uncertain season classification
+homes_seasons <- c(homes_tier2, homes_tier3)
 
 metrics_all <- c('pm25', 'voc', 'co2', 'temp','humid', 'lux', 'spl_a')
 locations_indoor <- c('living', 'bedroom', 'kitchen')
@@ -641,7 +587,7 @@ limit_df <-
        facet_grid(c('metric', 'location'))+
         # make point size proportional to # of obs, with 0 obs = size 0
       geom_point(aes(size = n, color = energy_cluster))+
-        scale_size_area(max_size = max_point_size+0.5,
+        scale_size_area(max_size = max_point_size+2,
                         )+
         facet_wrap(vars(metric), nrow = 1, labeller = labeller.all,
                    scales = 'free_y')+
@@ -669,7 +615,8 @@ limit_df <-
 
 ```
 
-###Plot
+###Plot for homes that had seasonal data
+###exclude homes that had less certain classification of seasons (group 1 homes)
 ```{r, fig.height=2.5, fig.width=8}
 
 
@@ -677,9 +624,10 @@ a <- map(c('pm25', 'voc', 'co2', 'temp'), function(x_metric){
   
   dat <- omni_hourly %>%
     filter( 
-      home %in% homes_no5, 
+      home %in% c(homes_seasons), 
             location %in% locations_indoor,
             energy_cluster %in% c('heat', 'shoulder', 'ac'))
+  
     
   time.table(dat, 'hour', x_metric, groupers = c('energy_cluster'))
 }
@@ -691,7 +639,7 @@ a$metric <- factor(a$metric, levels = c('pm25', 'voc', 'co2', 'temp'))
 
 
 # plot
-plot.hourly.seasons(data = a, n_homes = length(homes_no5))
+plot.hourly.seasons(data = a, n_homes = length(homes_seasons))
 
 
 ```
