@@ -142,10 +142,8 @@ locations_indoor <- c('living', 'kitchen', 'bedroom')
 # metric <- 'pm25'
 # days <- 27
 # days2 <- 27
-# all_time <- TRUE
 #     longterm_avail_limit <- 0
 #     sample_avail_limit <- 0
-#     overlap <- FALSE
 #     
 # 
 # 
@@ -194,8 +192,6 @@ entropy.table.hourly <- function(
   date_ranges_entire,
   tested_sample_sequence, # sequence of tested short sampling period lengths (in days)
   location_type, # sensor location (living, bedroom, kitchen, or pooled)
-  overlap, # if FALSE, only use samples made of ditinct days
-  all_time, # if TRUE, compare each short sampling period to entire monitoring year of home
     longterm_avail_limit = 0, # only use data from a long-term period if it has at least this fraction of data available (0 means no periods are omitted if they have any data)
   sample_avail_limit = 0, # only use data from a sample period if it has at least this fraction of data available (0 means no periods are omitted if they have any data)
   data = omni_hourly) {
@@ -321,8 +317,7 @@ entropy.table.hourly <- function(
       length(data_season %>% pull(datehour) %>% unique())/
       length(all_dates_season)
     
-    if(all_time == TRUE) {
-      
+
       # stop if missing 25% of data in year
       if(year_data_avail < longterm_avail_limit) {
         output <<- na.result(
@@ -334,25 +329,8 @@ entropy.table.hourly <- function(
         stop()
       }
       
-      entire <- data_year
-      
-    } else {
-      
-      # stop if missing 25% of data in season
-      if(season_data_avail < longterm_avail_limit) {
-        output <<- na.result(
-          paste0('season_missing_',
-                 signif((1-season_data_avail)*100, 2),
-                 '%'),
-          period_label
-        )
-        stop()
-      }
-      
-      entire <- data_season
-    }
-    
-    entire <- entire %>%
+
+    entire <- data_year %>%
       group_by(hour) %>%
   summarise(mean = mean(get(metric)), sd = sd(get(metric)), n = n(),
             .groups = 'drop') %>%
@@ -424,9 +402,7 @@ entropy.table.hourly <- function(
           # number of hour periods in short sampling period
                # only evaluate windows that are full
                # (ignore partial windows at start)
-               # only use disticnt days if overlap == FALSE
-               at = seq(days*24, length(all_dates_season),
-                        {if(overlap == TRUE) 24 else days*24}),
+               at = seq(days*24, length(all_dates_season), days*24),
           f = function(y) { # y = window, vector (length = k) of specified days per iteration
             
             # filter out only given room
@@ -619,9 +595,7 @@ sample_results
     mutate(method = 'time',
            home = home_num,
            metric = metric,
-           location = location_type,
-           period_compare = ifelse(all_time == TRUE, 'year', 'season'),
-                      overlap = overlap
+           location = location_type
            )
   
   
@@ -636,12 +610,10 @@ sample_results
 # start <- Sys.time()
 # # 
 # test<- entropy.table.hourly('007', 'pm25',
-#                             overlap = FALSE,
 #                            date_ranges_entire = list(
 #                              c('2020-08-18', '2020-09-13')),
 #                            tested_sample_sequence = c(1,28),
-#                            location_type = 'living',
-#                            all_time = TRUE)
+#                            location_type = 'living')
 # 
 # 
 # end <- Sys.time()
@@ -739,8 +711,7 @@ sample_results
               date_ranges_entire = list(c(start_date,
                                           end_date)),
               tested_sample_sequence = c(1, 3, 7, 14),
-              location_type = x_location,
-              all_time = all_time_choice) %>%
+              location_type = x_location) %>%
               
               # add in column for energy_cluster
               mutate(energy_cluster = cluster_type) 
@@ -759,8 +730,6 @@ sample_results
     
     
       # make dfs--------------------
-all_time_choice <- TRUE
-    overlap_choice <- FALSE
 # clust <- c('all','heat', 'shoulder', 'ac') # can do multiple
 clust <- clusters_all
 
@@ -785,9 +754,8 @@ lapply(clust, function(cluster_type) {
       date_ranges_entire = list(c(start_date,
                                   end_date)),
       tested_sample_sequence = c(1, 3, 7, 14),
-      location_type = loc,
-        overlap = overlap_choice,
-      all_time = all_time_choice) %>%
+      location_type = loc
+      ) %>%
       
       # add in column for energy_cluster
       mutate(energy_cluster = cluster_type) 
@@ -823,9 +791,8 @@ lapply(clust, function(cluster_type) {
       date_ranges_entire = list(c(start_date,
                                   end_date)),
       tested_sample_sequence = c(1, 3, 7, 14),
-      location_type = loc,
-        overlap = overlap_choice,
-      all_time = all_time_choice) %>%
+      location_type = loc
+      ) %>%
       
       # add in column for energy_cluster
       mutate(energy_cluster = cluster_type) 
@@ -862,9 +829,8 @@ lapply(clust, function(cluster_type) {
       date_ranges_entire = list(c(start_date,
                                   end_date)),
       tested_sample_sequence = c(1, 3, 7, 14),
-      location_type = loc,
-        overlap = overlap_choice,
-      all_time = all_time_choice) %>%
+      location_type = loc
+      ) %>%
       
       # add in column for energy_cluster
       mutate(energy_cluster = cluster_type) 
@@ -900,14 +866,16 @@ co2_bedroom_heat_rep_data_time_hourly_pdf,
 #   co2_living_heat_rep_data_time_hourly_pdf,
 # co2_living_shoulder_rep_data_time_hourly_pdf,
 #   co2_living_ac_rep_data_time_hourly_pdf
-# ) %>% 
+# ) %>%
 #   write_rds ('./csv_created_article/representativeness_data/test_after_edit.rds')
  
 test <- read_rds('./csv_created_article/representativeness_data/test_before_edit.rds')
 
 test_after <- read_rds('./csv_created_article/representativeness_data/test_after_edit.rds')
 
-all.equal(test, test_after)
+
+
+all.equal(test %>% select(-period_compare, -overlap), test_after)
 
 # write csv files------------------------
 
@@ -917,16 +885,12 @@ all.equal(test, test_after)
 # if not pooled ---------------------
 write_rds(entropy_time_hourly_pdf_df, file =
             paste0('./csv_created_article/representativeness_data/rep_data_time_hourly_pdf',
-                   ifelse(all_time_choice == TRUE, '', '_season'),
-                   ifelse(overlap_choice == TRUE, '', '_no_overlap'),
                    ifelse(clust[1] %in% month.abb[1:12], '_month', ''),
                    '.rds'))
 # make dated backup
 write_rds(entropy_time_hourly_pdf_df, file =
             paste0('./csv_created_article/representativeness_data/rep_data_time_hourly_pdf_',
                    Sys.Date(),
-                   ifelse(all_time_choice == TRUE, '', '_season'),
-                   ifelse(overlap_choice == TRUE, '', '_no_overlap'),
                    ifelse(clust[1] %in% month.abb[1:12], '_month', ''),
                    '.rds'))
 
