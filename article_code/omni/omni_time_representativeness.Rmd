@@ -875,7 +875,7 @@ test_after <- read_rds('./csv_created_article/representativeness_data/test_after
 
 
 
-all.equal(test %>% select(-period_compare, -overlap), test_after)
+all.equal(test, test_after)
 
 # write csv files------------------------
 
