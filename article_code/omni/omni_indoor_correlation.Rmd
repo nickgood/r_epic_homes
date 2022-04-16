@@ -173,8 +173,8 @@ time_labels <- c ('Day', 'Night')
 # classify hourly data as night data or day data
 ```{r}
 omni_hourly <- omni_hourly %>%
-  mutate(hour = hour(datehour),
-         time = casewhen(hour >= 6 & hour <=20 ~ 'day',
+  mutate(hour = hour(datetime),
+         time = case_when(hour >= 6 & hour <=20 ~ 'day',
                          hour < 6 | hour > 20 ~ 'night',
                          TRUE ~ 'time_error')
   )
@@ -184,641 +184,110 @@ omni_hourly <- omni_hourly %>%
 
 # plot living room hourly values on x
 # bedroom and kitchen hourly values on y
-# color by hour type (day/night)
+# stratify by hour type (day/night)
+# all metrics at one time
+
 ```{r}
 
-```
+a <- omni_hourly %>%
+  # filter(time == 'day') %>%
+  filter(location %in% c('kitchen', 'living', 'bedroom')) %>% #only indoor
+  select(-c(score, noise, lux, temp, humid))%>% #only pm, voc, co2
+  pivot_longer(cols = c(co2:voc), names_to = 'metric') %>%
+  pivot_wider( values_from = value, names_from = location)
 
+ggplot(a, aes(x = living)) +
+  # geom_point(aes( y = kitchen), color = room_colors[3])+
+  # geom_raster( aes(y = kitchen, fill = after_stat(density)))
+stat_bin2d(aes(y = kitchen,  fill = after_stat(count)), binwidth = c(5,5))+
+  facet_grid(rows = vars(time), cols = vars(metric), scales = 'free')+
+  theme_classic()
 
-## Note: all plots use averaged hourly data to calculate means and confidence intervals  
-
-
-# Hourly 
-
-## Pooled homes
-
-
-### function
-```{r}
-
-   # plot pooled by home, facet by room, one metric
-      plot.hourly.pooled <- function(data) {
-     
-             # make a dummy df in which to define limits for each metric
-limit_df <- data %>%
-  group_by(metric) %>%
-  summarize(max = max(mean.val))%>%
-  mutate(min = 0) %>%
-        pivot_longer(cols = c(max, min), names_to = 'side', values_to = 'limits')
-
-      ### plot
-     ggplot(data, aes(x = hour, y = mean.val))+
-    geom_line( size = line_size)+
-    #geom_errorbar(aes(ymax = high.val, ymin = low.val))+ ##bars instead?
-    geom_ribbon(aes(ymax = high.val,
-                    ymin = low.val),
-                alpha = 0.2, color = NA)+
-        labs(
-          y = 'Average Value',
-             x = 'Hour of Day',
-          size= 'Home-Hours of Data')+
-       
-    scale_x_continuous(limits = c(0,24),
-                       breaks = c(0,6,12,18),
-                       labels = c('12am', '6am','12pm', '6pm'),
-                       expand = c(0,0))+
-    theme_bw()+
-       # guides(col = guide_legend(ncol = 2))+ #split up legend
-          ##for extra space between facets
-       facet_grid(c('metric', 'location'))+
-        # make point size proportional to # of obs, with 0 obs = size 0
-      geom_point(aes(y = mean.val, size = n))+
-        scale_size_area(max_size = max_point_size,
-                        )+
-        facet_grid(rows = vars(metric), cols = vars(location),
-                   scales = 'free_y',
-                   labeller = labeller.all,
-                   switch = 'y')+
-        theme(
-      strip.background =element_blank(),
-      strip.placement = 'outside',
-      strip.text = element_text(size = small-3),
-      legend.text = element_text(size = small-3),
-      axis.title = element_text(size = small-3)
-
-              )+
-        # use dummy df to define limits for each metric
-        geom_blank(data = limit_df, aes(x = 15, y = limits))
-      }
-
-
-```
-
-###Plot
-```{r, fig.height=4, fig.width=8}
-
-a <- map(c('pm25', 'voc', 'co2', 'temp'), function(x_metric){
-  time.table(omni_hourly, 'hour', x_metric, groupers = 'location')
-}
-) %>% bind_rows()
   
-# change order of metrics for plotting
-a$location <- factor(a$location, levels = c('kitchen', 'living', 'bedroom',
-                                            'garage', 'outdoor'))
-a$metric <- factor(a$metric, levels = c('pm25', 'voc', 'co2', 'temp'))
-
-
-# without temp
-plot.hourly.pooled(data = a %>% filter(metric != 
-                                         'temp'))
-
-# with temp
-plot.hourly.pooled(data = a)
-
-
 ```
 
-## By Home
+# one metric
 
-
-### function
+# function
 ```{r}
 
-   # plot disag by home, facet by room, one metric
-      plot.hourly.homes <- function(data) {
-     
-        
+correl.plot <- function(x_met)
+{
 
- # make a dummy df in which to define limits for each metric
-limit_df <-
-      data %>%
-  group_by( metric) %>%
-  summarize(max = max(mean.val))%>%
-  mutate(min = 0) %>%
-        pivot_longer(cols = c(max, min), names_to = 'side', values_to = 'limits')
+a <- omni_hourly %>%
+  # filter(time == 'day') %>%
+  filter(location %in% c('kitchen', 'living', 'bedroom')) %>% #only indoor
+  select(-c(score, noise, lux, temp, humid))%>% #only pm, voc, co2
+  pivot_longer(cols = c(co2:voc), names_to = 'metric') %>%
+  pivot_wider( values_from = value, names_from = location) %>%
+  pivot_longer( cols = c(kitchen, bedroom), names_to = 'location') %>%
+  filter(metric == x_met)
 
-
-      ### plot
-     ggplot(data, aes(x = hour, y = mean.val))+
-    geom_line( aes(color = home), size = line_size)+
-    #geom_errorbar(aes(ymax = high.val, ymin = low.val))+ ##bars instead?
-    geom_ribbon(aes(ymax = high.val,
-                    ymin = low.val, fill = home),
-                alpha = 0.2, color = NA)+
-        labs(
-          y = 'Average Value',
-             x = 'Hour of Day',
-          color= 'Home',
-          fill = 'Home')+
-       
-    scale_x_continuous(limits = c(0,24),
-                       breaks = c(0,6,12,18),
-                       labels = c('12am', '6am','12pm', '6pm'),
-                       expand = c(0,0))+
-    theme_bw()+
-       # guides(col = guide_legend(ncol = 2))+ #split up legend
-          ##for extra space between facets
-        # make point size proportional to # of obs, with 0 obs = size 0
-      # geom_point(aes(size = n, fill = home))+
-      #   scale_size_area(max_size = max_point_size,
-      #                   )+
-        facet_grid(rows = vars(metric), cols = vars(location),
-                   scales = 'free_y',
-                   labeller = labeller.all,
-                   switch = 'y')+
-        theme(
-       strip.background =element_blank(),
-      strip.placement = 'outside',
-      strip.text = element_text(size = small-3),
-      axis.title = element_text(size = small-3)
-              )+
-        # use dummy df to define limits for each metric
-        geom_blank(data = limit_df, aes(x = 15, y = limits))
-     }
+# calculate spearman correlation between living room
+# and other two rooms for day and night
+cor_df <- lapply(list( c('kitchen', 'day'),
+             c('kitchen', 'night'),
+             c('bedroom', 'day'),
+             c('bedroom', 'night')),
+       function(x) {
+         
+         data <- a %>% filter(location == x[1], time == x[2])
+         cor <- cor.test(
+         data %>%  pull(living),
+         data %>% pull(value),
+         method = 'spearman',
+         exact = FALSE # avoid error message, OK with approximate p value
+         )
+         
+         results <- list(
+           'location' = x[1],
+           'time' = x[2],
+           'rho' = cor$estimate,
+           'p' = cor$p.value
+         )
+       }
+) %>%
+  bind_rows() %>%
+  # for label, code source:
+  # https://stackoverflow.com/questions/27303019/ggplot-annotate-with-greek-symbol-and-1-apostrophe-or-2-in-between-text
+  mutate(rho_label = sprintf( "rho == %0.2f", rho))
 
 
-```
-
-###Plot
-```{r, fig.height=4, fig.width=8}
-
-a <- map(c('pm25', 'voc', 'co2', 'temp'), function(x_metric){
-  time.table(omni_hourly, 'hour', x_metric, groupers = c('home', 'location'))
-}
-) %>% bind_rows()
-
-# change order of metrics for plotting
-a$location <- factor(a$location, levels = c('kitchen', 'living', 'bedroom',
-                                            'garage', 'outdoor'))
-a$metric <- factor(a$metric, levels = c('pm25', 'voc', 'co2', 'temp'))
-
-# all homes
-plot.hourly.homes(data = a)
-
-# high homes omit
-plot.hourly.homes(data = a %>% filter(home != '003' , home!='015',
-                                      home != '008' , home!='002'))
-
-```
+# make the max x and y values whatever is the higheest value between all three rooms
+max <- max( c(
+  a %>%pull(value),
+  a %>% pull(living)
+), na.rm = TRUE )
 
 
-## By Season
-
-### function
-```{r}
-
-   # plot disag by season, facet by room and etric
-      plot.hourly.seasons <- function(data, n_homes) {
-     
-        
- # make a dummy df in which to define limits for each metric
-limit_df <-
-      data %>%
-  group_by( metric) %>%
-  summarize(max = max(mean.val))%>%
-  mutate(min = 0) %>%
-        pivot_longer(cols = c(max, min), names_to = 'side', values_to = 'limits')
-
-
-      ### plot
-     ggplot(data, aes(x = hour, y = mean.val))+
-    geom_line( aes(color = energy_cluster), size = line_size)+
-    #geom_errorbar(aes(ymax = high.val, ymin = low.val))+ ##bars instead?
-    geom_ribbon(aes(ymax = high.val,
-                    ymin = low.val, fill = energy_cluster),
-                alpha = 0.2, color = NA)+
-        labs(
-          y = 'Average Value',
-             x = 'Hour of Day',
-          color= 'Season',
-          fill = 'Season',
-          size = 'Room-Hours of Data')+
-       
-    scale_x_continuous(limits = c(0,24),
-                       breaks = c(0,6,12,18),
-                       labels = c('12am', '6am','12pm', '6pm'),
-                       expand = c(0,0))+
-    theme_bw()+
-       # guides(col = guide_legend(ncol = 2))+ #split up legend
-          ##for extra space between facets
-    theme(
-          strip.background =element_blank(),
-      strip.text = element_text(size = small-3),
-      legend.text = element_text(size = small-3),
-      axis.title = element_text(size = small-3)
-      )+
-       facet_grid(c('metric', 'location'))+
-        # make point size proportional to # of obs, with 0 obs = size 0
-      geom_point(aes(size = n, color = energy_cluster))+
-        scale_size_area(max_size = max_point_size+2,
-                        )+
-        facet_wrap(vars(metric), nrow = 1, labeller = labeller.all,
-                   scales = 'free_y')+
-
-        # use dummy df to define limits for each metric
-        geom_blank(data = limit_df, aes(x = 15, y = limits))+
-               #ensure seaons legend on top
-        guides(
-    fill = guide_legend(order = 1),
-        color = guide_legend(order = 1),
-    size = guide_legend(order = 2)
+#plot
+ggplot(a, aes(x = living)) +
+  geom_point(aes( y = value, color = location), size = 1)+
+  # geom_raster( aes(y = kitchen, fill = after_stat(density)))
+# stat_bin2d(aes(y = value,  fill = after_stat(count)), binwidth = c(5,5))+
+  facet_grid(rows = vars(time), cols = vars(location))+
+  theme_classic()+
+  scale_x_continuous(limits = c(0, max))+
+  scale_y_continuous(limits = c(0, max))+
+  # add spearman rho into plot
+  geom_text( data = cor_df,  aes(label = rho_label ),
+             parse = T,
+             x = 0.75*max, y = 0.25*max)+
+  scale_color_manual(
+    values = room_colors[c(2:3)],
+    breaks = room_breaks[c(2:3)],
+    labels = room_labels[c(2:3)]
   )+
-        labs(tag = paste('*n homes =', n_homes) )+
-      theme(
-        plot.tag.position = c(.1,0.02),
-        )+
-                scale_fill_manual(
-          breaks = energy_breaks,
-          values = energy_colors,
-          labels = energy_labels,
-          aesthetics = c('fill', 'color')
-        )
-     }
+  ggtitle(x_met)
 
-
-```
-
-###Plot for homes that had seasonal data
-###exclude homes that had less certain classification of seasons (group 1 homes)
-```{r, fig.height=2.5, fig.width=8}
-
-
-a <- map(c('pm25', 'voc', 'co2', 'temp'), function(x_metric){
-  
-  dat <- omni_hourly %>%
-    filter( 
-      home %in% c(homes_seasons), 
-            location %in% locations_indoor,
-            energy_cluster %in% c('heat', 'shoulder', 'ac'))
-  
-    
-  time.table(dat, 'hour', x_metric, groupers = c('energy_cluster'))
 }
-) %>% bind_rows()
-
-# change order of metrics for plotting
-a$metric <- factor(a$metric, levels = c('pm25', 'voc', 'co2', 'temp'))
 
 
+  
+```
 
 # plot
-plot.hourly.seasons(data = a, n_homes = length(homes_seasons))
-
-
-```
-
------
-
-
-
-
-# Weekday
-
-
-## pooled homes
-
-### function
-
 ```{r}
-
-   # plot pooled home, facet by room, all metrics
-      plot.weekday.pooled <- function(data) {
-     
-             # make a dummy df in which to define limits for each metric
-limit_df <- data %>%
-  group_by(metric) %>%
-  summarize(max = max(mean.val))%>%
-  mutate(min = 0) %>%
-        pivot_longer(cols = c(max, min), names_to = 'side', values_to = 'limits')
-
-      ### plot
-     ggplot(data, aes(x = weekday, y = mean.val))+
-    geom_line( size = line_size, aes(group = 1))+
-    #geom_errorbar(aes(ymax = high.val, ymin = low.val))+ ##bars instead?
-    geom_ribbon(aes(ymax = high.val,
-                    ymin = low.val, group = 1),
-                alpha = 0.2, color = NA)+
-        labs(
-          y = 'Average Value',
-             x = 'Weekday',
-          size= 'Home-Hours of Data')+
-       
-    scale_x_discrete(
-      breaks = c('Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'),
-      labels = c('Su', 'M', 'T', 'W', 'Th', 'F', 'Sa'),
-
-                     )+
-    theme_bw()+
-       # guides(col = guide_legend(ncol = 2))+ #split up legend
-          ##for extra space between facets
-
-       facet_grid(c('metric', 'location'))+
-        # make point size proportional to # of obs, with 0 obs = size 0
-      geom_point(aes(y = mean.val, size = n))+
-        scale_size_area(max_size = max_point_size,
-                        )+
-        facet_grid(rows = vars(metric), cols = vars(location),
-                   scales = 'free_y',
-                   labeller = labeller.all,
-                   switch = 'y')+
-        theme(
-       strip.background =element_blank(),
-      strip.placement = 'outside',
-      strip.text = element_text(size = small-3),
-      axis.title = element_text(size = small-3),
-      axis.text.x = element_text(size = small-4),
-      legend.text = element_text(size = small-3)
-              )+
-        # use dummy df to define limits for each metric
-        geom_blank(data = limit_df, aes(x = 'Wed', y = limits))
-      }
-
-
+lapply(c( 'pm25', 'voc', 'co2'), function(x) correl.plot(x) )
 ```
-
-### plot
-```{r, fig.height=4, fig.width=8}
-a <- map(c('pm25', 'voc', 'co2', 'temp'), function(x_metric){
-  
-    
-  time.table(omni_hourly, 'day', x_metric, groupers = 'location')
-}
-) %>% bind_rows()
-
-# change order of metrics for plotting
-a$metric <- factor(a$metric, levels = c('pm25', 'voc', 'co2', 'temp'))
-
-a$location <- factor(a$location, levels = c('kitchen', 'living', 'bedroom',
-                                            'garage', 'outdoor'))
-
-plot.weekday.pooled(a)
-
-
-
-```
-
-
-## by home
-
-### function
-
-```{r}
-
-   # plot pooled by home, facet by room, one metric
-      plot.weekday.homes <- function(data) {
-     
-             # make a dummy df in which to define limits for each metric
-limit_df <- data %>%
-  group_by(metric) %>%
-  summarize(max = max(mean.val))%>%
-  mutate(min = 0) %>%
-        pivot_longer(cols = c(max, min), names_to = 'side', values_to = 'limits')
-
-      ### plot
-     ggplot(data, aes(x = weekday, y = mean.val))+
-    geom_line( size = line_size, aes(color = home, group = home))+
-    #geom_errorbar(aes(ymax = high.val, ymin = low.val))+ ##bars instead?
-    geom_ribbon(aes(ymax = high.val,
-                    ymin = low.val, fill = home, group = home),
-                alpha = 0.2, color = NA)+
-        labs(
-          y = 'Average Value',
-             x = 'Weekday',
-          color= 'Home',
-          fill = 'Home')+
-       
-    scale_x_discrete(
-      breaks = c('Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'),
-      labels = c('Su', 'M', 'T', 'W', 'Th', 'F', 'Sa'),
-                     )+
-    theme_bw()+
-       # guides(col = guide_legend(ncol = 2))+ #split up legend
-          ##for extra space between facets
-
-       facet_grid(c('metric', 'location'))+
-        # make point size proportional to # of obs, with 0 obs = size 0
-      # geom_point(aes(y = mean.val, size = n))+
-        # scale_size_area(max_size = max_point_size,
-        #                 )+
-        facet_grid(rows = vars(metric), cols = vars(location),
-                   scales = 'free_y',
-                   labeller = labeller.all,
-                   switch = 'y')+
-        theme(
-       strip.background =element_blank(),
-      strip.placement = 'outside',
-      strip.text = element_text(size = small-3),
-      axis.title = element_text(size = small-3),
-      axis.text.x = element_text(size = small-4),
-              )+
-        # use dummy df to define limits for each metric
-        geom_blank(data = limit_df, aes(x = 'Wed', y = limits))
-      }
-
-
-```
-
-### plot
-```{r, fig.height=4, fig.width=8}
-a <- map(c('pm25', 'voc', 'co2', 'temp'), function(x_metric){
-  
-    
-  time.table(omni_hourly, 'day', x_metric, groupers = c('home','location'))
-}
-) %>% bind_rows()
-
-# change order of metrics for plotting
-a$metric <- factor(a$metric, levels = c('pm25', 'voc', 'co2', 'temp'))
-
-a$location <- factor(a$location, levels = c('kitchen', 'living', 'bedroom',
-                                            'garage', 'outdoor'))
-
-
-plot.weekday.homes(a)
-
-
-
-```
-
-
-------
-
-
-# Monthly 
-
-
-## pooled homes
-
-### line plot function
-
-```{r}
-
-   # plot pooled home, facet by room, all metrics
-      plot.month.pooled <- function(data) {
-     
-             # make a dummy df in which to define limits for each metric
-limit_df <- data %>%
-  group_by(metric) %>%
-  summarize(max = max(mean.val))%>%
-  mutate(min = 0) %>%
-        pivot_longer(cols = c(max, min), names_to = 'side', values_to = 'limits')
-
-      ### plot
-     ggplot(data, aes(x = as.Date(month), y = mean.val))+
-    geom_line( size = line_size, aes(group = 1))+
-    #geom_errorbar(aes(ymax = high.val, ymin = low.val))+ ##bars instead?
-    geom_ribbon(aes(ymax = high.val,
-                    ymin = low.val, group = 1),
-                alpha = 0.2, color = NA)+
-        labs(
-          y = 'Average Value',
-             x = 'Month',
-          size= 'Home-Hours of Data')+
-
-scale_x_date(
-                    breaks = c(seq(from=as.Date("2020-07-01"),
-                                   to=as.Date("2021-06-01"),by="month")),
-               labels = c(
-                 sapply(month.abb[c(7:12,1:6)],
-                                       substr, start = 1, stop = 1) %>% unname()))+    theme_bw()+
-       # guides(col = guide_legend(ncol = 2))+ #split up legend
-          ##for extra space between facets
-       facet_grid(c('metric', 'location'))+
-        # make point size proportional to # of obs, with 0 obs = size 0
-      geom_point(aes(y = mean.val, size = n))+
-        scale_size_area(max_size = max_point_size,
-                        )+
-        facet_grid(rows = vars(metric), cols = vars(location),
-                   scales = 'free_y',
-                   labeller = labeller.all,
-                   switch = 'y')+
-        theme(
-      strip.placement = 'outside',
-      strip.background =element_blank(),
-      strip.text = element_text(size = small-3),
-      axis.title = element_text(size = small-3),
-      axis.text.x = element_text(size = small-5),
-      legend.text = element_text(size = small-3)
-              )+
-        # use dummy df to define limits for each metric
-        geom_blank(data = limit_df, aes(x = as.Date('2020-10-01'), y = limits))+
-       theme(  panel.grid.minor.x = element_blank() )
-     
-      }
-
-
-```
-
-### plot
-```{r, fig.height=4, fig.width=8}
-a <- map(c('pm25', 'voc', 'co2', 'temp'), function(x_metric){
-  
-    
-  time.table(omni_hourly, 'month', x_metric, groupers = 'location')
-}
-) %>% bind_rows()
-
-# change order of metrics for plotting
-a$metric <- factor(a$metric, levels = c('pm25', 'voc', 'co2', 'temp'))
-
-a$location <- factor(a$location, levels = c('kitchen', 'living', 'bedroom',
-                                            'garage', 'outdoor'))
-
-# all metrics and locations
-plot.month.pooled(a)
-
-```
-
-
-
-## by home
-
-### function
-
-```{r}
-
-   # plot diasggragaetd homes, facet by room, all metrics
-      plot.month.homes <- function(data) {
-     
-             # make a dummy df in which to define limits for each metric
-limit_df <- data %>%
-  group_by(metric) %>%
-  summarize(max = max(mean.val))%>%
-  mutate(min = 0) %>%
-        pivot_longer(cols = c(max, min), names_to = 'side', values_to = 'limits')
-
-      ### plot
-     ggplot(data, aes(x = as.Date(month), y = mean.val))+
-    geom_path( size = line_size, aes(color = home, group = home))+
-    #geom_errorbar(aes(ymax = high.val, ymin = low.val))+ ##bars instead?
-    geom_ribbon(aes(ymax = high.val,
-                    ymin = low.val, fill = home, group = home),
-                alpha = 0.2, color = NA)+
-        labs(
-          y = 'Average Value',
-             x = 'Month',
-          fill = 'Home',
-          color = 'Home')+
-
-scale_x_date(
-                    breaks = c(seq(from=as.Date("2020-07-01"),
-                                   to=as.Date("2021-06-01"),by="month")),
-               labels = c(
-                 sapply(month.abb[c(7:12,1:6)],
-                                       substr, start = 1, stop = 1) %>% unname()))+    theme_bw()+
-       # guides(col = guide_legend(ncol = 2))+ #split up legend
-          ##for extra space between facets
-       facet_grid(c('metric', 'location'))+
-        # make point size proportional to # of obs, with 0 obs = size 0
-      # geom_point(aes(y = mean.val, size = n))+
-      #   scale_size_area(max_size = max_point_size,
-      #                   )+
-        facet_grid(rows = vars(metric), cols = vars(location),
-                   scales = 'free_y',
-                   labeller = labeller.all,
-                   switch = 'y')+
-theme(
-      strip.placement = 'outside',
-      strip.background =element_blank(),
-      strip.text = element_text(size = small-3),
-      axis.title = element_text(size = small-3),
-      axis.text.x = element_text(size = small-5)
-      )+
-        # use dummy df to define limits for each metric
-        geom_blank(data = limit_df, aes(x = as.Date('2020-10-01'), y = limits))+
-       # set minimum to avoid cutting off min temps
-       scale_y_continuous(limits = c(-5, NA))+
-       theme(  panel.grid.minor.x = element_blank() )
-      }
-
-
-```
-
-### plot
-```{r, fig.height=4, fig.width=8}
-a <- map(c('pm25', 'voc', 'co2', 'temp'), function(x_metric){
-  
-    
-  time.table(omni_hourly, 'month', x_metric, groupers = c('home','location'))
-}
-) %>% bind_rows()%>%
-  mutate(month = as.Date(month))%>%
-  group_by(home, location, metric) %>%
-  complete(month = seq.Date(as.Date('2020-07-01'), as.Date('2021-05-01'), by="month")) %>%
-  ungroup()
-
-
-
-# change order of metrics for plotting
-a$metric <- factor(a$metric, levels = c('pm25', 'voc', 'co2', 'temp'))
-
-a$location <- factor(a$location, levels = c('kitchen', 'living', 'bedroom',
-                                            'garage', 'outdoor'))
-
-plot.month.homes(a)
-
-
-
-```
-
 
