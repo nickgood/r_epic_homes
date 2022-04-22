@@ -687,7 +687,7 @@ sample_results
 # clust <- c('all','heat', 'shoulder', 'ac') # can do multiple
 clust <- clusters_all
 
-met <- 'co2'
+met <- 'pm25'
 
 loc <- 'living'
 lapply(clust, function(cluster_type) {
@@ -785,19 +785,19 @@ lapply(clust, function(cluster_type) {
   
 entropy_time_hourly_pdf_df <- bind_rows(
 
-co2_bedroom_heat_rep_data_time_hourly_pdf,
-  co2_living_heat_rep_data_time_hourly_pdf,
-  co2_kitchen_heat_rep_data_time_hourly_pdf,
-  co2_bedroom_shoulder_rep_data_time_hourly_pdf,
-  co2_living_shoulder_rep_data_time_hourly_pdf,
-  co2_kitchen_shoulder_rep_data_time_hourly_pdf,
-  co2_bedroom_ac_rep_data_time_hourly_pdf,
-  co2_living_ac_rep_data_time_hourly_pdf,
-  co2_kitchen_ac_rep_data_time_hourly_pdf
+pm25_bedroom_heat_rep_data_time_hourly_pdf,
+  pm25_living_heat_rep_data_time_hourly_pdf,
+  pm25_kitchen_heat_rep_data_time_hourly_pdf,
+  pm25_bedroom_shoulder_rep_data_time_hourly_pdf,
+  pm25_living_shoulder_rep_data_time_hourly_pdf,
+  pm25_kitchen_shoulder_rep_data_time_hourly_pdf,
+  pm25_bedroom_ac_rep_data_time_hourly_pdf,
+  pm25_living_ac_rep_data_time_hourly_pdf,
+  pm25_kitchen_ac_rep_data_time_hourly_pdf
 )
 
 
-# for making edits
+# for making edits -----------
 
 #  bind_rows(
 #   co2_living_heat_rep_data_time_hourly_pdf,
@@ -812,22 +812,40 @@ co2_bedroom_heat_rep_data_time_hourly_pdf,
 # 
 # all.equal(test, test_after)
 
+
+
+
 # write csv files------------------------
 
+# write_rds(entropy_time_hourly_pdf_df, file =
+#             paste0('./csv_created_article/representativeness_data/rep_data_time.rds'))
+# # make dated backup
+# write_rds(entropy_time_hourly_pdf_df, file =
+#             paste0('./csv_created_article/representativeness_data/rep_data_time_',
+#                    Sys.Date(),
+#                    '.rds'))
 
+# for joining files ---------------------
 
+# rep_co2 <- read_rds('./csv_created_article/representativeness_data/co2_rep_data_time.rds')
+# 
+# rep_voc <- read_rds('./csv_created_article/representativeness_data/voc_rep_data_time.rds')
+# 
+# rep_pm25 <- read_rds('./csv_created_article/representativeness_data/pm25_rep_data_time.rds')
+# 
+# entropy_time_hourly_pdf_df_all <- bind_rows(
+#   rep_co2, rep_voc, rep_pm25
+# )
+# 
+# 
+# write_rds(entropy_time_hourly_pdf_df_all, file =
+#             paste0('./csv_created_article/representativeness_data/rep_data_time.rds'))
+# # make dated backup
+# write_rds(entropy_time_hourly_pdf_df_all, file =
+#             paste0('./csv_created_article/representativeness_data/rep_data_time_',
+#                    Sys.Date(),
+#                    '.rds'))
 
-# if not pooled ---------------------
-write_rds(entropy_time_hourly_pdf_df, file =
-            paste0('./csv_created_article/representativeness_data/rep_data_time_hourly_pdf',
-                   ifelse(clust[1] %in% month.abb[1:12], '_month', ''),
-                   '.rds'))
-# make dated backup
-write_rds(entropy_time_hourly_pdf_df, file =
-            paste0('./csv_created_article/representativeness_data/rep_data_time_hourly_pdf_',
-                   Sys.Date(),
-                   ifelse(clust[1] %in% month.abb[1:12], '_month', ''),
-                   '.rds'))
 
 ```
 
