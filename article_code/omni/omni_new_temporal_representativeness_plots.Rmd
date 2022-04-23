@@ -27,9 +27,6 @@ library(googlesheets4)
 library(lubridate)
 library(gridExtra)
 library(ggpubr) # for tesing log-normality
-# library(cubature) # for alternative method of integrating kld function
-# library(entropy) # for KLD function
-# library(fitdistrplus) # for fitting distribution to data NOTE, MASS::select CONFLICTS WITH dplyr::select
 
 ```
 
@@ -37,17 +34,15 @@ library(ggpubr) # for tesing log-normality
 
 ```{r import_energy_cluster_homes}
 # import energy cluster dataframe for all homes
-energy_cluster_df <- read_csv('../sense/csv_created_sense/energy_cluster_df.csv')
+energy_cluster_df <- read_csv('../sense/csv_created_sense_article/energy_cluster_df.csv')
 ```
 
 
 
 ```{r import_assessment_data}
 
-assessment_data <- read_csv('../../data_thesis/homes/home_assessment_data.csv')
+assessment_data <- read_csv('../data_article/homes/home_assessment_data.csv')
 
-# # using googlesheets4
-# assessment_data <- read_sheet('https://docs.google.com/spreadsheets/d/12vWpqdmzIII0vEKH79xpmICUYGuzc8PjfBT2_3YjIHU/edit?usp=sharing', sheet = 'data')
 ```
 
 
@@ -93,11 +88,7 @@ labeller.metrics.seasons <- as_labeller(c(
 # fraction of sample needed to use sample of certain length
 frac_samp_required <- 0
 
-# method of scaling relative entropy to scaled entropy
-# 'universal' or 'conditional'
-long_term_period <- 'year'
-overlap <- FALSE
-month_cluster <- FALSE
+
 omit_outliers <- 'extreme'
 pooled_rooms <- FALSE
 clusters_all <- c('heat','shoulder', 'ac')
@@ -163,28 +154,12 @@ large <- 24
 
 ```
 
-```{r import_pdf_data}
+```{r import_rep_data}
 
 
 # read in csv files
 entropy_df <- 
   
-  if(long_term_period == 'year' & overlap == FALSE & month_cluster == FALSE
-           & pooled_rooms == TRUE ){
-    
-    bind_rows(
-      # read_rds(file = './csv_created/representativeness_data/rep_data_shape_hourly_pdf_pooled_no_overlap.rds')
-      data.frame(median_sample=NA, median_entire=NA,
-                 mean_sample = NA, mean_entire = NA,
-                 iqr_sample = NA, iqr_entire = NA,
-                 variance_sample=NA, variance_entire = NA),
-
-    )%>%
-      filter(period_compare == long_term_period)
-    
-    
-  } else if(long_term_period == 'year' & overlap == FALSE & month_cluster == FALSE
-           & pooled_rooms == FALSE ){
     
     bind_rows(
       # read_rds(file = './csv_created/representativeness_data/rep_data_shape_hourly_pdf_no_overlap.rds')
@@ -192,41 +167,15 @@ entropy_df <-
                  mean_sample = NA, mean_entire = NA,
                  iqr_sample = NA, iqr_entire = NA,
                  variance_sample=NA, variance_entire = NA),
-      read_rds(file = './csv_created/representativeness_data/rep_data_time_hourly_pdf_no_overlap.rds')
-    )%>%
-      filter(period_compare == long_term_period)
+      
+      read_rds(file = './csv_created_article/representativeness_data/rep_data_time.rds')
     
-  }
+      )
   
-  
-  # if(long_term_period == 'year' & overlap == TRUE & month_cluster == FALSE) {
-  #   
-  #   # bind_rows(
-  #   #   read_csv(file = './csv_created/representativeness_data/rep_data_shape_hourly_pdf.csv'),
-  #   #   read_csv(file = './csv_created/representativeness_data/rep_data_time_hourly_pdf.csv'))
-  #   
-  # }else if(long_term_period == 'season'& overlap == TRUE & month_cluster == FALSE){
-  #   
-  #   # bind_rows(
-  #   #   read_csv(file = './csv_created/representativeness_data/rep_data_shape_hourly_pdf_season.csv'),
-  #   #   read_csv(file = './csv_created/representativeness_data/rep_data_time_hourly_pdf_season.csv'))
-  #   
-  # } else if(long_term_period == 'season'& overlap == FALSE & month_cluster == FALSE){
-  #   
-  #   bind_rows(
-  #     read_csv(file = './csv_created/representativeness_data/rep_data_shape_hourly_pdf_season_no_overlap.csv'),
-  #     read_csv(file = './csv_created/representativeness_data/rep_data_time_hourly_pdf_season_no_overlap.csv'))
-  #   
-  # }else if(long_term_period == 'season'& overlap == TRUE & month_cluster == TRUE){
-  #   
-  #   # bind_rows(
-  #   #   read_csv(file = './csv_created/representativeness_data/rep_data_shape_hourly_pdf_season_month.csv'),
-  #   #   read_csv(file = './csv_created/representativeness_data/rep_data_time_hourly_pdf_season_month.csv'))
-  # }
-
-
 ```
 
+
+# clean rep data
 ```{r cleaning_omissions}
 # count omissions --------------
 
@@ -237,23 +186,6 @@ n_homes_data <-16 # n of homes with data used at least partially
 n_indoor_sensors_data <- 15*3+2 # n of indoor sensors with data used at least partially
 n_sensors_ac <- 5*3+2 # n of sensors in homes with ac detected
 n_sensors_ac_ignore <- 3 # Home 011 ac usage ignored because only detected 5 days 
-
-# no cluster
-
-# clustered <- entropy_df%>%
-#   filter(home != '005') %>% # omit home 5 from count
-#   filter(!(home == '002' & location == 'kitchen')) %>% # omit home 002 kitchen from count
-#     filter(!(grepl('likely_no_cluster', error))) %>%
-#   filter(grepl('missing', error)) %>%
-#   group_by(method, metric, energy_cluster) %>%
-#   summarize(n = n(), .groups = 'drop')
-# 
-# 
-# pm_time_no_cluster <- entropy_df%>%
-#   filter(method == 'time', metric == 'pm25',
-#          grepl('likely_no_cluster', error)) %>%
-#   group_by(home, location, energy_cluster) %>%
-#   summarize(n = n(), .groups = 'drop')
 
 
 # clean dataframes ------------------------
@@ -374,163 +306,6 @@ entropy_shape <- entropy_df_clean %>% filter(method == 'shape')
 * omitting high outliers does lead to ceratin sensors being underrepresented (but mostly when they had a small sample size)
 
 # Time-Structured Represenetativeness
-
-## Rep Summary Plots
-
-### Example Plot
-```{r, fig.height=3, fig.width = 3}
-a <- entropy_time %>% filter(metric == 'pm25', energy_cluster == 'heat')
-
-summary <- a %>%
-  group_by(method, metric, energy_cluster, sample_length) %>%
-  summarize(n_sample_length= n(), y_label = min(rep)-0.05,
-            .groups = 'drop')
-
-ggplot(a, aes(x = sample_length, group = sample_length,
-                   y = rep))+
-  geom_violin(width = 1.75, color = 'darkgrey')+
-  geom_boxplot(width=0.35, outlier.shape = NA,
-                 color = 'black',
-                 lwd = 0.5)+
-  # geom_text(aes(label = (ext_outlier_n*100) %>% signif(2)),
-  #           y = 0.75, size = xsmall)+
-  facet_wrap(vars(metric, energy_cluster))+
-  geom_hline(yintercept = thresh_vector, linetype = 'dashed')+
-  geom_text(data = summary, aes(label = n_sample_length, y = y_label),
-            size = 2)+
-  ylab('Time-Structured Representativeness')
-
-```
-
-### All conditions
-```{r, fig.height=5, fig.width = 8}
-
-summary <- entropy_time %>%
-  group_by(method, metric, energy_cluster, sample_length) %>%
-  summarize(n_sample_length= n(), y_label = min(rep)-0.05,
-            .groups = 'drop')
-
-ggplot(entropy_time, aes(x = sample_length, group = sample_length,
-                   y = rep))+
-  geom_violin(width = 1.75, color = 'darkgrey')+
-  geom_boxplot(width=0.35, outlier.shape = NA,
-                 color = 'black',
-                 lwd = 0.5)+
-  # geom_text(aes(label = (ext_outlier_n*100) %>% signif(2)),
-  #           y = 0.75, size = xsmall)+
-  facet_wrap(vars(metric, energy_cluster))+
-  geom_hline(yintercept = thresh_vector, linetype = 'dashed')+
-  geom_text(data = summary, aes(label = n_sample_length, y = y_label),
-            size = 2)+
-  ylab('Time-Structured Representativeness')+
-  ggtitle('Samples from all homes pooled')
-
-
-```
-
-
-### One Home
-
-* find home with most data
-```{r}
-data_summary <- 
-  entropy_time %>%
-  filter(home %in% homes_tier3) %>%
-  group_by(home, location, energy_cluster) %>%
-  summarize(n_samples = n(), .groups = 'drop')
-
-```
-
-** for heating season
-```{r}
-# top homes for heat season
-a <- data_summary %>% filter(energy_cluster == 'heat')
-
-a[ order(a$n_samples, decreasing = TRUE),] %>%
-  head(15)
-```
-
-** for shoulder season
-```{r}
-# top homes for shoulder season
-a <- data_summary %>% filter(energy_cluster == 'shoulder')
-
-a[ order(a$n_samples, decreasing = TRUE),] %>%
-  head(15)
-```
-
-** for ac season
-```{r}
-# top homes for ac season
-a <- data_summary %>% filter(energy_cluster == 'ac')
-
-a[ order(a$n_samples, decreasing = TRUE),] %>%
-  head(15)
-```
-
-
-* use Homes 9 and 12 as exampes because they have the most data in most seasons for ost rooms
-```{r, fig.height=5, fig.width = 8}
-
-loc <- if(pooled_rooms == TRUE) 'pooled' else 'living'
-
-hm <- '009'
-
-a <- entropy_time %>%
-  filter(home==hm, location == loc)
-
-summary <- a %>%
-  group_by(method, metric, energy_cluster, sample_length) %>%
-  summarize(n_sample_length= n(), y_label = min(rep)-0.05,
-            .groups = 'drop')
-
-ggplot(a, aes(x = sample_length, group = sample_length,
-                   y = rep))+
-  geom_violin(width = 1.75, color = 'darkgrey')+
-  geom_boxplot(width=0.35, outlier.shape = NA,
-                 color = 'black',
-                 lwd = 0.5)+
-  # geom_text(aes(label = (ext_outlier_n*100) %>% signif(2)),
-  #           y = 0.75, size = xsmall)+
-  facet_wrap(vars(metric, energy_cluster))+
-  geom_hline(yintercept = thresh_vector, linetype = 'dashed')+
-  geom_text(data = summary, aes(label = n_sample_length, y = y_label),
-            size = 2)+
-  ylab('Time-Structured Representativeness')+
-  ggtitle(paste('Home', hm, '-- Room=', loc))
-
-
-
-
-hm <- '012'
-
-a <- entropy_time %>%
-  filter(home==hm, location == loc)
-
-summary <- a %>%
-  group_by(method, metric, energy_cluster, sample_length) %>%
-  summarize(n_sample_length= n(), y_label = min(rep)-0.05,
-            .groups = 'drop')
-
-ggplot(a, aes(x = sample_length, group = sample_length,
-                   y = rep))+
-  geom_violin(width = 1.75, color = 'darkgrey')+
-  geom_boxplot(width=0.35, outlier.shape = NA,
-                 color = 'black',
-                 lwd = 0.5)+
-  # geom_text(aes(label = (ext_outlier_n*100) %>% signif(2)),
-  #           y = 0.75, size = xsmall)+
-  facet_wrap(vars(metric, energy_cluster))+
-  geom_hline(yintercept = thresh_vector, linetype = 'dashed')+
-  geom_text(data = summary, aes(label = n_sample_length, y = y_label),
-            size = 2)+
-  ylab('Time-Structured Representativeness')+
-  ggtitle(paste('Home', hm, '-- Room=', loc))
-
-
-```
-
-
 
 ## Rep Density Plots
 
@@ -771,7 +546,49 @@ grid.arrange(p1,p2,p3)
 
 
 
-## Comparison of Diurnal Trends of Samples to those of Long-Term Period
+## Example hour-of-day/Representativeness Comparison Plot
+
+
+* find home with most data
+```{r}
+data_summary <- 
+  entropy_time %>%
+  filter(home %in% homes_tier3) %>%
+  group_by(home, location, energy_cluster) %>%
+  summarize(n_samples = n(), .groups = 'drop')
+
+```
+
+** for heating season
+```{r}
+# top homes for heat season
+a <- data_summary %>% filter(energy_cluster == 'heat')
+
+a[ order(a$n_samples, decreasing = TRUE),] %>%
+  head(15)
+```
+
+** for shoulder season
+```{r}
+# top homes for shoulder season
+a <- data_summary %>% filter(energy_cluster == 'shoulder')
+
+a[ order(a$n_samples, decreasing = TRUE),] %>%
+  head(15)
+```
+
+** for ac season
+```{r}
+# top homes for ac season
+a <- data_summary %>% filter(energy_cluster == 'ac')
+
+a[ order(a$n_samples, decreasing = TRUE),] %>%
+  head(15)
+```
+
+
+* plotting function
+* use systemartic method to select sample data for plotting
 ```{r}
 # variables for testing---------------
 
@@ -788,7 +605,7 @@ grid.arrange(p1,p2,p3)
 
 # function-----------------
 diurn.rep.plot <- function(data, x_home, x_location, x_energy_cluster, x_metric,
-         sample_lengths = c(3,7,14), # has to be a numerical vector of length 3 or 4
+         sample_lengths = c(1,3,7), # has to be a numerical vector of length 3 or 4
          y_limits = NULL){
   
   data_condition <- data %>%
@@ -950,53 +767,11 @@ diurn.rep.plot <- function(data, x_home, x_location, x_energy_cluster, x_metric,
 ```
 
 
-* pick homes, seasons, (and rooms if not pooled)
+* Plot for specified home, season, and room
 ```{r, fig.height=2, fig.width = 4}
 
-# if(pooled_rooms == TRUE) {
-#   map(c('pm25', 'voc'), function(y_metric){
-#   map(c('009'), function(y_home){
-#   map(c('heat', 'shoulder', 'ac'), function(y_energy_cluster){
-#     diurn.rep.plot(
-#     data = entropy_time,
-#     x_home = y_home, x_location = 'pooled',
-#     x_energy_cluster = y_energy_cluster, x_metric = y_metric
-#     )
-#   })
-#   })
-#   })
-#   
-# 
-# } else if(pooled_rooms == FALSE){
-# 
-#     map(c('pm25', 'voc'), function(y_metric){
-#   map(c('009'), function(y_home){
-#   map(c('heat', 'shoulder'), function(y_energy_cluster){
-#   map(c('living', 'kitchen', 'bedroom'), function(y_location){
-#     diurn.rep.plot(
-#     data = entropy_time,
-#     x_home = y_home, x_location = y_location,
-#     x_energy_cluster = y_energy_cluster, x_metric = y_metric
-#     )
-#   })
-#   })
-#   })
-#     })
-#   
-# 
-# }
+# specific cases
 
-
-
-# test specific cases
-
-# # pooled rooms
-# diurn.rep.plot(entropy_time, '009', 'pooled', 'heat', 'pm25')
-# diurn.rep.plot(entropy_time, '012', 'pooled', 'heat', 'pm25')
-#
-#
-
-# not pooled rooms
 
 ## Thesis Plot, in body
 
@@ -1024,23 +799,5 @@ diurn.rep.plot(entropy_time, '009', 'living', 'heat', 'co2', c(1,3,7,14))
 
 ```
 
-
-* pick homes, seasons, (and rooms if not pooled) and choose less sample lengths
-
-```{r, fig.height=2, fig.width = 4}
-
-
-
-diurn.rep.plot(entropy_time, '009', 'living', 'heat', 'pm25',
-               sample_lengths = c(1), y_limits = c(0,100))
-
-diurn.rep.plot(entropy_time, '009', 'living', 'heat', 'pm25',
-               sample_lengths = c(1,3), y_limits = c(0,100))
-
-diurn.rep.plot(entropy_time, '009', 'living', 'heat', 'pm25',
-               sample_lengths = c(1,3,7), y_limits = c(0,100))
-
-
-```
 
 
