@@ -37,15 +37,6 @@ library(ggpubr) # for tesing log-normality
 energy_cluster_df <- read_csv('../sense/csv_created_sense_article/energy_cluster_df.csv')
 ```
 
-
-
-```{r import_assessment_data}
-
-assessment_data <- read_csv('../data_article/homes/home_assessment_data.csv')
-
-```
-
-
 ```{r functions_misc}
 
 #Function to only display 3 significant figures (for tables)
@@ -90,7 +81,6 @@ frac_samp_required <- 0
 
 
 omit_outliers <- 'extreme'
-pooled_rooms <- FALSE
 clusters_all <- c('heat','shoulder', 'ac')
 
 # list of all home numbers
