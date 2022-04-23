@@ -207,14 +207,25 @@ entropy_df_clean <- entropy_df%>%
     group_by(method, metric, sample_length) %>%
   #mark extreme outliers
   mutate(
-            outlier = 
-                     case_when(  kld > median(kld)+
+
+                outlier = 
+                     case_when(  kld > quantile(kld, 0.75)+
                     1.5*IQR(kld)~ TRUE,
                     TRUE ~FALSE),
             ext_outlier = 
-                     case_when(  kld > median(kld)+
+                     case_when(  kld > quantile(kld, 0.75)+
                     3*IQR(kld)~ TRUE,
-                    TRUE ~FALSE),
+                    TRUE ~FALSE),    
+    
+    # mistake made during thesis, kept here to allow for comparison
+            # outlier = 
+            #          case_when(  kld > median(kld)+
+            #         1.5*IQR(kld)~ TRUE,
+            #         TRUE ~FALSE),
+            # ext_outlier = 
+            #          case_when(  kld > median(kld)+
+            #         3*IQR(kld)~ TRUE,
+            #         TRUE ~FALSE),
 
     ) %>% ungroup()
 
@@ -616,9 +627,9 @@ ggplot(a)+
 
 
 map(c(
-  'pm25'
-      # 'voc',
-      # 'co2'
+  'pm25',
+      'voc',
+      'co2'
   ), function(x_metric){
   
 a <- entropy_time %>% filter(sample_length %in% c(1,3,7,14) &
