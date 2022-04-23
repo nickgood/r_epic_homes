@@ -565,58 +565,8 @@ diurn.rep.plot(entropy_time, '009', 'living', 'heat', 'co2', c(1,3,7,14))
 
 ## Rep Density Plots
 
-### pooled seasons
-
-```{r, fig.height=3, fig.width = 8}
-
-
-map(c('pm25', 'voc', 'co2'), function(x_metric){
-a <- entropy_time %>% filter(sample_length %in% c(1,3,7,14) &
-                               !is.na(rep) &
-                               metric == x_metric)
-
-  lvls <- levels(as.factor(a$sample_length))
-  n <- by(a, a$sample_length, function(x) length(x$rep))
-  
-  above1 <- by(a, a$sample_length, function(x) {
-    (sum(x$rep >thresh_vector[1])/length(x$rep)*100) %>%
-      signif(2)
-  }
-  )
-  
-  above2 <- by(a, a$sample_length, function(x) {
-    (sum(x$rep >thresh_vector[2])/length(x$rep)*100) %>%
-      signif(2)
-  }
-  )
-  
-  labels <- paste0(lvls,", n=",as.integer(n),", ", above1, "%>",
-                   thresh_vector[1], ',  ',above2, "%>",thresh_vector[2])
-  
-  
-ggplot(a)+
-  geom_density(aes(x = rep, fill = as.factor(sample_length)), alpha = 0.3)+
-  # geom_text(aes(label = (ext_outlier_n*100) %>% signif(2)),
-  #           y = 0.75, size = xsmall)+
-  facet_wrap(vars(metric))+
-  geom_vline(xintercept = thresh_vector, linetype = 'dashed')+
-  xlab('Time-Structured Representativeness')+
-  ggtitle('Samples from all homes, rooms, and seasons pooled')+
-      labs(fill = 'Sample Length, days')+
-    theme_classic()+
-    theme(
-      axis.text.y = element_blank(),
-      axis.ticks.y = element_blank()
-    )+
-    scale_fill_manual( values = length_colors,
-                       labels=labels)+
-  ylab('Amount of Samples')+
-  coord_cartesian(xlim = c(0,1))
-}
-)
-```
-
 ### faceted by season
+* see plot with pooled seasons in past code versions
 
 *Group 3 homes only
 * legend outside plot
