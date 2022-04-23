@@ -565,10 +565,192 @@ diurn.rep.plot(entropy_time, '009', 'living', 'heat', 'co2', c(1,3,7,14))
 
 ## Rep Density Plots
 
-### faceted by season
+* faceted by season
 * see plot with pooled seasons in past code versions
 
-*Group 3 homes only
+* Group 3 homes only
+
+
+### Article Plots
+
+* legend outside plot
+```{r, fig.height=8, fig.width = 5}
+
+# see post on methodology 
+# https://stackoverflow.com/questions/14840542/place-a-legend-for-each-facet-wrap-grid-in-ggplot2
+
+
+map(c(
+  'pm25',
+      'voc',
+      'co2'
+  ), function(x_metric){
+  
+a <- entropy_time %>% filter(sample_length %in% c(1,3,7) &
+                               !is.na(rep) &
+                               metric == x_metric & 
+                               home %in% homes_tier3)
+
+# make a column with the label, so this can be used for the legend
+a <- a %>%
+  group_by(energy_cluster, sample_length) %>%
+    mutate(n = n(),
+         above1 = signif( sum(rep>thresh_vector[1])/n*100, 2),
+         label = paste0(sample_length, ",  n=",as.integer(n),",  ", above1, "%")
+)
+
+
+a <- split(a,f = a$energy_cluster)
+
+# reorder factors so the legend is ordered by day 1,3,7,14
+# use the inverse of length function, as samples of legnth 1 will have the
+# most values (greatest legnth)
+
+a[['ac']]$label <- reorder(a[['ac']]$label,
+                           X = as.character(a[['ac']]$label),
+                           FUN = function(x) -length(x))
+
+a[['shoulder']]$label <- reorder(a[['shoulder']]$label,
+                                 X = as.character(a[['shoulder']]$label),
+                           FUN = function(x) -length(x))
+
+a[['heat']]$label <- reorder(a[['heat']]$label,
+                             X = as.character(a[['heat']]$label),
+                           FUN = function(x) -length(x))
+
+
+
+
+p1 <- ggplot(a[['ac']])+
+  geom_density(aes(x = rep, fill = as.factor(label)), alpha = 0.3)+
+  # geom_text(aes(label = (ext_outlier_n*100) %>% signif(2)),
+  #           y = 0.75, size = xsmall)+
+  facet_wrap(vars(energy_cluster))+
+  geom_vline(xintercept = thresh_vector[1], linetype = 'dashed')+
+  xlab('Representativeness')+
+  ggtitle(paste0(x_metric, ': Samples from GROUP 3 homes and rooms pooled'))+
+      labs(fill = 'Length of Sample, days')+
+    theme_classic()+
+    theme(
+      axis.text.y = element_blank(),
+      axis.ticks.y = element_blank(),
+      plot.title = element_blank(),
+      strip.text = element_text(size = medium),
+      axis.text = element_text(size = medium-4),
+      axis.title = element_text(size = medium-3),
+      legend.text = element_text(size = medium-3),
+      legend.title = element_text(size = medium-3)
+
+    )+
+    scale_fill_manual( values = length_colors
+                       )+
+  ylab('Density')+
+  coord_cartesian(xlim = c(0,1))+
+  facet_wrap(~energy_cluster, ncol=1, labeller = labeller.metrics.seasons)
+
+
+p2 <- p1 %+% a[['shoulder']]
+p3 <- p1 %+% a[['heat']]
+
+
+grid.arrange(p1,p2,p3)
+
+})
+ 
+```
+
+* legend inside plot
+
+```{r, fig.height=8, fig.width = 4}
+
+# see post on methodology 
+# https://stackoverflow.com/questions/14840542/place-a-legend-for-each-facet-wrap-grid-in-ggplot2
+
+
+map(c(
+  'pm25',
+      'voc',
+      'co2'
+  ), function(x_metric){
+  
+a <- entropy_time %>% filter(sample_length %in% c(1,3,7) &
+                               !is.na(rep) &
+                               metric == x_metric & 
+                               home %in% homes_tier3)
+
+# make a column with the label, so this can be used for the legend
+a <- a %>%
+  group_by(energy_cluster, sample_length) %>%
+    mutate(n = n(),
+         above1 = signif( sum(rep>thresh_vector[1])/n*100, 2),
+         label = paste0(sample_length, ",  n=",as.integer(n),",  ", above1, "%")
+)
+
+
+a <- split(a,f = a$energy_cluster)
+
+# reorder factors so the legend is ordered by day 1,3,7,14
+# use the inverse of length function, as samples of legnth 1 will have the
+# most values (greatest legnth)
+
+a[['ac']]$label <- reorder(a[['ac']]$label,
+                           X = as.character(a[['ac']]$label),
+                           FUN = function(x) -length(x))
+
+a[['shoulder']]$label <- reorder(a[['shoulder']]$label,
+                                 X = as.character(a[['shoulder']]$label),
+                           FUN = function(x) -length(x))
+
+a[['heat']]$label <- reorder(a[['heat']]$label,
+                             X = as.character(a[['heat']]$label),
+                           FUN = function(x) -length(x))
+
+
+
+
+p1 <- ggplot(a[['ac']])+
+  geom_density(aes(x = rep, fill = as.factor(label)), alpha = 0.3)+
+  # geom_text(aes(label = (ext_outlier_n*100) %>% signif(2)),
+  #           y = 0.75, size = xsmall)+
+  facet_wrap(vars(energy_cluster))+
+  geom_vline(xintercept = thresh_vector[1], linetype = 'dashed')+
+  xlab('Representativeness')+
+  ggtitle(paste0(x_metric, ': Samples from GROUP 3 homes and rooms pooled'))+
+      labs(fill = 'Length of Sample, days')+
+    theme_classic()+
+    theme(
+      axis.text.y = element_blank(),
+      axis.ticks.y = element_blank(),
+      plot.title = element_blank(),
+      strip.text = element_text(size = medium),
+      axis.text = element_text(size = medium-4),
+      axis.title = element_text(size = medium-3),
+      legend.text = element_text(size = medium-3),
+      legend.title = element_text(size = medium-3),
+      legend.position = c(0.4, 0.7),
+      legend.background = element_blank()
+
+    )+
+    scale_fill_manual( values = length_colors
+                       )+
+  ylab('Density')+
+  coord_cartesian(xlim = c(0,1))+
+  facet_wrap(~energy_cluster, ncol=1, labeller = labeller.metrics.seasons)
+
+
+p2 <- p1 %+% a[['shoulder']]
+p3 <- p1 %+% a[['heat']]
+
+
+grid.arrange(p1,p2,p3)
+
+})
+ 
+```
+
+
+### Thesis Plots
+
 * legend outside plot
 ```{r, fig.height=8, fig.width = 5}
 
@@ -749,8 +931,6 @@ grid.arrange(p1,p2,p3)
 })
  
 ```
-
-
 
 
 
