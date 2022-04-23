@@ -170,7 +170,7 @@ time_labels <- c ('Day', 'Night')
 
 ```
 
-# classify hourly data as night data or day data
+# classify hourly data as night data or day data (not used)
 ```{r}
 omni_hourly <- omni_hourly %>%
   mutate(hour = hour(datetime),
@@ -184,29 +184,7 @@ omni_hourly <- omni_hourly %>%
 
 # plot living room hourly values on x
 # bedroom and kitchen hourly values on y
-# stratify by hour type (day/night)
-# all metrics at one time
 
-```{r, eval = FALSE}
-
-a <- omni_hourly %>%
-  # filter(time == 'day') %>%
-  filter(location %in% c('kitchen', 'living', 'bedroom')) %>% #only indoor
-  select(-c(score, noise, lux, temp, humid))%>% #only pm, voc, co2
-  pivot_longer(cols = c(co2:voc), names_to = 'metric') %>%
-  pivot_wider( values_from = value, names_from = location)
-
-ggplot(a, aes(x = living)) +
-  # geom_point(aes( y = kitchen), color = room_colors[3])+
-  # geom_raster( aes(y = kitchen, fill = after_stat(density)))
-stat_bin2d(aes(y = kitchen,  fill = after_stat(count)), binwidth = c(5,5))+
-  facet_grid(rows = vars(time), cols = vars(metric), scales = 'free')+
-  theme_classic()
-
-  
-```
-
-# one metric
 
 # function
 ```{r}
@@ -227,13 +205,11 @@ a <- omni_hourly %>%
 
 # calculate spearman correlation between living room
 # and other two rooms for day and night
-cor_df <- lapply(list( c('kitchen', 'day'),
-             c('kitchen', 'night'),
-             c('bedroom', 'day'),
-             c('bedroom', 'night')),
+cor_df <- lapply( 
+  c('kitchen', 'bedroom'),
        function(x) {
          
-         data <- a %>% filter(location == x[1], time == x[2])
+         data <- a %>% filter(location == x)
          
          n <- nrow(data)
          
@@ -245,11 +221,11 @@ cor_df <- lapply(list( c('kitchen', 'day'),
          )
          
          results <- list(
-           'location' = x[1],
-           'time' = x[2],
+           'location' = x,
            'rho' = cor$estimate,
            'p' = cor$p.value,
-           'n_cor' = n
+           'n_cor' = n,
+           'n_lab' = formatC(n, format = 'd', big.mark = ',')
          )
        }
 ) %>%
@@ -271,7 +247,10 @@ ggplot(a, aes(x = living)) +
   geom_point(aes( y = value, color = location), size = 1)+
   # geom_raster( aes(y = kitchen, fill = after_stat(density)))
 # stat_bin2d(aes(y = value,  fill = after_stat(count)), binwidth = c(5,5))+
-  facet_grid(rows = vars(time), cols = vars(location))+
+  facet_wrap(
+    vars(location),
+             labeller = labeller.all
+             )+
   theme_classic()+
   scale_x_continuous(limits = c(0, max))+
   scale_y_continuous(limits = c(0, max))+
@@ -279,14 +258,20 @@ ggplot(a, aes(x = living)) +
   geom_text( data = cor_df,  aes(label = rho_label ),
              parse = T,
              x = 0.75*max, y = 0.25*max)+
-    geom_text( data = cor_df,  aes(label = paste0('n=', n_cor) ),
+    geom_text( data = cor_df,  aes(label = paste0('n=', n_lab) ),
              x = 0.75*max, y = 0.17*max)+
   scale_color_manual(
     values = room_colors[c(2:3)],
     breaks = room_breaks[c(2:3)],
     labels = room_labels[c(2:3)]
   )+
-  ggtitle(x_met)
+  ggtitle(x_met)+
+  ylab('Hourly Average Concentration')+
+    xlab('Hourly Average Concentration in Living Room')+
+  theme(
+    legend.position = 'none'
+  )
+
 
 }
 
@@ -295,7 +280,8 @@ ggplot(a, aes(x = living)) +
 ```
 
 # plot
-```{r, fig.height=6, fig.width = 6}
+```{r, fig.height=2, fig.width = 3}
 lapply(c( 'pm25', 'voc', 'co2'), function(x) correl.plot(x) )
+
 ```
 
