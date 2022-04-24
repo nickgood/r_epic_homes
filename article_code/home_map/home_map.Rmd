@@ -1,0 +1,140 @@
+---
+title: "home_map"
+author: "Andrew Purgiel"
+date: "2/28/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+library("tidyverse")
+library("ggmap")
+library("sf")
+library("mapview")
+library("ggrepel")
+
+
+```
+
+
+* INSERT API KEY
+* need to register a Google Cloud account and acquire an API key
+* use instructions from https://www.jessesadler.com/post/geocoding-with-r/
+```{r, eval = FALSE}
+
+#authorize queries with API
+ggmap::register_google(key = "INSERT API KEY HERE")
+
+```
+
+* read in locations of homes from csv and make a csv of coordinates
+* csv comes out with date to ensure previous file is not overwritten
+
+* you may need to correct/manually enter a couple coordinates
+```{r, eval = FALSE}
+
+# read in csv of home addresses
+df <- read_csv( file = 'home_location.csv',
+                   col_types = cols()) %>%
+  na.omit() %>% # omit rows that have NAs
+
+  # add "fort collins to the end of all
+  # addresses to help with geocdoing
+  mutate(address = paste0(address, ', fort collins, co'))
+
+
+
+  # make cols of lat and longitude from addresses
+# (involves API queries from Gmaps)
+home_coord <- mutate_geocode(df, address)
+
+
+# make a csv of data
+write_csv(home_coord, paste0('home_coord_', Sys.Date(),'.csv'))
+```
+
+* make interactive map
+```{r, eval = TRUE}
+home_coord <- read_csv('home_coord_article.csv')
+
+# make an sf object of home coordinates
+home_map <- st_as_sf(home_coord, coords = c("lon", "lat"), crs = 4326)
+
+# show zoomable map
+mapview(home_map)
+
+```
+
+* make black and white map and save file
+```{r, eval = FALSE}
+
+# make plain map
+
+bw_map <- get_googlemap(
+  # use lat and lon to estimate map center
+  center = c(lon = mean(home_coord$lon),
+             lat = mean(home_coord$lat)),
+  zoom = 12,
+  color = "bw")
+
+
+# save the map 
+save(bw_map, file= 'home_map.rda')
+```
+
+* load map and make colored jpeg
+* with different colors for different categories (round)
+```{r}
+# load the map previously saved
+ load(file="home_map.rda")
+
+ 
+             # jitter points to allow for anonymity
+pos <- position_jitter(w = 0.005, h = 0.005, seed = 2)
+
+  # plot map wiht points and labels
+ a <- ggmap(bw_map)+
+  geom_point(data = home_coord,
+             aes(x = lon, y = lat, color = owner, shape = owner),
+             size = 4,
+             position=pos # jitter points to allow for anonymity
+             ) +
+    geom_text_repel(data = home_coord,
+                    aes(x = lon, y = lat, label = home),
+                    size = 6, min.segment.length = 0.1,
+                    position=pos # jitter points to allow for anonymity
+    ) +
+   scale_color_discrete(
+     breaks = c('yes', 'no'),
+     labels = c('Owner-Occupied', 'Renter-Occupied'),
+     name = 'Home Type'
+   )+
+   scale_shape_discrete(
+     breaks = c('yes', 'no'),
+     labels = c('Owner-Occupied', 'Renter-Occupied'),
+     name = 'Home Type'
+   )+
+   theme(
+     plot.tag.position = c(0.78, 0.2),
+     plot.tag = element_text(vjust = 0, hjust = 0, size = 10)
+   )+
+   xlab('Longitude')+
+   ylab('Latitude')+
+   labs(tag = paste0('* Home locations have been\n',
+                     'shifted randomly by up to\n',
+                     '0.005 degrees (Lat and Lon)\n',
+                     'to preserve participant\n',
+                     'anonymity.'))
+   
+ # show map
+a
+   
+# and save as jpeg
+ggsave(plot = a,
+       filename = paste0('home_map_image_',Sys.Date(),'.jpeg'))
+
+```
+
+
+
