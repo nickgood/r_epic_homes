@@ -210,7 +210,8 @@ avg.data <- function(data  = omni_daily, met){
     select(date, home, location, all_of(met), energy_cluster) %>%
           mutate(date_avg = floor_date(date, unit = paste(days, 'days'))) %>%
        drop_na(all_of(met))%>% # drop NA values to ensure n is accurate
-          group_by(home, location, energy_cluster, date_avg) %>%
+    # pool rooms (don't group by location)
+    group_by(home, energy_cluster, date_avg) %>%
         # summarise_at(vars(all_of(met)), list(mean = mean, sd = sd), na.rm = TRUE) %>%
     summarise_at(vars(all_of(met)),
                  list(
@@ -226,7 +227,6 @@ avg.data <- function(data  = omni_daily, met){
 #test one home----------
 
 # test <- avg.data(met = 'pm25')
-
 
 ####
 
@@ -258,7 +258,7 @@ a <- data_avg %>%
   filter(metric %in% c('pm25', 'voc', 'co2', 'temp'))
 
 # change order of metrics for plotting
-a$location <- factor(a$location, levels = c('kitchen', 'living', 'bedroom'))
+# a$location <- factor(a$location, levels = c('kitchen', 'living', 'bedroom'))
 a$metric <- factor(a$metric, levels = c('pm25', 'voc', 'co2', 'temp'))
 a$energy_cluster <- factor(a$energy_cluster, levels = c('ac', 'shoulder', 'heat'))
 
@@ -330,7 +330,7 @@ a <- data_avg %>%
   filter(metric %in% c('pm25', 'voc', 'co2', 'temp'))
 
 # change order of metrics for plotting
-a$location <- factor(a$location, levels = c('kitchen', 'living', 'bedroom'))
+# a$location <- factor(a$location, levels = c('kitchen', 'living', 'bedroom'))
 a$metric <- factor(a$metric, levels = c('pm25', 'voc', 'co2', 'temp'))
 
 
@@ -364,11 +364,11 @@ ggplot(a,aes( x = 1,  y = mean))+
   theme(
     strip.background =element_blank(),
     panel.grid.major.x = element_blank(),
-    strip.text = element_text(size = small -3),
-    axis.text.y = element_text(size = small -3),
+    strip.text = element_text(size = small+2),
+    axis.text.y = element_text(size = small+2),
     axis.text.x = element_blank(),
     axis.ticks.x = element_blank(),
-    axis.title = element_text(size = small -3),
+    axis.title = element_text(size = small+2),
         axis.title.x = element_blank()
 
     )+
@@ -377,7 +377,8 @@ ggplot(a,aes( x = 1,  y = mean))+
   ylab('IEQ Indicator Value')+
     geom_text(data=n_labels, aes(x = 1.1,
                                  y=label_position,
-                               label=label_value),hjust=0)
+                               label=label_value),
+              hjust=0, size = 6)
 
 
 ###
