@@ -398,7 +398,7 @@ limit_df <- data %>%
         labs(
           y = 'Average Value',
              x = 'Hour of Day',
-          size= 'Home-Hours of Data')+
+          size= 'Home-Hours\nof Data')+
        
     scale_x_continuous(limits = c(0,24),
                        breaks = c(0,6,12,18),
@@ -419,9 +419,12 @@ limit_df <- data %>%
         theme(
       strip.background =element_blank(),
       strip.placement = 'outside',
-      strip.text = element_text(size = small-3),
-      legend.text = element_text(size = small-3),
-      axis.title = element_text(size = small-3)
+      strip.text = element_text(size = small),
+      legend.text = element_text(size = small),
+      axis.title = element_text(size = small),
+      legend.title = element_text(size = small),
+      axis.text = element_text(size = small - 2),
+      legend.position = 'none'
 
               )+
         # use dummy df to define limits for each metric
