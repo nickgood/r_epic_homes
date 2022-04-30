@@ -1,5 +1,5 @@
 ---
-title: "Import and Clean Omni Data"
+title: "Calibrate Omni PM2.5 Data"
 output:
   html_document:
     toc: true
@@ -90,6 +90,7 @@ omni_data_precal <-
 
 ```{r import_filter_data}
 filter_data <- read_rds('../output_article/pm25/pm25.rds')
+
 ```
 
 * count how many upas samples did not have enough data (not including blanks)
@@ -149,6 +150,7 @@ grav_cf_df <- omni_data_precal %>%
   )
 
 ```
+
 
 * check between rooms and ensure same calibration value can be used for all indoor rooms
 ```{r}
@@ -388,7 +390,7 @@ omni_data_cal <- omni_data_precal %>%
 # Add in energy cluster column
 
 ```{r}
-daily_energy_df <- read_csv('../sense/csv_created_sense/daily_energy_data_clustered.csv')
+daily_energy_df <- read_csv('../sense/csv_created_sense_article/daily_energy_data_clustered.csv')
 
 omni_data_cal <- omni_data_cal %>%
   mutate(dateday = floor_date(datetime, unit = 'day')%>%as.Date())%>%
@@ -397,7 +399,9 @@ omni_data_cal <- omni_data_cal %>%
 ```
 
 
-```{r}
+# make rds files
+
+```{r, eval = F}
 # make rds file and backup-----------
 write_rds(omni_data_cal, paste0('./csv_created/omni_calibrated_',
 Sys.Date(),'.rds'))
@@ -405,7 +409,7 @@ Sys.Date(),'.rds'))
 write_rds(omni_data_cal, paste0('./csv_created/omni_calibrated.rds'))
 ```
 
-```{r hourly_cal_data_rds}
+```{r hourly_cal_data_rds, eval = F}
 
 omni_hourly_data <- omni_data_cal %>%
   select(-heat, -ac) %>%
@@ -424,7 +428,7 @@ write_rds(omni_hourly_data, paste0('./csv_created/omni_hourly_calibrated.rds'))
 
 ```
 
-```{r daily_cal_data_rds}
+```{r daily_cal_data_rds, eval = F}
 
   omni_daily_data <- omni_data_cal %>%
     select(-heat, -ac) %>%
