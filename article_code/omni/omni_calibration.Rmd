@@ -215,6 +215,9 @@ ggplot(grav_cf_df_clean, aes( x = 1, y = grav_cf))+
   )+
   theme(
     legend.position = 'none'
+  )+
+  scale_y_continuous(
+    breaks = seq(0,6,1)
   )
 
 
