@@ -1,0 +1,35 @@
+---
+title: "Compare Thesis and Article Season Classifciation Datasets"
+output: html_document
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.path = 'figures/',
+  warning = FALSE,
+  message = FALSE,
+  echo = FALSE,
+  fig.width = 10, fig.height = 16,
+  cache = FALSE)
+
+```
+
+```{r source_functions_libraries, eval = TRUE}
+# reads source
+source("../functions_epic.R")
+# add extra libraries for cluster analysis
+library('cluster')
+library('factoextra')
+
+
+```
+
+## cheack that the season categorization of each day
+## was the same for thesis and article datasets
+```{r read_energy_cluster_df}
+# test <- read_csv('./csv_created_sense/daily_energy_data_clustered_nozero.csv')
+sense_data_article <- read_csv('./csv_created_sense_article/daily_energy_data_clustered.csv')
+
+sense_data_thesis <- read_csv('../../sense/csv_created_sense/daily_energy_data_clustered.csv')
+
+all.equal(sense_data_article, sense_data_thesis)
+```
