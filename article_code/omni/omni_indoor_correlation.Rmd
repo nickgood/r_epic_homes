@@ -235,6 +235,13 @@ cor_df <- lapply(
   mutate(rho_label = sprintf( "rho == %0.2f", rho))
 
 
+# define title depending on metric
+if(x_met == 'pm25') metric_title <- expression(paste('PM'[2.5]))
+   if(x_met == 'co2') metric_title <- expression(paste('CO'[2]))
+   if(x_met == 'voc') metric_title <- 'TVOC'
+   if(x_met == 'temp') metric_title <- 'Temperature'
+
+
 # make the max x and y values whatever is the higheest value between all three rooms
 max <- max( c(
   a %>%pull(value),
@@ -265,12 +272,13 @@ ggplot(a, aes(x = living)) +
     breaks = room_breaks[c(2:3)],
     labels = room_labels[c(2:3)]
   )+
-  ggtitle(x_met)+
+  ggtitle(metric_title)+
   ylab('Hourly Average Concentration')+
     xlab('Hourly Average Concentration in Living Room')+
   theme(
-    legend.position = 'none'
-  )
+    legend.position = 'none',
+    plot.title = element_text(hjust = 0.5 )
+    )
 
 
 }
