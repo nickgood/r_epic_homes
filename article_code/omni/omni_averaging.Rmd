@@ -190,6 +190,7 @@ lag_spl_a <- lag_df %>% filter(energy_cluster == 'total', metric == 'spl_a') %>%
 
 
 # make averaging function
+* ONLY USES INDOOR DATA
 ```{r}
 
 # function-----------
@@ -205,6 +206,7 @@ avg.data <- function(data  = omni_daily, met){
     )
   
   data %>%
+      filter(location %in% locations_indoor) %>% 
     select(date, home, location, all_of(met), energy_cluster) %>%
           mutate(date_avg = floor_date(date, unit = paste(days, 'days'))) %>%
        drop_na(all_of(met))%>% # drop NA values to ensure n is accurate
@@ -222,6 +224,7 @@ avg.data <- function(data  = omni_daily, met){
 #######
 
 #test one home----------
+
 # test <- avg.data(met = 'pm25')
 
 
@@ -252,7 +255,6 @@ data_avg <-
 
 # only indoor, Group 3 Homes, some metrics --------
 a <- data_avg %>%
-  filter(location %in% locations_indoor) %>% 
   filter(metric %in% c('pm25', 'voc', 'co2', 'temp'))
 
 # change order of metrics for plotting
@@ -324,7 +326,6 @@ ggplot(a,aes( x = 1,  y = mean))+
 
 # only indoor, Group 3 Homes, some metrics --------
 a <- data_avg %>%
-  filter(location %in% locations_indoor) %>% 
   # filter(energy_cluster %in% energy_breaks[c(1:3)]) %>%
   filter(metric %in% c('pm25', 'voc', 'co2', 'temp'))
 
