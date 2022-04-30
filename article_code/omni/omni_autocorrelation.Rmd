@@ -1,5 +1,5 @@
 ---
-title: "omni_autocorrelation"
+title: "Auto-correlation: correlograms and determination of independent sample"
 author: "Andrew Purgiel"
 date: "1/13/2021"
 output: html_document
@@ -31,7 +31,7 @@ library(tseries) # for tests of stationarity
 ```
 
 
-```{r data_import, eval = FALSE}
+```{r data_import, eval = F}
 
 ##Import CSV with Real Time Data
 omni_hourly<- read_rds('./csv_created_article/omni_hourly_calibrated.rds')
@@ -40,7 +40,7 @@ omni_hourly<- read_rds('./csv_created_article/omni_hourly_calibrated.rds')
 ```
 
 # only use data up to June 2021
-```{r censor_date, eval = FALSE}
+```{r censor_date, eval = F}
 omni_hourly <- omni_hourly %>% filter(datehour<ymd_hms('2021-06-01 00:00:00'))
 
 
@@ -133,6 +133,7 @@ energy_labels <- c('Cooling', 'Shoulder', 'Heating', 'Entire Period')
 ```
 
 
+# count the amount of missing data
 ```{r function_count_missing_values, include = FALSE}
 
 ##function to count missing day values for a home/room
@@ -163,7 +164,7 @@ count.missing <- function(data, hm, loc, metric,
 
 ```
 
-```{r count_missing_values, include = FALSE}
+```{r count_missing_values, eval = F}
 
 # count the amount of days completely missing data for all homes in a specified room
  sapply(homes_all, count.missing,
@@ -173,6 +174,8 @@ count.missing <- function(data, hm, loc, metric,
 
 ```
 
+
+# create datasets with NA input for missing day values for each sensor
 ```{r create_daily_df, eval = FALSE}
 
 # all homes/locations in one dataframe
@@ -503,30 +506,30 @@ ggplot(a, aes(x = lag, y = acf))+
 
 
 
-```{r, fig.height = 2, fig.width = 6}
+```{r, fig.height = 2, fig.width = 6, eval = F}
 acf.grid('living', 'ac', n_rows = 1)
 ```
 
-```{r, fig.height = 3.5, fig.width = 8}
+```{r, fig.height = 3.5, fig.width = 8, eval = F}
 acf.grid('living', 'shoulder')
 ```
 
-```{r, fig.height = 3.5, fig.width = 8}
+```{r, fig.height = 3.5, fig.width = 8, eval = F}
 acf.grid('living', 'heat')
 ```
 
 
 
 
-```{r, fig.height = 2, fig.width = 4}
+```{r, fig.height = 2, fig.width = 4, eval = F}
 acf.grid('kitchen', 'ac', n_rows = 1)
 ```
 
-```{r, fig.height = 3.5, fig.width = 6}
+```{r, fig.height = 3.5, fig.width = 6, eval = F}
 acf.grid('kitchen', 'shoulder')
 ```
 
-```{r, fig.height = 3.5, fig.width = 8}
+```{r, fig.height = 3.5, fig.width = 8, eval = F}
 acf.grid('kitchen', 'heat')
 ```
 
@@ -534,15 +537,15 @@ acf.grid('kitchen', 'heat')
 
 
 
-```{r, fig.height = 2, fig.width = 8}
+```{r, fig.height = 2, fig.width = 8, eval = F}
 acf.grid('bedroom', 'ac', n_rows = 1)
 ```
 
-```{r, fig.height = 3.5, fig.width = 8}
+```{r, fig.height = 3.5, fig.width = 8, eval = F}
 acf.grid('bedroom', 'shoulder')
 ```
 
-```{r, fig.height = 3.5, fig.width = 8}
+```{r, fig.height = 3.5, fig.width = 8, eval = F}
 acf.grid('bedroom', 'heat')
 ```
 
