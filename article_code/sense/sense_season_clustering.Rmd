@@ -320,7 +320,7 @@ units <- 'hours'
 
 
 ## Tier 3 Homes
-```{r plot_manual_cluster_tier3, eval = FALSE, fig.width=8, fig.height=1, eval = FALSE}
+```{r plot_manual_cluster_tier3, fig.width=8, fig.height=1, eval = FALSE}
 
 
 
@@ -354,7 +354,7 @@ home_012 <- cluster.manual(hm, c('furnace','ac'))
 ```
 
 ## Tier 2 Homes
-```{r plot_manual_cluster_tier2, eval = FALSE, fig.width=8, fig.height=1, eval = FALSE}
+```{r plot_manual_cluster_tier2, fig.width=8, fig.height=1, eval = FALSE}
 
 hm <- '004'
 # no AC
@@ -388,7 +388,7 @@ cluster.manual.heat(hm, c('furnace'))
 ```
 
 ## Tier 1 Homes
-```{r plot_manual_cluster_tier1, eval = FALSE, fig.width=8, fig.height=1, eval = FALSE}
+```{r plot_manual_cluster_tier1, fig.width=8, fig.height=1, eval = FALSE}
 
 
 hm <- '006'
