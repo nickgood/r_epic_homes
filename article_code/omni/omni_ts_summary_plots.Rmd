@@ -575,7 +575,7 @@ limit_df <-
              x = 'Hour of Day',
           color= 'Season',
           fill = 'Season',
-          size = 'Room-Hours of Data')+
+          size = 'Room-Hours\nof Data')+
        
     scale_x_continuous(limits = c(0,24),
                        breaks = c(0,6,12,18),
@@ -586,9 +586,11 @@ limit_df <-
           ##for extra space between facets
     theme(
           strip.background =element_blank(),
-      strip.text = element_text(size = small-3),
-      legend.text = element_text(size = small-3),
-      axis.title = element_text(size = small-3)
+      strip.text = element_text(size = small),
+      legend.text = element_text(size = small),
+            legend.title = element_text(size = small),
+      axis.text = element_text(size = small - 2),
+      axis.title = element_text(size = small)
       )+
        facet_grid(c('metric', 'location'))+
         # make point size proportional to # of obs, with 0 obs = size 0
@@ -608,7 +610,7 @@ limit_df <-
   )+
         labs(tag = paste('*n homes =', n_homes) )+
       theme(
-        plot.tag.position = c(.1,0.02),
+        plot.tag.position = c(.1,0.02)
         )+
                 scale_fill_manual(
           breaks = energy_breaks,
