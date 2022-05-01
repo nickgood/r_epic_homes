@@ -264,20 +264,23 @@ ggplot(a, aes(x = living)) +
   # add spearman rho into plot
   geom_text( data = cor_df,  aes(label = rho_label ),
              parse = T,
-             x = 0.75*max, y = 0.25*max)+
+             x = 0.75*max, y = 0.3*max, size = 5)+
     geom_text( data = cor_df,  aes(label = paste0('n=', n_lab) ),
-             x = 0.75*max, y = 0.17*max)+
+             x = 0.75*max, y = 0.17*max, size = 5)+
   scale_color_manual(
     values = room_colors[c(2:3)],
     breaks = room_breaks[c(2:3)],
     labels = room_labels[c(2:3)]
   )+
   ggtitle(metric_title)+
-  ylab('Hourly Average Concentration')+
+  ylab('Hourly Average\nConcentration')+
     xlab('Hourly Average Concentration in Living Room')+
   theme(
     legend.position = 'none',
-    plot.title = element_text(hjust = 0.5 )
+    plot.title = element_text(hjust = 0.5 ),
+      strip.text = element_text(size = small),
+      axis.text = element_text(size = small-4),
+      axis.title = element_text(size = small-1)
     )
 
 
@@ -288,8 +291,11 @@ ggplot(a, aes(x = living)) +
 ```
 
 # plot
-```{r, fig.height=2, fig.width = 3}
-lapply(c( 'pm25', 'voc', 'co2'), function(x) correl.plot(x) )
+```{r, fig.height=3, fig.width = 5}
+# test for one mwtric
+# correl.plot('pm25')
+
+lapply(c( 'pm25','voc', 'co2'), function(x) correl.plot(x) )
 
 ```
 
