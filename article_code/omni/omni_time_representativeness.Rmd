@@ -679,10 +679,52 @@ sample_results
 
 ```
 
+# count omissions from Group 3 Homes
+# (only group 3 homes are compared later in Representativeness analysis)
 
-### Hourly Data
 
-```{r data_maker_hourly, eval = FALSE}
+```{r}
+hm <- '009'
+
+# all data for group 3 homes
+a <-omni_hourly %>%
+  filter( location %in% locations_indoor & home %in% homes_tier3)
+
+
+# count Group 3 home data that did not fit into a continuous season
+# because of lacking sense data at the end or beginning of sampling campaign,
+# or after because of excluding data after the end of the heating season
+# note: Home 7 wifi caused 23.7% of data loss for that home
+
+c <- 
+  lapply(homes_tier3,  function(x_home) {
+    
+home_data <- a %>% filter(home == x_home)
+
+    date_start <- pick.start(x_home, 'ac')
+    date_end <- pick.end(x_home, 'heat')
+
+data_omitted <- home_data %>%
+  filter( datehour > ymd(date_end) | datehour < ymd(date_start))
+
+# count rows of data omitted
+list( 'home' = x_home, 'omitted' = nrow(data_omitted),
+      'frac_omitted' = nrow(data_omitted) / nrow(home_data)
+)
+  }
+) %>% bind_rows() %>%
+  # what fraction of total amount omitted did each home contribute
+  mutate(total_frac = omitted/ sum(omitted))
+
+
+# fraction of Group 2 and 3 Home Data omitted
+c %>%  pull(omitted) %>% sum()  /    nrow(a)
+
+```
+
+### Make Representativeness Dataframes/csvs
+
+```{r data_maker, eval = FALSE}
       # make dfs--------------------
 # clust <- c('all','heat', 'shoulder', 'ac') # can do multiple
 clust <- clusters_all
