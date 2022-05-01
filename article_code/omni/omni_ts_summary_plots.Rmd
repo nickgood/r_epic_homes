@@ -623,6 +623,24 @@ limit_df <-
 
 ```
 
+### count omissions (due to missing sense data) from Group 2 and 3 homes
+
+```{r}
+# all data for group 2 and 3 homes
+a <-omni_hourly %>%
+  filter( 
+      home %in% c(homes_seasons), 
+            location %in% locations_indoor)
+
+# Group 2 and 3 Home data with unclassified seasons
+c <- a %>% filter( is.na(energy_cluster ))
+
+# fraction of Group 2 and 3 Home Data omitted
+nrow(c)/nrow(a)
+```
+
+
+
 ###Plot for homes that had seasonal data
 ###exclude homes that had less certain classification of seasons (group 1 homes)
 ```{r, fig.height=2.5, fig.width=8}
