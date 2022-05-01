@@ -477,7 +477,7 @@ diurn.rep.plot <- function(data, x_home, x_location, x_energy_cluster, x_metric,
                        color = sample_length,
                        fill = sample_length))+
     geom_line()+
-    geom_point()+
+    geom_point(size = 0.5)+
     # geom_text(data = rep_values, aes(y = y_label,
     #                                  label = paste('Rep=', signif(rep, 2))),
     #           x = -Inf, hjust = 0)+
@@ -520,7 +520,10 @@ diurn.rep.plot <- function(data, x_home, x_location, x_energy_cluster, x_metric,
     theme_bw()+
     theme(
       plot.title = element_blank(),
-      
+      legend.text = element_text(size = medium-5),
+            legend.title = element_text(size = medium-5),
+      axis.text = element_text(size = medium - 6),
+      axis.title = element_text(size = medium-4)      
     )
 
 }
@@ -724,9 +727,10 @@ p1 <- ggplot(a[['ac']])+
       plot.title = element_blank(),
       strip.text = element_text(size = medium),
       axis.text = element_text(size = medium-4),
-      axis.title = element_text(size = medium-3),
-      legend.text = element_text(size = medium-3),
-      legend.title = element_text(size = medium-3),
+      axis.title.x = element_text(size = medium-3),
+      axis.title.y = element_text(size = medium+2),
+      legend.text = element_text(size = medium+2),
+      legend.title = element_text(size = medium),
       legend.position = c(0.4, 0.7),
       legend.background = element_blank()
 
