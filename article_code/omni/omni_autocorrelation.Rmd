@@ -601,19 +601,20 @@ ggplot(a, aes(x = lag, y = acf))+
 ```
 
 
-# make lag df
 # count data that will be omitted, but dont omit data from csv
-```{r, eval = FALSE}
+```{r}
 
 ##### Count data that will be omitted (but don't omit yet) 
 
 # isolate 3 metrics considered in thesis
 acf_ieq <- acf_data %>%
-  filter(metric %in% c('pm25', 'voc', 'temp'))
+  filter(metric %in% c('pm25', 'voc', 'co2', 'temp'))
 
 
   # make dataframe with counts of different types of "missingness"
 # for each condition for all metrics
+
+
   acf_lags2 <- acf_ieq %>%
         group_by(home, location, energy_cluster, metric) %>%
     summarise(
@@ -678,12 +679,21 @@ n_sig_omit <- acf_sig_omit %>%
               missing_pct = unique(miss),
               .groups = 'drop')
 
+
+```
+
+# make lag df
+* make csvs
+```{r, eval = F}
+
 #write file
 write_csv(acf_lags, paste0('./csv_created_article/acf/acf_lags.csv'))
 
 # create dated backup
 write_csv(acf_lags, paste0('./csv_created_article/acf/acf_lags_',Sys.Date(), '.csv'))
+
 ```
+
 
 ## Plots of all homes without clusters
 
