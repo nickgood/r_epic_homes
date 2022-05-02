@@ -31,10 +31,10 @@ library(arules) # to discretize data for histogram
 ```
 
 ```{r data_import}
-omni_hourly <- read_rds('./csv_created/omni_hourly_calibrated.rds') %>%
+omni_hourly <- read_rds('./csv_created_article/omni_hourly_calibrated.rds') %>%
   rename(datetime = datehour)
 
-home_type_df <- read_csv('../sense/csv_created_sense/home_type_df.csv')
+home_type_df <- read_csv('../sense/csv_created_sense_article/home_type_df.csv')
 ```
 
 # only use data up to June 2021
@@ -247,35 +247,6 @@ time.table <- function(data, period, met,
     
   }
   
-  # #weekday and hour of each day
-  # if (period == 'day.hour'){
-  #   a <- a %>% 
-  #     mutate(weekday = wday(datetime, label = TRUE),
-  #            hour = hour(datetime)) %>%
-  #     group_by(weekday, hour, .dots = groupers) %>% 
-  #     summarize_if(is.numeric, list(mean.val = mean.val,
-  #                                   low.val = low.val,
-  #                                   high.val = high.val))%>%
-  #     ungroup() %>%
-  #     mutate(hour = as.numeric(hour))
-  #   
-  # }
-  
-  #month
- # if (period == 'month'){
- #    a <- a %>% 
- #      mutate(month = floor_date(datetime, unit = 'month')) %>%
- #      count(month, home) %>% # count amount of observations used for each average
- #      full_join(
- #        a %>%
- #          mutate(month = floor_date(datetime, unit = 'month')) %>%
- #          
- #      group_by(month, .dots = groupers) %>% 
- #      summarize_if(is.numeric, list(mean.val = mean.val,
- #                                    low.val = low.val,
- #                                    high.val = high.val))%>%
- #      ungroup())
- # }
   
     #weekday
   if (period == 'month'){
@@ -298,31 +269,6 @@ time.table <- function(data, period, met,
     
   }
   
-  # #month and hour of each day
-  # if (period == 'month.hour'){
-  #   a <- a %>% 
-  #     mutate(month = month(datetime, label = TRUE),
-  #            hour = hour(datetime)) %>%
-  #     group_by(month, hour, .dots = groupers) %>% 
-  #     summarize_if(is.numeric, list(mean.val = mean.val,
-  #                                   low.val = low.val,
-  #                                   high.val = high.val))%>%
-  #     ungroup() %>%
-  #     mutate(hour = as.numeric(hour))
-  #   
-  # }
-  
-  #     if (period == 'date.day'){
-  #   a <- a %>% 
-  #     mutate(datetime = floor_date(datetime, unit = 'days')) %>%
-  #     group_by(datetime, .dots = groupers) %>% 
-  #     summarize_if(is.numeric, list(mean.val = mean.val,
-  #                                   low.val = low.val,
-  #                                   high.val = high.val))%>%
-  #     ungroup() %>%
-  #     mutate()
-  # }
-
   return(a)
 
 }
@@ -424,7 +370,7 @@ period_colors <- c(cbbPalette['light_orange'],
                    cbbPalette['dark_blue'])%>% unname()
 
 period_breaks <- c('cam_peak', 'no_cam_peak')
-period_labels <- c( 'Cameron Peak Fire Effects', 'Negligible Cameron Peak Fire Effects'
+period_labels <- c( 'Cameron Peak\nFire Effects', 'Negligible Cameron\nPeak Fire Effects'
 )
 ```
 
@@ -477,7 +423,7 @@ limit_df <-
              x = 'Hour of Day',
           color= 'Time Period',
           fill = 'Time Period',
-          size = 'Room-Hours of Data')+
+          size = 'Sensor-Hours\nof Data')+
        
     scale_x_continuous(limits = c(0,24),
                        breaks = c(0,6,12,18),
@@ -488,9 +434,12 @@ limit_df <-
           ##for extra space between facets
     theme(
           strip.background =element_blank(),
-      strip.text = element_text(size = small-3),
-      legend.text = element_text(size = small-3),
-      axis.title = element_text(size = small-3)
+      strip.text = element_text(size = small),
+      legend.text = element_text(size = small),
+            legend.title = element_text(size = small),
+      axis.text = element_text(size = small - 2),
+      axis.title = element_text(size = small),
+      legend.spacing.y = unit(0.1, 'in') # allow extra space between legend items
       )+
        facet_grid(c('metric', 'location'))+
         # make point size proportional to # of obs, with 0 obs = size 0
@@ -504,8 +453,12 @@ limit_df <-
         geom_blank(data = limit_df, aes(x = 15, y = limits))+
                #ensure seaons legend on top
         guides(
-    fill = guide_legend(order = 1),
-        color = guide_legend(order = 1),
+    fill = guide_legend(order = 1,
+                        byrow = T # allow extra space between legend items
+                        ), 
+        color = guide_legend(order = 1,
+                             byrow = T# allow extra space between legend items
+                             ),
     size = guide_legend(order = 2)
   )+
         labs(tag = paste('*n homes =', n_homes) )+
