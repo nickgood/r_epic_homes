@@ -896,12 +896,16 @@ scale_x_date(
                    labeller = labeller.all,
                    switch = 'y')+
         theme(
+       strip.background =element_blank(),
       strip.placement = 'outside',
-      strip.background =element_blank(),
-      strip.text = element_text(size = small-3),
-      axis.title = element_text(size = small-3),
-      axis.text.x = element_text(size = small-5),
-      legend.text = element_text(size = small-3)
+      strip.text = element_text(size = small),
+      axis.title = element_text(size = small),
+      axis.text = element_text(size = small -2),
+      legend.text = element_text(size = small-2),
+      legend.title = element_text(size = small),
+      legend.position = 'none'
+      
+      
               )+
         # use dummy df to define limits for each metric
         geom_blank(data = limit_df, aes(x = as.Date('2020-10-01'), y = limits))+
