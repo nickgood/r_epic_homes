@@ -186,7 +186,7 @@ omni_hourly <- omni_hourly %>%
 # bedroom and kitchen hourly values on y
 
 
-# function
+# plot function
 ```{r}
 
 
@@ -248,7 +248,6 @@ max <- max( c(
   a %>% pull(living)
 ), na.rm = TRUE )
 
-
 #plot
 ggplot(a, aes(x = living)) +
   geom_point(aes( y = value, color = location), size = 1)+
@@ -284,6 +283,7 @@ ggplot(a, aes(x = living)) +
     )
 
 
+
 }
 
 
@@ -295,7 +295,45 @@ ggplot(a, aes(x = living)) +
 # test for one mwtric
 # correl.plot('pm25')
 
-lapply(c( 'pm25','voc', 'co2'), function(x) correl.plot(x) )
+lapply(c( 'pm25',
+          'voc', 
+          'co2'
+          ), function(x) correl.plot(x) )
 
 ```
 
+
+
+# correlation for one metric and one room
+```{r}
+met <- 'voc'
+
+
+a <- omni_hourly %>%
+  # filter(time == 'day') %>%
+  filter(location %in% c('kitchen', 'living', 'bedroom')) %>% #only indoor
+  select(-c(score, noise, lux, temp, humid))%>% #only pm, voc, co2
+  pivot_longer(cols = c(co2:voc), names_to = 'metric') %>%
+  pivot_wider( values_from = value, names_from = location) %>%
+  pivot_longer( cols = c(kitchen, bedroom), names_to = 'location') %>%
+  filter(metric == met) %>%
+  filter(!is.na(value) & !is.na(living))
+
+# calculate spearman correlation between living room
+# and other two rooms for day and night
+
+
+         data <- a %>% filter(location == 'kitchen')
+         
+         n <- nrow(data)
+         
+         cor.test(
+         data %>%  pull(living),
+         data %>% pull(value),
+         method = 'spearman',
+         # exact = FALSE # avoid error message, OK with approximate p value
+         )
+
+
+  
+```
