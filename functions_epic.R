@@ -11,10 +11,12 @@ library(readr)
 library(stringr)
 library(googlesheets4)
 library(hrbrthemes)
-library(kableExtra)
+#library(kableExtra)
 library(pracma)
 library(padr)
 library(magrittr)
+library(gridExtra)
+library(tufte)
 
 #_______________________________________________________________________________
 # clean names
@@ -252,3 +254,18 @@ summarise_omni_1hour <- function(data){
     select(-hour)
 }
 ##______________________________________________________________________________
+
+##______________________________________________________________________________
+## month to season
+# calculates meteorological season from month of year
+month_to_season <- function(x){
+  season <- NA_character_
+  ifelse(x == 3 | x == 4 | x == 5, season <- "spring", season)
+  ifelse(x == 6 | x == 7 | x == 8, season <- "summer", season)
+  ifelse(x == 9 | x == 10 | x == 11, season <- "fall", season)
+  ifelse(x == 1 | x == 2 | x == 12, season <- "winter", season)
+  return(season)
+}
+##______________________________________________________________________________
+
+
