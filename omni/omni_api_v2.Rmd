@@ -90,6 +90,25 @@ read_log <- log %>%
                      get_15min))
 ```
 
+* read 15 min data in 1 week chunks all homes after October 2021
+
+```{r, include=FALSE}
+read_log <- log %>%
+  filter(as.Date(start_date) >= as.Date("2021-11-01")) %>%
+  filter(grepl("028|029|030|031|032|033|034|035", id_home)) %>%
+  mutate(year = year(start_date),
+         week = week(start_date)) %>%
+  group_by(id_home, location, year, week) %>%
+  summarise_all(first) %>%
+  ungroup() %>%
+  mutate(end_date = as.character(as.Date(end_date) + 6)) %>%
+  mutate(tkn = tkn, org_id = org_id) %>%
+  mutate(data = pmap(list(tkn, org_id, id_omni,
+                          start_date, end_date,
+                          id_home, location),
+                     get_15min))
+```
+
 ```{r, include=FALSE}
 read_log <- log %>%
   filter(grepl("007", id_home)) %>%
