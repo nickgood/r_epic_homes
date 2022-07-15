@@ -142,8 +142,8 @@ ggplot(meta, aes(x = as.numeric(duration) /24 )) +
 data <- pm25 %>%
   filter(!grepl("blank", location)) %>%
   na.omit() %>%
-  mutate(pattern = paste("^omni.*", id_home, location, sep = "_"),
-         files = map2("../output/omni", pattern, list.files, full.names = TRUE),
+  mutate(pattern = paste("^.*_.*", id_home, location, sep = "_"),
+         files = map2("../output/omni_raw_15min", pattern, list.files, full.names = TRUE, recursive = TRUE),
          start_ = as.Date(start) - 1,
          end_ = as.Date(end) + 1,
          dates = map2(start_, end_, seq.Date, by = "day"),
