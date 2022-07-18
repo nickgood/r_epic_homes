@@ -19,15 +19,18 @@ knitr::opts_chunk$set(fig.path = 'figures/',
 ---
 
 ```{r}
-library(googlesheets)
-library(tidyverse)
-# gs_auth(new_user = TRUE)
-q_appl_info <- gs_title("Appliance Questionnaire (Responses)")
-q_appl <- gs_read(q_appl_info, col_types = cols(.default = "c"))
+source("../functions_epic.R")
+```
+
+
+```{r}
+data <- read_sheet(ss = "154vgySyseWzcUYLubFWOYqQ_IZkgckqiyEIwzFkphzY",
+           sheet = "Compilation of forms",
+           col_types = "c")
 ```
 
 ```{r}
-q_appl <- q_appl %>%
+data_long <- data %>%
   pivot_longer(-c("Visit", "Participant ID"),
     names_to = "question",
     values_to = "answer") %>%
@@ -35,21 +38,26 @@ q_appl <- q_appl %>%
 ```
 
 ```{r}
-questions_appl <- as_tibble(unique(q_appl$question)) %>%
+questions <- as_tibble(unique(data_long$question)) %>%
   rename(question = "value") %>%
   mutate(q = row.names(.))
 ```
 
 ```{r}
-q_appl <- q_appl %>%
-  left_join(questions_appl, by = "question") %>%
+data_long <- data_long %>%
+  left_join(questions, by = "question") %>%
   dplyr::select(-question) %>%
   mutate(answer = tolower(answer))
 ```
 
 ```{r}
-questions_appl <- questions_appl %>%
+questions <- questions %>%
   mutate(question = tolower(question))
+```
+
+```{r}
+write_rds(data_long, "../output/questionnaires/appliance_answers.rds")
+write_rds(questions, "../output/questionnaires/appliance_questions.rds")
 ```
 
 ---
