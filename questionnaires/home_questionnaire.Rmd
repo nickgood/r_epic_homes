@@ -57,5 +57,11 @@ questions <- questions %>%
   mutate(question = tolower(question))
 ```
 
+```{r}
+write_rds(data_long, "../output/questionnaires/home_answers.rds")
+write_rds(questions, "../output/questionnaires/home_questions.rds")
+```
+
+
 ---
 
