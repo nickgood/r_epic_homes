@@ -19,15 +19,20 @@ knitr::opts_chunk$set(fig.path = 'figures/',
 ---
 
 ```{r}
-library(googlesheets)
-library(tidyverse)
-# gs_auth(new_user = TRUE)
-q_home_info <- gs_title("Home Questionnaire (Responses)")
-q_home <- gs_read(q_home_info, col_types = cols(.default = "c"))
+source("../functions_epic.R")
 ```
 
+
 ```{r}
-q_home <- q_home %>%
+data <- read_sheet(ss = "1ZMAggLlA64uDy05lfLupGyBcbyVvEN8AbRzTmxuJpZA",
+           sheet = "Compilation of forms",
+           col_types = "c")
+```
+
+
+
+```{r}
+data_long <- data %>%
   pivot_longer(-c("Visit", "Participant ID"),
     names_to = "question",
     values_to = "answer") %>%
@@ -35,20 +40,20 @@ q_home <- q_home %>%
 ```
 
 ```{r}
-questions_home <- as_tibble(unique(q_home$question)) %>%
+questions <- as_tibble(unique(data_long$question)) %>%
   rename(question = "value") %>%
   mutate(q = row.names(.))
 ```
 
 ```{r}
-q_home <- q_home %>%
-  left_join(questions_home, by = "question") %>%
+data_long <- data_long %>%
+  left_join(questions, by = "question") %>%
   dplyr::select(-question) %>%
   mutate(answer = tolower(answer))
 ```
 
 ```{r}
-questions_home <- questions_home %>%
+questions <- questions %>%
   mutate(question = tolower(question))
 ```
 
