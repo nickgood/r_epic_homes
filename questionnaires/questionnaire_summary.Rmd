@@ -1,0 +1,19 @@
+---
+title: "Questionnaire Summary"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: paper
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.path = 'figures/',
+  warning = FALSE,
+  message = FALSE,
+  echo = FALSE,
+  fig.width = 10, fig.height = 4,
+  cache = FALSE)
+```
+
+---
