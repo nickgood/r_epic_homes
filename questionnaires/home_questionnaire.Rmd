@@ -29,8 +29,6 @@ data <- read_sheet(ss = "1ZMAggLlA64uDy05lfLupGyBcbyVvEN8AbRzTmxuJpZA",
            col_types = "c")
 ```
 
-
-
 ```{r}
 data_long <- data %>%
   pivot_longer(-c("Visit", "Participant ID"),
