@@ -181,6 +181,10 @@ kable_styling(bootstrap_options = "striped", full_width = F, position = "center"
 # indoor smoking frequency
 df_3 <- home_a %>%
   filter(grepl("^113$|^114$|^115$|^116$|^117$", q)) %>%
+  mutate(answer = factor(answer, levels = c("daily", "weekly", "monthly", "rarely", "never"))) %>%
+  group_by(participant_id) %>%
+  arrange(participant_id, answer) %>%
+  summarise(answer = first(answer), .groups = "drop") %>%
   group_by(answer) %>%
   count()
 
@@ -192,6 +196,10 @@ kable_styling(bootstrap_options = "striped", full_width = F, position = "center"
 # outdoor smoking frequency
 df_4 <- home_a %>%
   filter(grepl("^118$|^119$|^120$|^121$|^122$", q)) %>%
+  mutate(answer = factor(answer, levels = c("daily", "weekly", "monthly", "rarely", "never"))) %>%
+  group_by(participant_id) %>%
+  arrange(participant_id, answer) %>%
+  summarise(answer = first(answer), .groups = "drop") %>%
   group_by(answer) %>%
   count()
 
