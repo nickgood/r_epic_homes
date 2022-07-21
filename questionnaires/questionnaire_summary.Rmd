@@ -115,6 +115,23 @@ ggplot(df_3, aes(x = years)) +
   ggtitle("Years living at past three addresses")
 ```
 
+```{r}
+df_4 <- df_2 %>%
+  pivot_wider(names_from = "q", values_from = "rent_own") %>%
+  rename_all(clean_names) %>%
+  select(-prior_to_previous_address) %>%
+  mutate(history = if_else(prior_address == "rent" & current_address == "rent", "rent-rent", NA_character_),
+         history = if_else(prior_address == "rent" & current_address == "own", "rent-own", history),
+         history = if_else(prior_address == "own" & current_address == "rent", "own-rent", history),
+         history = if_else(prior_address == "own" & current_address == "own", "own-own", history)) %>%
+  na.omit() %>%
+  group_by(history) %>%
+  count()
+
+kable(df_4, caption = "Home History (previous-current") %>%
+kable_styling(bootstrap_options = "striped", full_width = F, position = "center")
+```
+
 ---
 
 # Ventilation
