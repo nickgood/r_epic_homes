@@ -1,0 +1,131 @@
+---
+title: "Missing Data"
+output: html_document
+---
+
+```{r global_options, include=FALSE}
+knitr::opts_chunk$set(fig.path = 'figures/',
+  warning = FALSE,
+  message = FALSE,
+  echo = FALSE,
+  fig.width = 10, fig.height = 3,
+  cache = FALSE)
+```
+
+```{r}
+#library(tidyverse)
+library(dplyr)
+library(tidyr)
+library(lubridate)
+library(googlesheets4)
+library(ggplot2)
+```
+
+# Read log
+
+```{r}
+log <- read_sheet("1PnPjgbYWljb5oXoSCBqpJb2pi7gU0Kzre5lx4H-3i70", sheet = "omni") %>%
+  mutate(date_end = if_else(is.na(date_end), as.character(Sys.Date()), date_end),
+         id_home = str_pad(id_home, 3, "left", "0")) %>%
+  group_by(id_home, location) %>%
+  summarise(date_start = min(date_start),
+            date_end = max(date_end),
+            .groups = "drop") %>%
+  mutate(date_end = as.Date(date_end),
+         date_start = as.Date(date_start),
+         n_days = as.numeric(date_end - date_start),
+         n_hours = n_days * 24)
+
+log
+```
+
+# Read OMNI
+
+```{r}
+data <- read_rds("../output/omni/omni_1hour.rds")
+```
+
+```{r}
+n_omni <- data %>%
+  group_by(id_home, location) %>%
+  summarise(n_obs = n())
+
+n_omni
+```
+
+
+
+# Join
+
+```{r}
+missing <- joined_data <- log %>%
+  left_join(n_omni, by = c("id_home", "location")) %>%
+  mutate(pct_present =  100* n_obs/ n_hours,
+         pct_missing = 100 - pct_present)
+
+missing
+```
+
+
+```{r}
+ggplot(missing, aes(x = id_home, y = pct_present, color = location)) +
+  geom_point() +
+  theme_bw()
+```
+
+```{r}
+##______________________________________________________________________________
+## month to season
+# calculates meteorological season from month of year
+month_to_season <- function(x){
+  season <- NA_character_
+  ifelse(x == 3 | x == 4 | x == 5, season <- "spring", season)
+  ifelse(x == 6 | x == 7 | x == 8, season <- "summer", season)
+  ifelse(x == 9 | x == 10 | x == 11, season <- "fall", season)
+  ifelse(x == 1 | x == 2 | x == 12, season <- "winter", season)
+  return(season)
+}
+##______________________________________________________________________________
+```
+
+
+```{r}
+log_2 <- read_sheet("1PnPjgbYWljb5oXoSCBqpJb2pi7gU0Kzre5lx4H-3i70", sheet = "omni") %>%
+  mutate(date_end = if_else(is.na(date_end), as.character(Sys.Date()), date_end)) %>%
+  na.omit() %>%
+  mutate_at(vars(starts_with("date")), as.Date) %>%
+  filter(date_end > date_start) %>%
+  mutate(start_date = map2(date_start, date_end, seq, by = "1 day")) %>%
+  unnest(start_date) %>%
+  mutate(end_date = start_date + 1) %>%
+  select(-date_start, -date_end) %>%
+  mutate_at(vars(ends_with("date")), as.character) %>%
+  mutate(id_home = str_pad(id_home, 3, "left", "0")) %>%
+  mutate(month = month(as.Date(start_date)), 
+         season = month_to_season(month))
+```
+
+```{r}
+omni_2 <- data %>%
+  group_by(date, id_home, location) %>%
+  summarise_if(is.numeric, mean, na.rm = TRUE) %>%
+  mutate(start_date = as.character(date))
+
+omni_2
+```
+
+```{r}
+missing_2 <- log_2 %>%
+  left_join(omni_2, by = c( "start_date", "id_home", "location"))
+```
+
+
+```{r}
+missing_2 %>%
+  group_by(id_home, location, season) %>%
+  filter(!is.na(co2)) %>%
+  count()
+
+
+```
+
