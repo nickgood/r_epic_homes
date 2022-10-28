@@ -272,7 +272,7 @@ month_to_season <- function(x){
 ## hours of season
 hours_of_season <- function(sn, date_start, date_end){
   tibble(datetime = seq(as.POSIXct(date_start, tz = "US/Mountain"),
-                             as.POSIXct(date_end, tz = "US/Mountain"),
+                             as.POSIXct(date_end, tz = "US/Mountain") + days(1),
                              by = 60 * 60)) %>%
     mutate(season = factor(quarter(datetime, fiscal_start = 3),
                            levels = c(seq(1, 4, 1)),
