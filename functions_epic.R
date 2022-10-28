@@ -268,4 +268,21 @@ month_to_season <- function(x){
 }
 ##______________________________________________________________________________
 
+##______________________________________________________________________________
+## hours of season
+hours_of_season <- function(sn, date_start, date_end){
+  tibble(datetime = seq(as.POSIXct(date_start, tz = "US/Mountain"),
+                             as.POSIXct(date_end, tz = "US/Mountain"),
+                             by = 60 * 60)) %>%
+    mutate(season = factor(quarter(datetime, fiscal_start = 3),
+                           levels = c(seq(1, 4, 1)),
+                           labels = c("spring", "summer", "fall", "winter"))) %>%
+    group_by(season) %>%
+    count() %>%
+    right_join(tibble(season = c("spring", "summer", "fall", "winter")), by = "season") %>%
+    mutate(n = if_else(is.na(n), as.integer(0), n)) %>%
+    filter(season == sn) %>%
+    pull(n)
+}
+##______________________________________________________________________________
 
