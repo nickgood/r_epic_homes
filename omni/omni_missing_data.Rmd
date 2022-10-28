@@ -71,10 +71,7 @@ obs <- omni %>%
   pivot_wider(names_from = "season", values_from = "n_obs") %>%
   mutate_at(vars(starts_with("obs_")), ~replace(., is.na(.), 0)) %>%
   mutate(obs_hours = obs_spring + obs_summer + obs_fall + obs_winter)
-
-obs
 ```
-
 
 # Missing
 
@@ -85,10 +82,8 @@ missing <- max_obs %>%
          meas_summer_pct = 100 * obs_summer / n_summer,
          meas_fall_pct = 100 * obs_fall / n_fall,
          meas_winter_pct = 100 * obs_winter / n_winter,
-         meas_pct = 100 * obs_hours / n_hours) %>%
-  mutate_at(vars(starts_with("meas_")), ~replace(., is.na(.), 0))
-
-missing
+         meas_pct = 100 * obs_hours / n_hours) #%>%
+  #mutate_at(vars(starts_with("meas_")), ~replace(., is.na(.), 0))
 ```
 
 ```{r}
