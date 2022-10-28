@@ -90,12 +90,11 @@ read_log <- log %>%
                      get_15min))
 ```
 
-* read 15 min data in 1 week chunks all homes after March 2022
+* read 15 min data in 1 week chunks all homes after August 2022
 
-```{r, include=FALSE}
+```{r, include = TRUE}
 read_log <- log %>%
   filter(as.Date(start_date) >= as.Date("2022-08-12")) %>%
-  #filter(grepl("028|029|030|031|032|033|034|035|036|037|038|039|040|041", id_home)) %>%
   mutate(year = year(start_date),
          week = week(start_date)) %>%
   group_by(id_home, location, year, week) %>%
