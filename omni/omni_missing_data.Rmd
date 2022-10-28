@@ -13,12 +13,19 @@ knitr::opts_chunk$set(fig.path = 'figures/',
 ```
 
 ```{r}
-#library(tidyverse)
 library(dplyr)
 library(tidyr)
 library(lubridate)
 library(googlesheets4)
 library(ggplot2)
+library(stringr)
+library(forcats)
+library(readr)
+library(kableExtra)
+```
+
+```{r}
+source("../functions_epic.R")
 ```
 
 # Read log
@@ -30,102 +37,64 @@ log <- read_sheet("1PnPjgbYWljb5oXoSCBqpJb2pi7gU0Kzre5lx4H-3i70", sheet = "omni"
   group_by(id_home, location) %>%
   summarise(date_start = min(date_start),
             date_end = max(date_end),
-            .groups = "drop") %>%
-  mutate(date_end = as.Date(date_end),
-         date_start = as.Date(date_start),
-         n_days = as.numeric(date_end - date_start),
-         n_hours = n_days * 24)
-
-log
+            .groups = "drop")
 ```
+
+```{r}
+max_obs <- log %>%
+  mutate(n_hours = as.numeric((as.POSIXct(date_end, tz = "US/Mountain") -
+                   as.POSIXct(date_start, tz = "US/Mountain")) * 24)) %>%
+  mutate(n_spring = pmap(list("spring", date_start, date_end), hours_of_season),
+         n_summer = pmap(list("summer", date_start, date_end), hours_of_season),
+         n_fall = pmap(list("fall", date_start, date_end), hours_of_season),
+         n_winter = pmap(list("winter", date_start, date_end), hours_of_season)) %>%
+  unnest(cols = c(n_spring, n_summer, n_fall, n_winter))
+```
+
+
+---
 
 # Read OMNI
 
 ```{r}
-data <- read_rds("../output/omni/omni_1hour.rds")
+omni <- read_rds("../output/omni/omni_1hour.rds") %>%
+  distinct()
 ```
 
 ```{r}
-n_omni <- data %>%
-  group_by(id_home, location) %>%
-  summarise(n_obs = n())
+obs <- omni %>%
+  mutate(season = factor(quarter(datetime, fiscal_start = 3),
+                           levels = c(seq(1, 4, 1)),
+                           labels = c("obs_spring", "obs_summer", "obs_fall", "obs_winter"))) %>%
+  group_by(id_home, location, season) %>%
+  summarise(n_obs = n(), .groups = "drop") %>%
+  pivot_wider(names_from = "season", values_from = "n_obs") %>%
+  mutate_at(vars(starts_with("obs_")), ~replace(., is.na(.), 0)) %>%
+  mutate(obs_hours = obs_spring + obs_summer + obs_fall + obs_winter)
 
-n_omni
+obs
 ```
 
 
-
-# Join
+# Missing
 
 ```{r}
-missing <- joined_data <- log %>%
-  left_join(n_omni, by = c("id_home", "location")) %>%
-  mutate(pct_present =  100* n_obs/ n_hours,
-         pct_missing = 100 - pct_present)
+missing <- max_obs %>%
+  left_join(obs, by = c("id_home", "location")) %>%
+  mutate(meas_spring_pct = 100 * obs_spring / n_spring,
+         meas_summer_pct = 100 * obs_summer / n_summer,
+         meas_fall_pct = 100 * obs_fall / n_fall,
+         meas_winter_pct = 100 * obs_winter / n_winter,
+         meas_pct = 100 * obs_hours / n_hours) %>%
+  mutate_at(vars(starts_with("meas_")), ~replace(., is.na(.), 0))
 
 missing
 ```
 
-
 ```{r}
-ggplot(missing, aes(x = id_home, y = pct_present, color = location)) +
-  geom_point() +
-  theme_bw()
-```
-
-```{r}
-##______________________________________________________________________________
-## month to season
-# calculates meteorological season from month of year
-month_to_season <- function(x){
-  season <- NA_character_
-  ifelse(x == 3 | x == 4 | x == 5, season <- "spring", season)
-  ifelse(x == 6 | x == 7 | x == 8, season <- "summer", season)
-  ifelse(x == 9 | x == 10 | x == 11, season <- "fall", season)
-  ifelse(x == 1 | x == 2 | x == 12, season <- "winter", season)
-  return(season)
-}
-##______________________________________________________________________________
-```
-
-
-```{r}
-log_2 <- read_sheet("1PnPjgbYWljb5oXoSCBqpJb2pi7gU0Kzre5lx4H-3i70", sheet = "omni") %>%
-  mutate(date_end = if_else(is.na(date_end), as.character(Sys.Date()), date_end)) %>%
-  na.omit() %>%
-  mutate_at(vars(starts_with("date")), as.Date) %>%
-  filter(date_end > date_start) %>%
-  mutate(start_date = map2(date_start, date_end, seq, by = "1 day")) %>%
-  unnest(start_date) %>%
-  mutate(end_date = start_date + 1) %>%
-  select(-date_start, -date_end) %>%
-  mutate_at(vars(ends_with("date")), as.character) %>%
-  mutate(id_home = str_pad(id_home, 3, "left", "0")) %>%
-  mutate(month = month(as.Date(start_date)), 
-         season = month_to_season(month))
-```
-
-```{r}
-omni_2 <- data %>%
-  group_by(date, id_home, location) %>%
-  summarise_if(is.numeric, mean, na.rm = TRUE) %>%
-  mutate(start_date = as.character(date))
-
-omni_2
-```
-
-```{r}
-missing_2 <- log_2 %>%
-  left_join(omni_2, by = c( "start_date", "id_home", "location"))
-```
-
-
-```{r}
-missing_2 %>%
-  group_by(id_home, location, season) %>%
-  filter(!is.na(co2)) %>%
-  count()
-
-
+kable(missing %>% select(id_home, location, starts_with("meas")),
+  digits = 0,
+  col.names = c("Home", "Sensor", "Spring (%)", "Summer (%)", "Fall (%)", "Winter (%)", "Overall (%)")) %>%
+  kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
 ```
 
