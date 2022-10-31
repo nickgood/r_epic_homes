@@ -22,7 +22,6 @@ library(stringr)
 library(forcats)
 library(readr)
 library(kableExtra)
-
 ```
 
 ```{r}
