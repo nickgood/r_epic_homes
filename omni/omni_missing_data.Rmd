@@ -13,13 +13,7 @@ knitr::opts_chunk$set(fig.path = 'figures/',
 ```
 
 ```{r}
-library(dplyr)
-library(tidyr)
-library(lubridate)
-library(googlesheets4)
-library(ggplot2)
-library(stringr)
-library(forcats)
+lvdsandsjkbcxf 
 library(readr)
 library(kableExtra)
 
