@@ -96,3 +96,37 @@ kable(missing %>% select(id_home, location, starts_with("meas")),
   kable_styling(bootstrap_options = "striped", full_width = F, position = "left")
 ```
 
+# Non-Missing Bedroom & Outdoor
+
+```{r}
+bo <- omni %>%
+  filter(grepl("bedroom|outdoor", location)) %>%
+  group_by(id_home, datetime) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  filter(n == 2) %>%
+  select(-n) %>%
+  mutate(season = factor(quarter(datetime, fiscal_start = 3),
+                           levels = c(seq(1, 4, 1)),
+                           labels = c("spring", "summer", "fall", "winter"))) %>%
+  group_by(id_home, season) %>%
+  summarise(obs = n(), .groups = "drop")
+```
+
+```{r}
+max_bo <- max_obs %>%
+  select(-n_hours) %>%
+  filter(grepl("bedroom|outdoor", location)) %>%
+  group_by(id_home) %>%
+  summarise_if(is.numeric, max) %>%
+  pivot_longer(is.numeric, names_to = "season", values_to = "max") %>%
+  mutate(season = sub("^n_", "", season))
+```
+
+```{r}
+bo_missing <- max_bo %>%
+  left_join(bo, by = c("id_home", "season")) %>%
+  mutate(obs = if_else(is.na(obs), 0, as.numeric(obs)),
+         pct = 100 * obs / max)
+```
+
+
